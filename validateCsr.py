@@ -1,11 +1,14 @@
+from cryptography import x509
 
-import sys
 
 valid_dns_file = "valid_dns_names.txt"
 
 def is_valid_name(name, names):
     for n in names:
-        if name.endswith(n):
+
+        # Make sure the topdmain is in the list
+        # Not mydnssunet.se is invalid, it must be mydns.sunet.se
+        if name.endswith("." + n):
             return True
     return False
 
@@ -32,4 +35,16 @@ def validate_subject_alternative_name(extension):
             return False
 
     return True
+
+
+def validate_subject_name(extension):
+    valid_names = valid_dns_names()
+
+    # <Name(C=SE,ST=Malmo,L=Malo,O=SUNET,OU=SUNET SOC,CN=sunet-soc-test.sunet.se)>
+    # The library handles parsing well so we dont have to
+    for r in extension.rdns:
+        if r.rfc4514_string().startswith("CN="):
+            if is_valid_name(r.rfc4514_string(), valid_names):
+                return True
+    return False
 

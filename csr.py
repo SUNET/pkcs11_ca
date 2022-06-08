@@ -62,7 +62,11 @@ def new_csr(private_key=None):
             x509.DNSName("test3-soc.sunet.se"),
         ]),
         critical=True,
-        
+
+    # Test to adding more extensions
+    #).add_extension(
+    #    x509.BasicConstraints(ca=False, path_length=None), critical=True,
+
     # Sign the CSR with our private key.
     ).sign(private_key, hashes.SHA256())
 
@@ -84,6 +88,8 @@ def sign_csr(csr=None):
 
     
     # Set our ca issuing names
+    if not validateCsr.validate_subject_name(csr.subject):
+        raise("FIXME not a valid name")
     builder = builder.subject_name(x509.Name(csr.subject.rdns))
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
 
@@ -98,10 +104,9 @@ def sign_csr(csr=None):
             # FIXME add error handling
             if not validateCsr.validate_subject_alternative_name(e):
                 raise("FIXME not a valid name")
-            
-            builder = builder.add_extension(
-                x509.SubjectAlternativeName(e.value),
-                critical=True)
+
+        builder = builder.add_extension(e.value, critical=e.critical)
+        
 
     certificate = builder.sign(
         private_key=rootca_key, algorithm=hashes.SHA256()
