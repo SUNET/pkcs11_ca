@@ -1,30 +1,37 @@
 
 # openssl ca -config ./ca.conf -out signed_cert_from_csr.pem -infiles csr.pem
 
+import datetime
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes
 
-
-import datetime
-
 import ca
+import serial
 import validateCsr
 
 csr_privatekeyfile_password = "CHANGEME"
 
-def save_signed_csr(csr):
+csr_keyfile = "csr.key"
+csr_csrfile = "csr.pem"
+
+def data_to_csr(data):
+    csr = x509.load_pem_x509_csr(data)
+    return csr
+
+def save_signed_csr(csr, path):
     # Write our CSR out to disk.
-    with open("csr_signed.pem", "wb") as f:
+    with open(path, "wb") as f:
         f.write(csr.public_bytes(serialization.Encoding.PEM))
 
     print("Saved signed CSR to disk OK")
         
-def save_csr(csr, key):
+def save_csr(csr, key, csr_path, key_path):
     # Write our key to disk for safe keeping
-    with open("csr_key.pem", "wb") as f:
+    with open(key_path, "wb") as f:
         f.write(key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
@@ -32,7 +39,7 @@ def save_csr(csr, key):
                 csr_privatekeyfile_password.encode('utf-8'))))
 
     # Write our CSR out to disk.
-    with open("csr.pem", "wb") as f:
+    with open(csr_path, "wb") as f:
         f.write(csr.public_bytes(serialization.Encoding.PEM))
 
     print("Saved CSR to disk OK")
@@ -74,44 +81,42 @@ def new_csr(private_key=None):
     
     return csr, private_key
 
+def sign_csr(csr):
 
-def sign_csr(csr=None):
-    if csr is None:
-        with open("csr.pem", "rb") as f:
-            csr_file = f.read()
-        csr = x509.load_pem_x509_csr(csr_file)
-    
+    # Get ca and ca_key to sign and add attributes with
     rootca, rootca_key= ca.load_ca()
 
     builder = x509.CertificateBuilder()
     builder = builder.public_key(csr.public_key())
 
-    
     # Set our ca issuing names
     if not validateCsr.validate_subject_name(csr.subject):
         raise("FIXME not a valid name")
+
     builder = builder.subject_name(x509.Name(csr.subject.rdns))
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
 
     builder = builder.not_valid_before(datetime.datetime.today() - datetime.timedelta(1, 0, 0))
     builder = builder.not_valid_after(datetime.datetime.today() + ca.ca_expiry)
 
-    builder = builder.serial_number(ca.ca_serial_number)
-    
+    new_serial = serial.new_serial()
+    builder = builder.serial_number(new_serial)
 
     for e in csr.extensions:
+        # FIXME add error handling
+        # If the extension is subject_alternative_name
         if e.oid.dotted_string == "2.5.29.17":
-            # FIXME add error handling
             if not validateCsr.validate_subject_alternative_name(e):
                 raise("FIXME not a valid name")
 
         builder = builder.add_extension(e.value, critical=e.critical)
-        
 
     certificate = builder.sign(
         private_key=rootca_key, algorithm=hashes.SHA256()
     )
 
+    serial.write_serial(new_serial)
+    
     print("Signed certificate OK")
     
     return certificate

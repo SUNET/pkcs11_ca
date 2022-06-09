@@ -8,14 +8,14 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+import serial
+
+ca_certfile = "ca.pem"
+ca_keyfile = "ca.key"
 
 # FIXME read password from config file
 ca_privatekeyfile_password = "CHANGEME"
 ca_expiry = datetime.timedelta(365*2, 0, 0)
-
-# FIXME, read serial number from database, make sure we dont use an existing one
-# FIXME save serial number to database
-ca_serial_number = x509.random_serial_number()
 
 # FIXME change to ca from ca-test
 # FIXME add proper email address
@@ -31,13 +31,12 @@ ca_nameattributes = [
 
 # FIXME get latest serial number for new cert issued by us
 # Store in some database
-
 def load_ca():
     # Write CA and key
-    with open("ca.key", "rb") as f:
+    with open(ca_keyfile, "rb") as f:
         private_key = f.read()
 
-    with open("ca.crt", "rb") as f:
+    with open(ca_certfile, "rb") as f:
         cert = f.read()
 
     root_key = serialization.load_pem_private_key(
@@ -52,14 +51,14 @@ def load_ca():
 
 def save_ca(certificate, private_key):
     # Write CA and key
-    with open("ca.key", "wb") as f:
+    with open(ca_keyfile, "wb") as f:
         f.write(private_key.private_bytes(
             encoding=serialization.Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.BestAvailableEncryption(ca_privatekeyfile_password.encode('utf-8'))
         ))
 
-    with open("ca.crt", "wb") as f:
+    with open(ca_certfile, "wb") as f:
         f.write(certificate.public_bytes(
             encoding=serialization.Encoding.PEM
         ))
@@ -81,8 +80,10 @@ def new_ca(private_key=None):
 
     builder = builder.not_valid_before(datetime.datetime.today() - datetime.timedelta(1, 0, 0))
     builder = builder.not_valid_after(datetime.datetime.today() + ca_expiry)
-    
-    builder = builder.serial_number(ca_serial_number)
+
+    new_serial = serial.new_serial()
+    builder = builder.serial_number(new_serial)
+
     builder = builder.public_key(private_key.public_key())
     
     builder = builder.add_extension(
@@ -92,6 +93,9 @@ def new_ca(private_key=None):
         private_key=private_key, algorithm=hashes.SHA256()
     )
 
+    # Save serial to database
+    serial.write_serial(new_serial)
+    
     print("Created CA OK")
     
     return certificate, private_key
