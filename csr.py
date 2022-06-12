@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import hashes
 
 import ca
 import serial
+import certdb
 import validateCsr
 
 csr_privatekeyfile_password = "CHANGEME"
@@ -21,13 +22,6 @@ csr_csrfile = "csr.pem"
 def data_to_csr(data):
     csr = x509.load_pem_x509_csr(data)
     return csr
-
-def save_signed_csr(csr, path):
-    # Write our CSR out to disk.
-    with open(path, "wb") as f:
-        f.write(csr.public_bytes(serialization.Encoding.PEM))
-
-    print("Saved signed CSR to disk OK")
         
 def save_csr(csr, key, csr_path, key_path):
     # Write our key to disk for safe keeping
@@ -116,6 +110,7 @@ def sign_csr(csr):
     )
 
     serial.write_serial(new_serial)
+    certdb.write_cert(certificate)
     
     print("Signed certificate OK")
     

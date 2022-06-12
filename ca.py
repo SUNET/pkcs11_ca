@@ -37,13 +37,13 @@ def load_ca():
         private_key = f.read()
 
     with open(ca_certfile, "rb") as f:
-        cert = f.read()
+        curr_cert = f.read()
 
     root_key = serialization.load_pem_private_key(
         private_key, password=ca_privatekeyfile_password.encode('utf-8')
     )
 
-    root_cert = x509.load_pem_x509_certificate(cert)
+    root_cert = x509.load_pem_x509_certificate(curr_cert)
 
     print("Loaded CA OK")
     
