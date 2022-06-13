@@ -93,8 +93,8 @@ def new_ca(private_key=None):
         private_key=private_key, algorithm=hashes.SHA256()
     )
 
-    # Save serial to database
-    serial.save_serial(new_serial)
+    # DONT SAVE THE CAs serial, only for pki issued by the CA
+    # serial.save_serial(new_serial)
     
     print("Created CA OK")
     
