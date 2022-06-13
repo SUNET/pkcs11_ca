@@ -36,6 +36,7 @@ print(serials)
 c = 0
 for curr_serial in serials:
     if c == 1:
+        print(curr_serial.hex())
         crl.revoke_cert(curr_serial)
     c += 1
 

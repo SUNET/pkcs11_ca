@@ -20,8 +20,7 @@ csr_keyfile = "csr.key"
 csr_csrfile = "csr.pem"
 
 def data_to_csr(data):
-    csr = x509.load_pem_x509_csr(data)
-    return csr
+    return x509.load_pem_x509_csr(data)
         
 def save_csr(csr, key, csr_path, key_path):
     # Write our key to disk for safe keeping
@@ -37,7 +36,7 @@ def save_csr(csr, key, csr_path, key_path):
         f.write(csr.public_bytes(serialization.Encoding.PEM))
 
     print("Saved CSR to disk OK")
-        
+            
 def new_csr(private_key=None):
     if private_key is None:
         # Generate our key
@@ -108,9 +107,9 @@ def sign_csr(csr):
     certificate = builder.sign(
         private_key=rootca_key, algorithm=hashes.SHA256()
     )
-
-    serial.write_serial(new_serial)
-    certdb.write_cert(certificate)
+    
+    serial.save_serial(new_serial)
+    certdb.save_cert(certificate)
     
     print("Signed certificate OK")
     

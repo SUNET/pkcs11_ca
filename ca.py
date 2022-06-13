@@ -94,7 +94,7 @@ def new_ca(private_key=None):
     )
 
     # Save serial to database
-    serial.write_serial(new_serial)
+    serial.save_serial(new_serial)
     
     print("Created CA OK")
     
