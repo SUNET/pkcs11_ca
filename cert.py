@@ -8,6 +8,16 @@ def data_to_cert(data):
 def fingerprint_cert(curr_cert):
     return curr_cert.fingerprint(algorithm=hashes.SHA256()).hex()
 
+# FIXME handle error better
+def get_subject(curr_cert):
+    try:
+        for r in curr_cert.subject.rdns:
+            if r.rfc4514_string().startswith("CN="):
+                return r.rfc4514_string().replace("CN=", "")
+    except:
+        return None
+    return None
+          
 def save_cert(new_cert, new_cert_path):
     # Write our CSR out to disk.
     with open(new_cert_path, "wb") as f:

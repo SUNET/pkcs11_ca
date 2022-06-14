@@ -15,23 +15,11 @@ crl_path = "crl.pem"
 def data_to_crl(data):
     return x509.load_pem_x509_crl(data)
 
-def load_serials_from_crl():
-    serials = []
-    
-    with open(crl_path, "rb") as f:
-        curr_crl = f.read()
-
-    curr_crl = x509.load_pem_x509_crl(curr_crl)
-
-    for r in curr_crl:
-        if r not in serials:
-            print (r)
-            serials.append(r.serial_number)
-
-    return serials
-
-
+# FIXME
 def load_crl():
+    if not os.path.isfile(crl_path):
+        raise("FIXME")
+    
     with open(crl_path, "rb") as f:
         curr_crl = f.read()
 
@@ -50,7 +38,9 @@ def revoke_cert(curr_serial):
 
     builder = x509.CertificateRevocationListBuilder()
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
-    builder = builder.last_update(datetime.datetime.today())
+
+    # Set last update to one minute ago, to ensure no timing problems
+    builder = builder.last_update(datetime.datetime.today() - datetime.timedelta(1))
     builder = builder.next_update(datetime.datetime.today() + datetime.timedelta(1, 0, 0))
     revoked_cert = x509.RevokedCertificateBuilder().serial_number(
         curr_serial
@@ -62,20 +52,16 @@ def revoke_cert(curr_serial):
     # Get previous revoked serials
     if os.path.isfile(crl_path):
         loaded_crl = load_crl()   
-
-        # Add previous revoked serials to our new crl
-        #for r in revoked_serials:
-        print(type(loaded_crl))
         for curr_revoked_cert in loaded_crl:
             builder = builder.add_revoked_certificate(curr_revoked_cert)
-            
+
+    # Add this serial to the new crl
     builder = builder.add_revoked_certificate(revoked_cert)
 
-    # Get ca and ca_key to sign and add attributes with
+    # Get ca and ca_key to sign
     rootca, rootca_key= ca.load_ca()
     
-    curr_crl = builder.sign(
-        
+    curr_crl = builder.sign(        
     private_key=rootca_key, algorithm=hashes.SHA256(),
     )
 

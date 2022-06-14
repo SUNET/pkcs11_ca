@@ -5,11 +5,13 @@ import crl
 import cert
 import certdb
 
-#if not os.path.isfile("ca.key"):
-#rootca, rootca_key = ca.new_ca()
-#ca.save_ca(rootca, rootca_key)
-#else:
-rootca, rootca_key = ca.load_ca()
+import os
+
+if not os.path.isfile("ca.key"):
+    rootca, rootca_key = ca.new_ca()
+    ca.save_ca(rootca, rootca_key)
+else:
+    rootca, rootca_key = ca.load_ca()
 
 # Create new csr
 csr_cert, csr_key = csr.new_csr()
@@ -31,7 +33,7 @@ cert.save_cert(signed_csr, "csr_signed.pem")
 serials = serial.get_serials()
 
 # Revoke the cert 
-curr_crl = crl.revoke_cert(serials[1])
+curr_crl = crl.revoke_cert(serials[0])
 
 
 # fingerprint = cert.fingerprint_cert(signed_csr)

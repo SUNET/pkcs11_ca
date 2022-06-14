@@ -36,15 +36,16 @@ def validate_subject_alternative_name(extension):
 
     return True
 
-
+# The cryptoprahpy lib should make sure we get the correct oid in the cert to validate agains
 def validate_subject_name(extension):
     valid_names = valid_dns_names()
 
-    # <Name(C=SE,ST=Malmo,L=Malo,O=SUNET,OU=SUNET SOC,CN=sunet-soc-test.sunet.se)>
-    # The library handles parsing well so we dont have to
-    for r in extension.rdns:
-        if r.rfc4514_string().startswith("CN="):
-            if is_valid_name(r.rfc4514_string(), valid_names):
+    for r in extension:
+        if r.oid.dotted_string == "2.5.4.3":
+            if is_valid_name(r.value, valid_names):        
                 return True
+
+    # FIXME better logging
+    print("Falied validatation of subject name, could not find subject in cert")
     return False
 

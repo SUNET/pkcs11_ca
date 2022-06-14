@@ -6,6 +6,7 @@ import os
 
 import cert
 
+certs_folder_root = "./certs"
 certdb_path = "certdb.txt"
 
 def get_issued_certs():
@@ -61,7 +62,20 @@ qtppkTdG/GxT0R4Jl9cCFtkMZEFUu/eUvcRqLcr5hoxg5Gf8HqVZ6BVrOrEaWA==
 
 """)
     
-    # Write our CSR out to disk.
+    # Write our CSR to oyt certdb.
     with open(certdb_path, "a") as f:
         f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8') + "\n")
 
+    fingerprint = cert.fingerprint_cert(new_cert)
+    # create folder
+    os.makedirs(certs_folder_root +"/" + fingerprint[0:2], mode=0o755, exist_ok=True) 
+
+    subject = cert.get_subject(new_cert)
+    if subject is None:
+        cert_path = certs_folder_root +"/" + fingerprint[0:2] + "/" + fingerprint + ".pem"
+    else:
+        cert_path = certs_folder_root +"/" + fingerprint[0:2] + "/" + subject + ".pem"
+            
+    # Write our CSR out to disk.
+    with open(cert_path, "w") as f:
+        f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8') + "\n")
