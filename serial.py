@@ -4,8 +4,14 @@ import os
 
 serials_path = "serials.txt"
 
+# We use serials as integers in the code and store them as hex encoded integers in the database
+
 def new_serial():
     return x509.random_serial_number()
+
+def bytes_to_serial(data):
+    s = data.decode("utf-8")
+    return int(s.replace(":", ""), base=16)
 
 def save_serial(curr_serial):
     curr_serial = '%x' % curr_serial
@@ -25,6 +31,18 @@ def save_serial(curr_serial):
         
     print("Saved serial to disk OK")
 
+def get_serials_pem():
+    serials = ""
+
+    with open(serials_path) as f:
+        for line in f:
+            if "#" in line or len(line) < 5:
+                continue
+            serials += line.replace("\n", ",")
+
+    return serials[:-1]
+
+    
 def get_serials():
     serials = []
 
@@ -37,3 +55,4 @@ def get_serials():
             serials.append(s)
 
     return serials
+

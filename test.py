@@ -35,10 +35,7 @@ serials = serial.get_serials()
 # Revoke the cert 
 curr_crl = crl.revoke_cert(serials[0])
 
-
 # fingerprint = cert.fingerprint_cert(signed_csr)
-
-
 
 certdb.get_issued_certs()
 

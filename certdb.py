@@ -9,6 +9,18 @@ import cert
 certs_folder_root = "./certs"
 certdb_path = "certdb.txt"
 
+def get_issued_certs_pem():
+    curr_data = ""
+    
+    with open(certdb_path) as f:
+        for line in f:
+            if "#" in line:
+                continue
+
+            curr_data += line
+
+    return curr_data
+
 def get_issued_certs():
     certs = []
     curr_data = ""
@@ -59,12 +71,11 @@ VyTQLIK8epgMk1Akfr2vHoxdgvozKWavzu9D9CbVbB5lcfkcyZlrLED6az6gzigu
 w8H84CnxHehgvABlVz1HiFqT3iBaVXVQgMDCTDsAeKnVO+g9WZezLi3+mlhH8qWD
 qtppkTdG/GxT0R4Jl9cCFtkMZEFUu/eUvcRqLcr5hoxg5Gf8HqVZ6BVrOrEaWA==
 -----END CERTIFICATE-----
-
 """)
     
     # Write our CSR to oyt certdb.
     with open(certdb_path, "a") as f:
-        f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8') + "\n")
+        f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8'))
 
     fingerprint = cert.fingerprint_cert(new_cert)
     # create folder
@@ -78,4 +89,4 @@ qtppkTdG/GxT0R4Jl9cCFtkMZEFUu/eUvcRqLcr5hoxg5Gf8HqVZ6BVrOrEaWA==
             
     # Write our CSR out to disk.
     with open(cert_path, "w") as f:
-        f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8') + "\n")
+        f.write(new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8'))

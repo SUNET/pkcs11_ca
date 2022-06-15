@@ -34,8 +34,15 @@ def save_crl(new_crl):
 # FIXME, make sure crl is updated once every hour
 def revoke_cert(curr_serial):
     if curr_serial not in serial.get_serials():
-        raise("FIXME SERIAL NOT EXIST")
+        raise("FIXME SERIAL WAS NOT ISSUED BY THIS CA")
 
+    if os.path.isfile(crl_path):
+        loaded_crl = load_crl()   
+        for curr_revoked_cert in loaded_crl:
+            if curr_serial == curr_revoked_cert.serial_number:
+                return loaded_crl
+
+    
     builder = x509.CertificateRevocationListBuilder()
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
 
@@ -47,7 +54,6 @@ def revoke_cert(curr_serial):
     ).revocation_date(
         datetime.datetime.today()
     ).build()
-
     
     # Get previous revoked serials
     if os.path.isfile(crl_path):
@@ -61,10 +67,7 @@ def revoke_cert(curr_serial):
     # Get ca and ca_key to sign
     rootca, rootca_key= ca.load_ca()
     
-    curr_crl = builder.sign(        
-    private_key=rootca_key, algorithm=hashes.SHA256(),
-    )
+    curr_crl = builder.sign(private_key=rootca_key, algorithm=hashes.SHA256(),)
 
     save_crl(curr_crl)
-    
     return curr_crl

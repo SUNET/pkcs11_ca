@@ -10,7 +10,7 @@ from cryptography.x509.oid import NameOID
 
 import serial
 
-ca_certfile = "ca.pem"
+ca_certfile = "ca.crt"
 ca_keyfile = "ca.key"
 
 # FIXME read password from config file

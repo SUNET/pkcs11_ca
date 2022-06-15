@@ -19,8 +19,16 @@ csr_privatekeyfile_password = "CHANGEME"
 csr_keyfile = "csr.key"
 csr_csrfile = "csr.pem"
 
+# input a string
 def data_to_csr(data):
-    return x509.load_pem_x509_csr(data)
+    if isinstance(data, str):
+        d = " " + data + " "
+    else:
+        d = " " + data.decode('utf-8') + " "
+
+    d = "-----BEGIN CERTIFICATE REQUEST-----" + d.split("-----")[2] \
+    + "-----END CERTIFICATE REQUEST-----"
+    return x509.load_pem_x509_csr(d.encode('utf-8'))
         
 def save_csr(csr, key, csr_path, key_path):
     # Write our key to disk for safe keeping
@@ -104,9 +112,7 @@ def sign_csr(csr):
 
         builder = builder.add_extension(e.value, critical=e.critical)
 
-    certificate = builder.sign(
-        private_key=rootca_key, algorithm=hashes.SHA256()
-    )
+    certificate = builder.sign(private_key=rootca_key, algorithm=hashes.SHA256())
     
     serial.save_serial(new_serial)
     certdb.save_cert(certificate)

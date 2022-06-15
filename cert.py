@@ -2,8 +2,15 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives import hashes
 
-def data_to_cert(data):
-    return x509.load_pem_x509_certificate(bytes(data, 'utf-8'))
+def data_to_cert(data):            
+    if isinstance(data, str):
+        d = " " + data + " "
+    else:
+        d = " " + data.decode('utf-8') + " "
+        
+    d = "-----BEGIN CERTIFICATE-----" + d.split("-----")[2] \
+    + "-----END CERTIFICATE-----"
+    return x509.load_pem_x509_certificate(d.encode('utf-8'))
 
 def fingerprint_cert(curr_cert):
     return curr_cert.fingerprint(algorithm=hashes.SHA256()).hex()
