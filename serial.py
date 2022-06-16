@@ -9,9 +9,12 @@ serials_path = "serials.txt"
 def new_serial():
     return x509.random_serial_number()
 
-def bytes_to_serial(data):
-    s = data.decode("utf-8")
-    return int(s.replace(":", ""), base=16)
+def data_to_serial(data):
+    if isinstance(data, str):
+        d = data
+    else:
+        d = data.decode('utf-8')
+    return int(d.replace(":", ""), base=16)
 
 def save_serial(curr_serial):
     curr_serial = '%x' % curr_serial

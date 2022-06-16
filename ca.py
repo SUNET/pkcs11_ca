@@ -31,6 +31,8 @@ ca_nameattributes = [
 
 # FIXME get latest serial number for new cert issued by us
 # Store in some database
+
+# FIXME, get from hardware
 def load_ca():
     # Write CA and key
     with open(ca_keyfile, "rb") as f:
@@ -49,33 +51,16 @@ def load_ca():
     
     return root_cert, root_key
 
-def save_ca(certificate, private_key):
-    # Write CA and key
-    with open(ca_keyfile, "wb") as f:
-        f.write(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.BestAvailableEncryption(ca_privatekeyfile_password.encode('utf-8'))
-        ))
-
-    with open(ca_certfile, "wb") as f:
-        f.write(certificate.public_bytes(
-            encoding=serialization.Encoding.PEM
-        ))
-
-    print("Saved CA to disk OK")
-
+# FIXME, get from hardware
 def new_ca(private_key=None):
     if private_key is None:
         private_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=2048
+            key_size=4096
         )
 
     builder = x509.CertificateBuilder()
-
     builder = builder.subject_name(x509.Name(ca_nameattributes))
-
     builder = builder.issuer_name(x509.Name(ca_nameattributes))
 
     builder = builder.not_valid_before(datetime.datetime.today() - datetime.timedelta(1, 0, 0))
@@ -83,7 +68,6 @@ def new_ca(private_key=None):
 
     new_serial = serial.new_serial()
     builder = builder.serial_number(new_serial)
-
     builder = builder.public_key(private_key.public_key())
     
     builder = builder.add_extension(
@@ -100,4 +84,18 @@ def new_ca(private_key=None):
     
     return certificate, private_key
 
+def save_ca(certificate, private_key):
+    # Write CA and key
+    with open(ca_keyfile, "wb") as f:
+        f.write(private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.BestAvailableEncryption(ca_privatekeyfile_password.encode('utf-8'))
+        ))
 
+    with open(ca_certfile, "wb") as f:
+        f.write(certificate.public_bytes(
+            encoding=serialization.Encoding.PEM
+        ))
+
+    print("Saved CA to disk OK")

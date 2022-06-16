@@ -13,6 +13,9 @@ if not os.path.isfile("ca.key"):
 else:
     rootca, rootca_key = ca.load_ca()
 
+# Create a crl
+curr_crl = crl.new_crl()
+    
 # Create new csr
 csr_cert, csr_key = csr.new_csr()
 csr.save_csr(csr_cert, csr_key, "csr.pem", "csr.key")
@@ -33,7 +36,7 @@ cert.save_cert(signed_csr, "csr_signed.pem")
 serials = serial.get_serials()
 
 # Revoke the cert 
-curr_crl = crl.revoke_cert(serials[0])
+#curr_crl = crl.revoke_cert(serials[0])
 
 # fingerprint = cert.fingerprint_cert(signed_csr)
 
