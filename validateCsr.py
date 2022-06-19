@@ -12,6 +12,7 @@ def is_valid_name(name, names):
             return True
     return False
 
+# READ FROM DB
 def valid_dns_names():
     names = {}
     with open(valid_dns_file) as f:

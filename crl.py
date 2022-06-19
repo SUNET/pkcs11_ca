@@ -1,57 +1,70 @@
-from cryptography import x509
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import NameOID
-from cryptography.hazmat.primitives import hashes, serialization
-
 import datetime
 import os
 import time
 
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.serialization import Encoding
+
 import ca
 import serial
-
-crl_path = "crl.pem"
+import db
 
 def data_to_crl(data):
-    return x509.load_pem_x509_crl(data)
+    if isinstance(data, str):
+        d = " " + data + " "
+    else:
+        d = " " + data.decode('utf-8') + " "
 
-# FIXME
+    values = d.split("-----")[2]
+    if "\n" not in values:
+        read_d = '\n'.join(values[i:i+64]
+                          for i in range(0, len(values), 64))
+        d = "-----BEGIN X509 CRL-----\n" + read_d \
+            + "\n-----END X509 CRL-----\n"
+    else:
+        d = "-----BEGIN X509 CRL-----" + values \
+            + "-----END X509 CRL-----\n"
+
+    return x509.load_pem_x509_crl(d.encode('utf-8'))
+
+# FIXME read from db
 def load_crl():
-    if not os.path.isfile(crl_path):
-        raise("FIXME")
-    
-    with open(crl_path, "rb") as f:
-        curr_crl = f.read()
-
-    return x509.load_pem_x509_crl(curr_crl)
+    return data_to_crl(db.load_crl())
 
 def save_crl(new_crl):
-    with open(crl_path, "w",) as f:
-        f.write(new_crl.public_bytes(serialization.Encoding.PEM).decode('utf-8'))
+    db.save_crl(new_crl.public_bytes(Encoding.PEM).decode('utf-8'),
+                str(new_crl.last_update),
+                str(new_crl.next_update),
+                1) # FIXME REAL AUTHOR
 
     print("Saved CRL to disk")
 
-
-def is_revoked(curr_serial):
-    if os.path.isfile(crl_path):
-        loaded_crl = load_crl()   
-        for curr_revoked_cert in loaded_crl:
-            if curr_serial == curr_revoked_cert.serial_number:
-                return True
+def is_revoked(curr_serial, curr_crl=None):
+    if curr_crl is None:
+        curr_crl = load_crl()
+    
+    for c in curr_crl:
+        if curr_serial == c.serial_number:
+            return True
 
     return False
 
 # FIXME, make sure crl is updated once every hour
 def revoke_cert(curr_serial):
-    if curr_serial not in serial.get_serials():
-        raise("FIXME SERIAL WAS NOT ISSUED BY THIS CA")
+
+    if not db.serial_exists(serial.string(curr_serial)):
+        # FIXME
+        raise ("SERIAL NOT ISUED BY US")
 
     # If cert is already revoked
-    if is_revoked(curr_serial):
-        return load_crl()
-    
-    
+    loaded_crl = load_crl()
+    if is_revoked(curr_serial, loaded_crl):
+        return loaded_crl()
+        
     builder = x509.CertificateRevocationListBuilder()
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
 
@@ -59,11 +72,9 @@ def revoke_cert(curr_serial):
     builder = builder.last_update(datetime.datetime.today() - datetime.timedelta(1))
     builder = builder.next_update(datetime.datetime.today() + datetime.timedelta(1, 0, 0))
 
-    # Add previous revoked serials
-    if os.path.isfile(crl_path):
-        loaded_crl = load_crl()   
-        for curr_revoked_cert in loaded_crl:
-            builder = builder.add_revoked_certificate(curr_revoked_cert)
+
+    for curr_revoked_cert in loaded_crl:
+        builder = builder.add_revoked_certificate(curr_revoked_cert)
 
     # Add this cert to crl
     revoked_cert = x509.RevokedCertificateBuilder().serial_number(
@@ -94,11 +105,9 @@ def new_crl():
     builder = builder.last_update(datetime.datetime.today() - datetime.timedelta(2))
     builder = builder.next_update(datetime.datetime.today() + datetime.timedelta(1, 0, 0))
     
-    # Get previous revoked serials
-    if os.path.isfile(crl_path):
-        loaded_crl = load_crl()   
-        for curr_revoked_cert in loaded_crl:
-            builder = builder.add_revoked_certificate(curr_revoked_cert)
+    #loaded_crl = load_crl()   
+    #for curr_revoked_cert in loaded_crl:
+    #    builder = builder.add_revoked_certificate(curr_revoked_cert)
 
     # Get ca and ca_key to sign
     rootca, rootca_key= ca.load_ca()
@@ -107,8 +116,7 @@ def new_crl():
 
     save_crl(curr_crl)
 
-    print ("Created new CRL")
-    
+    print ("Created new CRL")    
     return curr_crl
 
 # Ensure we create a new CRL every interval (24 hours)

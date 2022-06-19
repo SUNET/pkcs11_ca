@@ -6,5 +6,5 @@ rm -rf ca.crt ca.key serials.txt certdb.txt csr.pem csr.key csr_signed.pem crl.t
 
 ## Start the CA server
 
-python3 start.py
+uvicorn start_fastapi:app --header server:SUNET_CA
 

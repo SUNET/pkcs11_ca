@@ -1,8 +1,8 @@
-from cryptography import x509
-
 import os
 
-serials_path = "serials.txt"
+from cryptography import x509
+
+import db
 
 # We use serials as integers in the code and store them as hex encoded integers in the database
 
@@ -16,36 +16,21 @@ def data_to_serial(data):
         d = data.decode('utf-8')
     return int(d.replace(":", ""), base=16)
 
-def save_serial(curr_serial):
-    curr_serial = '%x' % curr_serial
+def string(curr_serial):
+    curr_serial_s = '%x' % curr_serial
 
-    if len(curr_serial) % 2 != 0:
-        curr_serial = "0" + curr_serial
+    if len(curr_serial_s) % 2 != 0:
+        curr_serial_s = "0" + curr_serial_s
 
-    if not os.path.isfile(serials_path):
-        with open(serials_path, "w") as f:
-            f.write("# Serials are in hex format, same as openssl info for a cert\n")
-
-    colon_s = ':'.join(curr_serial[i:i+2]
-                       for i in range(0, len(curr_serial), 2))
-
-    with open(serials_path, "a") as f:
-        f.write(colon_s + "\n")
+    # Ensure all serials have the same length, its an integer so extra 0 at the begining is ok
+    while len(curr_serial_s) < 40:
+        curr_serial_s = "00" + curr_serial_s
         
-    print("Saved serial to disk OK")
+    colon_s = ':'.join(curr_serial_s[i:i+2]
+                       for i in range(0, len(curr_serial_s), 2))
 
-def get_serials_pem():
-    serials = ""
+    return colon_s
 
-    with open(serials_path) as f:
-        for line in f:
-            if "#" in line or len(line) < 5:
-                continue
-            serials += line.replace("\n", ",")
-
-    return serials[:-1]
-
-    
 def get_serials():
     serials = []
 

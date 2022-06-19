@@ -3,7 +3,7 @@
 
 import datetime
 
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography import x509
 from cryptography.x509.oid import NameOID
@@ -11,13 +11,10 @@ from cryptography.hazmat.primitives import hashes
 
 import ca
 import serial
-import certdb
+import db
+import cert
 import validateCsr
-
-csr_privatekeyfile_password = "CHANGEME"
-
-csr_keyfile = "csr.key"
-csr_csrfile = "csr.pem"
+import config
 
 # input a string
 def data_to_csr(data):
@@ -26,31 +23,45 @@ def data_to_csr(data):
     else:
         d = " " + data.decode('utf-8') + " "
 
-    d = "-----BEGIN CERTIFICATE REQUEST-----" + d.split("-----")[2] \
-    + "-----END CERTIFICATE REQUEST-----"
+    values = d.split("-----")[2]
+    if "\n" not in values:
+        read_d = '\n'.join(values[i:i+64]
+                          for i in range(0, len(values), 64))
+        d = "-----BEGIN CERTIFICATE REQUEST-----\n" + read_d \
+            + "\n-----END CERTIFICATE REQUEST-----\n"
+    else:
+        d = "-----BEGIN CERTIFICATE REQUEST-----" + values \
+            + "-----END CERTIFICATE REQUEST-----\n"
+
     return x509.load_pem_x509_csr(d.encode('utf-8'))
         
-def save_csr(csr, key, csr_path, key_path):
+def save_csr_file(csr, key, csr_path, key_path):
     # Write our key to disk for safe keeping
     with open(key_path, "wb") as f:
         f.write(key.private_bytes(
-            encoding=serialization.Encoding.PEM,
+            encoding=Encoding.PEM,
             format=serialization.PrivateFormat.TraditionalOpenSSL,
             encryption_algorithm=serialization.BestAvailableEncryption(
-                csr_privatekeyfile_password.encode('utf-8'))))
+                config.csr_keyfile_password.encode('utf-8'))))
 
     # Write our CSR out to disk.
     with open(csr_path, "wb") as f:
-        f.write(csr.public_bytes(serialization.Encoding.PEM))
+        f.write(csr.public_bytes(Encoding.PEM))
 
     print("Saved CSR to disk OK")
-            
+
+def save_csr(csr):
+    return db.save_csr(csr.public_bytes(Encoding.PEM).decode('utf-8'),
+                       datetime.datetime.today(),
+                       1 # FIXME: REAL author from http conenction
+                       )
+    
 def new_csr(private_key=None):
     if private_key is None:
         # Generate our key
         private_key = rsa.generate_private_key(
             public_exponent=65537,
-            key_size=2048
+            key_size=4096
         )
 
     # Generate a CSR
@@ -97,7 +108,8 @@ def sign_csr(csr):
     builder = builder.subject_name(x509.Name(csr.subject.rdns))
     builder = builder.issuer_name(x509.Name(ca.ca_nameattributes))
 
-    builder = builder.not_valid_before(datetime.datetime.today() - datetime.timedelta(1, 0, 0))
+    curr_date = datetime.datetime.today() - datetime.timedelta(1, 0, 0)
+    builder = builder.not_valid_before(curr_date)
     builder = builder.not_valid_after(datetime.datetime.today() + ca.ca_expiry)
 
     new_serial = serial.new_serial()
@@ -113,9 +125,10 @@ def sign_csr(csr):
         builder = builder.add_extension(e.value, critical=e.critical)
 
     certificate = builder.sign(private_key=rootca_key, algorithm=hashes.SHA256())
-    
-    serial.save_serial(new_serial)
-    certdb.save_cert(certificate)
+
+
+    id_csr = save_csr(csr)
+    cert.save_cert(certificate, id_csr=id_csr)
     
     print("Signed certificate OK")
     

@@ -3,7 +3,6 @@ import csr
 import serial
 import crl
 import cert
-import certdb
 
 import os
 
@@ -38,9 +37,7 @@ serials = serial.get_serials()
 # Revoke the cert 
 #curr_crl = crl.revoke_cert(serials[0])
 
-# fingerprint = cert.fingerprint_cert(signed_csr)
-
-certdb.get_issued_certs()
+fingerprint = cert.fingerprint(signed_csr)
 
 curr_crl = crl.load_crl()
 
