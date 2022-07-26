@@ -1,3 +1,0 @@
-# List of root dns names the CA should issue for
-sunet.se
-
