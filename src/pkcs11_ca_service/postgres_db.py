@@ -14,6 +14,9 @@ from asyncpg.pool import Pool
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.root_ca import create as create_root_ca
 
+# asyncpg is safe from sql injections when using parameterized queries
+# https://github.com/MagicStack/asyncpg/issues/822
+
 from .config import (
     ROOT_CA_NAME_DICT,
     ROOT_CA_KEY_LABEL,
