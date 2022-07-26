@@ -7,6 +7,7 @@ from typing import Dict, Union, List, Tuple, Type
 import datetime
 import os
 
+from asyncpg.exceptions import UndefinedTableError
 from asyncpg import create_pool
 from asyncpg.pool import Pool
 
@@ -269,8 +270,11 @@ class PostgresDB(DataBaseObject):
     @classmethod
     async def _check_db(cls) -> None:
         async with cls.pool.acquire() as conn:
-            query = "SELECT serial FROM ca WHERE serial = issuer"
-            rows = await conn.fetch(query)
+            try:
+                query = "SELECT serial FROM ca WHERE serial = issuer"
+                rows = await conn.fetch(query)
+            except UndefinedTableError:
+                pass
 
     # Rewrite this code so its future proof
     @classmethod
