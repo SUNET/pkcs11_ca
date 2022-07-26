@@ -1,6 +1,6 @@
 from typing import Union, Dict
 from .base import DataClassObject, InputObject
-from .asn1 import pem_to_sha1_fingerprint
+from .asn1 import public_key_pem_to_sha1_fingerprint
 
 from .error import WrongDataType
 
@@ -40,5 +40,5 @@ class PublicKey(DataClassObject):
             self.info = "Missing info"
 
         # https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
-        self.fingerprint = pem_to_sha1_fingerprint(self.pem)
+        self.fingerprint = public_key_pem_to_sha1_fingerprint(self.pem)
         self.admin = 0

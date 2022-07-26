@@ -20,9 +20,7 @@ async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None
         return (
             "",
             -1,
-            JSONResponse(
-                status_code=401, content={"message": "public key not registered"}
-            ),
+            JSONResponse(status_code=401, content={"message": "public key not registered"}),
         )
 
     pub_key_vars = vars(pub_key_obj_list[0])
@@ -39,19 +37,17 @@ async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None
         return (
             "",
             -1,
-            JSONResponse(
-                status_code=401, content={"message": "public key is not admin"}
-            ),
+            JSONResponse(status_code=401, content={"message": "public key is not admin"}),
         )
 
-    if "pem" not in pub_key_vars or "authorized_by" not in pub_key_vars:
+    if "pem" not in pub_key_vars or "serial" not in pub_key_vars or pub_key_vars["serial"] < 1:
         return (
             "",
             -1,
             JSONResponse(status_code=401, content={"message": "public key invalid"}),
         )
     pub_key_pem: str = pub_key_vars["pem"]
-    auth_by: int = pub_key_vars["authorized_by"]
+    auth_by: int = pub_key_vars["serial"]
     return pub_key_pem, auth_by, None
 
 
@@ -78,9 +74,7 @@ async def _validate_token(
 
     # Load jwt public key from DB
     try:
-        decoded_jwt = jwt.decode(
-            token, algorithms=JWT_ALGOS, options={"verify_signature": False}
-        )
+        decoded_jwt = jwt.decode(token, algorithms=JWT_ALGOS, options={"verify_signature": False})
     except BaseException as exeption:  # pylint: disable=broad-except
         print(exeption)
         return (
@@ -88,25 +82,19 @@ async def _validate_token(
             "",
             JSONResponse(status_code=401, content={"message": "token invalid"}),
         )
-    pub_key_pem, auth_by, auth_error = await _pub_key_from_db(
-        jwk_key_to_pem(decoded_jwt)
-    )
+    pub_key_pem, auth_by, auth_error = await _pub_key_from_db(jwk_key_to_pem(decoded_jwt))
     if auth_error is not None or auth_by < 1:
         return -1, "", auth_error
 
     # Verify signature with public key from db
     try:
-        decoded_jwt = jwt.decode(
-            token, key=pub_key_pem.encode("utf-8"), algorithms=JWT_ALGOS
-        )
+        decoded_jwt = jwt.decode(token, key=pub_key_pem.encode("utf-8"), algorithms=JWT_ALGOS)
     except BaseException as exeption:  # pylint: disable=broad-except
         print(exeption)
         return (
             -1,
             "",
-            JSONResponse(
-                status_code=401, content={"message": "token signature invalid"}
-            ),
+            JSONResponse(status_code=401, content={"message": "token signature invalid"}),
         )
     print("Verified signature with public key")
 
@@ -117,31 +105,23 @@ async def _validate_url(request: Request, token: str) -> Union[JSONResponse, Non
     # https://ietf-wg-acme.github.io/acme/circle-test/draft-ietf-acme-acme.html#request-url-integrity
     jwt_header_decoded = json.loads(from_base64url(token.split(".")[0]))
     if "url" not in jwt_header_decoded:
-        return JSONResponse(
-            status_code=401, content={"message": "url missing in token"}
-        )
+        return JSONResponse(status_code=401, content={"message": "url missing in token"})
 
     if jwt_header_decoded["url"] == str(request.url):
         print("Verified url in token")
         return None
-    return JSONResponse(
-        status_code=401, content={"message": "url in token verification failed"}
-    )
+    return JSONResponse(status_code=401, content={"message": "url in token verification failed"})
 
 
 async def _validate_nonce(token: str) -> Union[JSONResponse, None]:
     jwt_header_decoded = json.loads(from_base64url(token.split(".")[0]))
     if "nonce" not in jwt_header_decoded:
-        return JSONResponse(
-            status_code=401, content={"message": "nonce missing in token"}
-        )
+        return JSONResponse(status_code=401, content={"message": "nonce missing in token"})
 
     if await verify_nonce(jwt_header_decoded["nonce"]):
         print("Verified nonce in token")
         return None
-    return JSONResponse(
-        status_code=401, content={"message": "nonce in token verification failed"}
-    )
+    return JSONResponse(status_code=401, content={"message": "nonce in token verification failed"})
 
 
 async def _authorized_by(request: Request) -> Tuple[int, Union[JSONResponse, None]]:
@@ -149,10 +129,12 @@ async def _authorized_by(request: Request) -> Tuple[int, Union[JSONResponse, Non
     if auth_error is not None or auth_by < 1:
         return -1, auth_error
 
+    # Must be after token signature validate
     auth_error = await _validate_url(request, token)
     if auth_error is not None:
         return -1, auth_error
 
+    # Must be after token signature validate
     auth_error = await _validate_nonce(token)
     if auth_error is not None:
         return -1, auth_error
@@ -165,6 +147,4 @@ async def authorized_by(request: Request) -> Tuple[int, Union[JSONResponse, None
         return await _authorized_by(request)
     except BaseException as exeption:  # pylint: disable=broad-except
         print(exeption)
-        return -1, JSONResponse(
-            status_code=401, content={"message": "authorization failed"}
-        )
+        return -1, JSONResponse(status_code=401, content={"message": "authorization failed"})

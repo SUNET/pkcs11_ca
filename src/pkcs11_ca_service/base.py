@@ -13,17 +13,15 @@ class DataBaseObject(ABC):
 
     @classmethod
     @abstractmethod
-    async def delete(
-        cls, table_name: str, unique_field: str, data: Union[str, int]
-    ) -> None:
+    async def delete(cls, table_name: str, unique_field: str, data: Union[str, int]) -> None:
         pass
 
     @classmethod
     @abstractmethod
     async def save(
         cls,
-        fields: Dict[str, Union[str, int]],
         table_name: str,
+        fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> int:
         pass
@@ -85,9 +83,7 @@ class DataClassObject(ABC):
         return data
 
     async def save(self) -> int:
-        serial = await self.db.save(
-            self.db_data(), self.db_table_name, self.db_unique_fields
-        )
+        serial = await self.db.save(self.db_table_name, self.db_data(), self.db_unique_fields)
         print("Saved into " + self.db_table_name + ", serial " + str(serial))
         self.serial = serial
         return serial
@@ -116,7 +112,7 @@ async def db_load_data_class(
 
     value_dict_list = await DataClassObject.db.load(
         input_vars,
-        list(db_data_class.db_fields.keys()),
+        ["serial"] + list(db_data_class.db_fields.keys()),
         db_data_class.db_unique_fields,
         db_data_class.db_table_name,
     )

@@ -29,7 +29,7 @@ from .config import (
 )
 from .error import WrongDataType
 from .asn1 import (
-    pem_to_sha1_fingerprint,
+    public_key_pem_to_sha1_fingerprint,
     pem_to_sha256_fingerprint,
     public_key_info_to_pem,
 )
@@ -41,9 +41,7 @@ class PostgresDB(DataBaseObject):
     pool: Pool
 
     @classmethod
-    async def delete(
-        cls, table_name: str, unique_field: str, data: Union[str, int]
-    ) -> None:
+    async def delete(cls, table_name: str, unique_field: str, data: Union[str, int]) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
                 query = "DELETE FROM " + table_name + " WHERE " + unique_field + " = $1"
@@ -55,21 +53,15 @@ class PostgresDB(DataBaseObject):
     @classmethod
     async def save(
         cls,
-        fields: Dict[str, Union[str, int]],
         table_name: str,
+        fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> int:
         serial: int
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
-                query = (
-                    "SELECT serial from "
-                    + table_name
-                    + " WHERE "
-                    + unique_fields[0]
-                    + " = $1"
-                )
+                query = "SELECT serial from " + table_name + " WHERE " + unique_fields[0] + " = $1"
                 rows = await conn.fetch(query, fields[unique_fields[0]])
                 if rows:
                     serial = rows[0][0]
@@ -130,9 +122,7 @@ class PostgresDB(DataBaseObject):
                     query = "SELECT "
                     for field in fields:
                         query += field + ","
-                    query = (
-                        query[:-1] + " FROM " + table_name + " WHERE " + key + " = $1"
-                    )
+                    query = query[:-1] + " FROM " + table_name + " WHERE " + key + " = $1"
                     rows = await conn.fetch(query, search[key])
                     fields_list += cls._rows_to_class_objects(rows, fields)
         return fields_list
@@ -196,21 +186,13 @@ class PostgresDB(DataBaseObject):
                     if not key_file.endswith(".pem"):
                         continue
 
-                    with open(
-                        ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb"
-                    ) as file_data:
+                    with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
                         key_pem = file_data.read().decode("utf-8")
                     print(
-                        "Saved admin key "
-                        + ROOT_ADMIN_KEYS_FOLDER
-                        + "/"
-                        + key_file
-                        + " into DB"
+                        "Saved admin key " + ROOT_ADMIN_KEYS_FOLDER + "/" + key_file + " into DB"
                     )
 
-                    query = cls._insert_root_item_query(
-                        classes_info["public_key"], "public_key"
-                    )
+                    query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
                     await conn.execute(
                         query,
                         *(
@@ -218,7 +200,7 @@ class PostgresDB(DataBaseObject):
                             key_file,
                             1,
                             1,
-                            pem_to_sha1_fingerprint(key_pem),
+                            public_key_pem_to_sha1_fingerprint(key_pem),
                             str(datetime.datetime.utcnow()),
                         ),
                     )
@@ -232,7 +214,7 @@ class PostgresDB(DataBaseObject):
         unique_fields: List[List[str]],
     ) -> None:
 
-        pool = await create_pool(
+        cls.pool = await create_pool(
             dsn="postgres://"
             + DB_USER
             + ":"
@@ -247,7 +229,6 @@ class PostgresDB(DataBaseObject):
             max_size=50,
             command_timeout=DB_TIMEOUT,
         )
-        cls.pool = pool
 
         classes_info: Dict[str, List[str]] = {}
         await cls._check_db()
@@ -304,9 +285,9 @@ class PostgresDB(DataBaseObject):
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
-                not_before = datetime.datetime.now(
-                    datetime.timezone.utc
-                ) - datetime.timedelta(minutes=2)
+                not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
+                    minutes=2
+                )
                 not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
 
                 root_ca_csr_pem, root_ca_pem = await create_root_ca(
@@ -322,42 +303,33 @@ class PostgresDB(DataBaseObject):
                 public_key_pem = public_key_info_to_pem(public_key_info)
 
                 # Insert into 'public_key' table
-                query = cls._insert_root_item_query(
-                    classes_info["public_key"], "public_key"
-                )
+                query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
                 await conn.execute(
                     query,
-                    *(
-                        public_key_pem,
-                        "root_ca",
-                        1,
-                        1,
-                        identifier.hex(),
-                        str(datetime.datetime.utcnow()),
-                    ),
+                    public_key_pem,
+                    "root_ca",
+                    1,
+                    1,
+                    identifier.hex(),
+                    str(datetime.datetime.utcnow()),
                 )
 
             # Insert into 'csr' table
             query = cls._insert_root_item_query(classes_info["csr"], "csr")
-            await conn.execute(
-                query,
-                *(1, root_ca_csr_pem, 1, str(datetime.datetime.utcnow())),
-            )
+            await conn.execute(query, 1, root_ca_csr_pem, 1, str(datetime.datetime.utcnow()))
 
             # Insert into 'ca' table
             query = cls._insert_root_item_query(classes_info["ca"], "ca")
             await conn.execute(
                 query,
-                *(
-                    1,
-                    ROOT_CA_KEY_LABEL,
-                    root_ca_pem,
-                    1,
-                    1,
-                    1,
-                    pem_to_sha256_fingerprint(root_ca_pem),
-                    str(not_before),
-                    str(not_after),
-                    str(datetime.datetime.utcnow()),
-                ),
+                1,
+                ROOT_CA_KEY_LABEL,
+                root_ca_pem,
+                1,
+                1,
+                1,
+                pem_to_sha256_fingerprint(root_ca_pem),
+                str(not_before),
+                str(not_after),
+                str(datetime.datetime.utcnow()),
             )

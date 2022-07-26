@@ -5,13 +5,16 @@ import sys
 
 from .base import db_load_data_class
 from .csr import Csr, CsrInput
+from .certificate import Certificate
 from .public_key import PublicKey, PublicKeyInput
 from .startup import startup
 from .asn1 import public_key_pem_from_csr
 from .nonce import generate_nonce, hash_nonce, nonces
 from .auth import authorized_by
+from .config import ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT
 
 from python_x509_pkcs11.crl import create as create_crl
+from python_x509_pkcs11.csr import sign_csr
 
 import asyncio
 
@@ -53,16 +56,11 @@ async def head_new_nonce() -> Response:
 
 @app.get("/new_nonce")
 async def get_new_nonce() -> Response:
-    response = Response(content="")
-    new_nonce = generate_nonce()
-    nonces.append(hash_nonce(new_nonce))
-    response.headers["Replay-Nonce"] = new_nonce
-    response.headers["Cache-Control"] = "no-store"
-    return response
+    return head_new_nonce()
 
 
 @app.post("/public_key")
-async def public_key(request: Request) -> JSONResponse:
+async def post_public_key(request: Request) -> JSONResponse:
     auth_by, auth_error = await authorized_by(request)
     if auth_error is not None or auth_by < 1:
         return auth_error
@@ -119,7 +117,7 @@ WOuWRK+vlgQ76Gi6sLkXIiFiyQ/deiUzwmgNNNbQ2mScYpK7lfF0zdk=
 
 
 @app.post("/crl")
-async def crl(request: Request) -> JSONResponse:
+async def post_crl(request: Request) -> JSONResponse:
     auth_by, auth_error = await authorized_by(request)
     if auth_error is not None or auth_by < 1:
         return auth_error
@@ -152,9 +150,55 @@ async def crl(request: Request) -> JSONResponse:
 # def has_issued_cert(c: cert.CertInput):
 #    return post_path.has_issued_cert(c)
 
-# @app.post("/sign_csr")
-# def sign_csr(c: csr.Csr):
-#   return post_path.sign_csr(c)
+# @app.post("/add_public_key")
+# async def post_sign_csr(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
+#     auth_by, auth_error = await authorized_by(request)
+#     if auth_error is not None or auth_by < 1:
+#         return auth_error
+
+#     new_public_key = PublicKey(
+#         {"pem": public_key_pem_from_csr(csr_input.pem),
+#          "authorized_by": auth_by}
+#     )
+#     await new_public_key.save()
+
+
+# FIXME allow request to specify which CA to sign with, perhaps the CAs pem or the CAs pub_key pem
+# Perhaps a 'replaced_by' field for CAs and/or error message trying to use a revoked/old CA to sign with
+@app.post("/sign_csr")
+async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
+    auth_by, auth_error = await authorized_by(request)
+    if auth_error is not None or auth_by < 1:
+        return auth_error
+
+    if csr_input.pem is None:
+        return JSONResponse(
+            status_code=400, content={"message": "must have json dict with key 'pem' with a csr"}
+        )
+
+    public_key_obj = PublicKey(
+        {"pem": public_key_pem_from_csr(csr_input.pem), "authorized_by": auth_by}
+    )
+    await public_key_obj.save()
+
+    csr_obj = Csr(
+        {"pem": csr_input.pem, "authorized_by": auth_by, "public_key": public_key_obj.serial}
+    )
+    await csr_obj.save()
+
+    cert_pem = await sign_csr(ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT, csr_obj.pem)
+    cert_obj = Certificate(
+        {
+            "pem": cert_pem,
+            "authorized_by": auth_by,
+            "csr": csr_obj.serial,
+            "public_key": public_key_obj.serial,
+            "issuer": 1,
+        }
+    )
+    await cert_obj.save()
+    return JSONResponse(status_code=200, content={"certificate": cert_obj.pem})
+
 
 # Special for compatibility
 # @app.post("/sign_csr_file")

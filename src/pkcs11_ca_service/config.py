@@ -1,12 +1,11 @@
 # Folder for the initial trusted pub_keys
-ROOT_ADMIN_KEYS_FOLDER = "pub_keys"
+ROOT_ADMIN_KEYS_FOLDER = "trusted_pub_keys"
 
 DB_MODULE = "postgres_db"
 # Table order is important: for example 'ca' dependes on 'public_key' so it comes after
 DB_TABLE_MODULES = ["public_key", "csr", "ca", "certificate", "crl"]
 
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
-# jwt_algos = ["EdDSA", "PS256", "PS384", "PS512", "ES256", "ES384", "ES521"]
 JWT_ALGOS = ["PS256", "PS384", "PS512", "ES256", "ES384", "ES521"]
 
 ROOT_CA_KEY_LABEL = "my_ROOT_CA_key_label"

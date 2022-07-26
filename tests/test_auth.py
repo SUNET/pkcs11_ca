@@ -9,11 +9,6 @@ import jwt
 
 from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
 
-# from asn1crypto.core import GeneralizedTime
-# from asn1crypto import x509 as asn1_x509
-# from asn1crypto import csr as asn1_csr
-# from asn1crypto import pem as asn1_pem
-
 
 class TestAuth(unittest.TestCase):
     """
@@ -30,18 +25,16 @@ class TestAuth(unittest.TestCase):
         nonce = req.headers["Replay-Nonce"]
         # self.assertTrue(req.status_code == 401)
 
-        with open("privkey.pem", "rb") as f:
+        with open("trusted_pub_keys/privkey1.key", "rb") as f:
             priv_key = f.read()
-        with open("privkey2.pem", "rb") as f:
+        with open("trusted_pub_keys/privkey2.key", "rb") as f:
             priv_key2 = f.read()
-        with open("pub_keys/pubkey.pem", "rb") as f:
+        with open("trusted_pub_keys/pubkey1.pem", "rb") as f:
             pub_key = f.read()
 
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/public_key"}
         jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-        encoded = jwt.encode(
-            jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers
-        )
+        encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
         headers = {}
         headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
         # print (headers)

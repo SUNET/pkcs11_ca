@@ -35,11 +35,13 @@ def pem_to_sha256_fingerprint(pem: str) -> str:
 
 
 # https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
-def pem_to_sha1_fingerprint(pem: str) -> str:
+def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
-    return hashlib.sha1(data).hexdigest()
+    key = PublicKeyInfo().load(data)
+    fingerprint: str = key.sha1.hex()
+    return fingerprint
 
 
 def public_key_info_to_pem(public_key_info: PublicKeyInfo) -> str:
@@ -50,9 +52,7 @@ def public_key_info_to_pem(public_key_info: PublicKeyInfo) -> str:
 def jwk_key_to_pem(data: Dict[str, str]) -> str:
     rsa = RSAPublicKey()
     rsa["modulus"] = int(from_base64url(data["modulus"]).decode("utf-8"))
-    rsa["public_exponent"] = int(
-        from_base64url(data["public_exponent"]).decode("utf-8")
-    )
+    rsa["public_exponent"] = int(from_base64url(data["public_exponent"]).decode("utf-8"))
 
     pki = PublicKeyInfo()
     pka = PublicKeyAlgorithm()
@@ -76,13 +76,11 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         print("rsa detected")
 
         ret["kty"] = "rsa"
-        ret["modulus"] = to_base64url(
-            str(key["public_key"].native["modulus"]).encode("utf-8")
-        )
+        ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
         ret["public_exponent"] = to_base64url(
             str(key["public_key"].native["public_exponent"]).encode("utf-8")
         )
-        ret["kid"] = to_base64url(hashlib.sha1(key.dump()).hexdigest().encode("utf-8"))
+        ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
         return ret
 
     if "eliptic curve" == key["algorithm"].native["algorithm"]:

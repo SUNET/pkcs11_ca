@@ -21,9 +21,7 @@ def load_db_data_modules() -> List[DataClassObject]:
         if "_" in class_name:
             index = class_name.index("_")
             class_name = (
-                class_name[:index]
-                + class_name[index + 1].upper()
-                + class_name[index + 2 :]
+                class_name[:index] + class_name[index + 1].upper() + class_name[index + 2 :]
             )
         db_data_classes.append(getattr(db_data_module, class_name))
     return db_data_classes
@@ -47,9 +45,7 @@ def load_db_module() -> DataBaseObject:
     return db_obj
 
 
-async def db_init(
-    db_obj: DataBaseObject, db_data_classes: List[DataClassObject]
-) -> None:
+async def db_init(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]) -> None:
     tables: List[str] = []
     fields: List[Dict[str, Union[Type[str], Type[int]]]] = []
     reference_fields: List[Dict[str, str]] = []

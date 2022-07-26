@@ -25,3 +25,6 @@ softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so
 
 # In another shell, start the server with
 uvicorn src.pkcs11_ca_service.main:app --workers 1
+
+
+# TODO: lookup extract RSA sig from GPG sig, should be possible so we can sign with current gpg yubikey signs
