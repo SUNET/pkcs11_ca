@@ -1,6 +1,7 @@
 """
 Test our public key creation
 """
+from typing import Tuple
 import unittest
 import requests
 import datetime
@@ -15,7 +16,8 @@ from asn1crypto.keys import PublicKeyInfo
 from asn1crypto import pem as asn1_pem
 from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
 
-def generate_keypair():
+
+def generate_keypair() -> Tuple[str, str]:
     # Generate new key
     new_private_key = rsa.generate_private_key(
         key_size=2048,
@@ -24,14 +26,13 @@ def generate_keypair():
     new_private_key_pem = new_private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption()
+        encryption_algorithm=serialization.NoEncryption(),
     )
 
     new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo
+        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
-    return new_private_key_pem.decode('utf-8'), new_public_key_pem.decode('utf-8')
+    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
 
 
 class TestPublicKey(unittest.TestCase):
@@ -48,7 +49,6 @@ class TestPublicKey(unittest.TestCase):
             priv_key = f.read()
         with open("trusted_pub_keys/pubkey1.pem", "rb") as f:
             pub_key = f.read()
-
 
         # Test loading public keys
         req = requests.head("http://localhost:8000/new_nonce")
@@ -72,7 +72,6 @@ class TestPublicKey(unittest.TestCase):
             self.assertTrue(isinstance(test_key, PublicKeyInfo))
             self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
             self.assertTrue(isinstance(test_key["public_key"].native["modulus"], int))
-
 
         # Create and post a key
         new_private_key, new_public_key = generate_keypair()
@@ -102,13 +101,14 @@ class TestPublicKey(unittest.TestCase):
         nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/public_key"}
         jwk_key_data = pem_key_to_jwk(new_public_key)
-        encoded = jwt.encode(jwk_key_data, new_private_key.encode('utf-8'), algorithm="PS256", headers=jwt_headers)
+        encoded = jwt.encode(
+            jwk_key_data, new_private_key.encode("utf-8"), algorithm="PS256", headers=jwt_headers
+        )
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
         req = requests.get("http://localhost:8000/public_key", headers=request_headers)
         self.assertTrue(req.status_code == 401)
 
-        
         # Create and post an admin key
         new_private_key, new_public_key = generate_keypair()
         req = requests.head("http://localhost:8000/new_nonce")
@@ -119,7 +119,9 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
 
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + ',"admin": 1'"}")
+        data = json.loads(
+            '{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + ',"admin": 1' "}"
+        )
         req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
 
@@ -137,7 +139,9 @@ class TestPublicKey(unittest.TestCase):
         nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/public_key"}
         jwk_key_data = pem_key_to_jwk(new_public_key)
-        encoded = jwt.encode(jwk_key_data, new_private_key.encode('utf-8'), algorithm="PS256", headers=jwt_headers)
+        encoded = jwt.encode(
+            jwk_key_data, new_private_key.encode("utf-8"), algorithm="PS256", headers=jwt_headers
+        )
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
         req = requests.get("http://localhost:8000/public_key", headers=request_headers)

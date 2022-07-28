@@ -10,6 +10,7 @@ class PublicKeyInput(InputObject):
     fingerprint: Union[str, None]
     admin: Union[int, None]
 
+
 class PublicKey(DataClassObject):
 
     db_table_name = "public_key"
@@ -44,12 +45,12 @@ class PublicKey(DataClassObject):
         if admin is not None:
             if not isinstance(admin, int):
                 raise WrongDataType("'admin', must be a 'int'")
-            if (admin == 1 or admin == 0):
+            if admin == 1 or admin == 0:
                 self.admin = admin
             else:
                 self.admin = 0
         else:
             self.admin = 0
-            
+
         # https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
         self.fingerprint = public_key_pem_to_sha1_fingerprint(self.pem)

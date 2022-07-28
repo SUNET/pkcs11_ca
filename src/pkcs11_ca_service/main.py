@@ -107,9 +107,11 @@ async def post_public_key(request: Request, public_key_input: PublicKeyInput) ->
     is_admin = 0
     if isinstance(public_key_input.admin, int) and public_key_input.admin == 1:
         is_admin = 1
-    
+
     # Save Public key for new CA
-    public_key_obj = PublicKey({"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin})
+    public_key_obj = PublicKey(
+        {"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin}
+    )
     await public_key_obj.save()
     return JSONResponse(status_code=200, content={"public_key": public_key_obj.pem})
 
@@ -179,7 +181,7 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
             "issuer": issuer_obj.serial,
         }
     )
-    crl_obj.save()
+    await crl_obj.save()
 
     return JSONResponse(status_code=200, content={"crl": crl_pem})
 
