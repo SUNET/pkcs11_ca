@@ -71,59 +71,48 @@ async def get_new_nonce() -> Response:
     return response
 
 
-@app.post("/public_key")
-async def post_public_key(request: Request) -> JSONResponse:
+# Redo this so CRLS can be fetched by perhaps the CAs common name
+@app.get("/public_key")
+async def get_public_key(request: Request) -> JSONResponse:
     auth_by, auth_error = await authorized_by(request)
     if auth_error is not None or auth_by < 1:
         return auth_error
 
+    public_key_objs: List[PublicKey] = []
+    public_key_pems: List[str] = []
 
-#     p_key = """-----BEGIN PUBLIC KEY-----
-# MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA+1TSL9l6b5uleqVVkS22
-# 1xf9C7OqR9jxR1IqAxJkESuuSeldyPL1F4jFA65p13EaPFnLLVuG5RAa6wSjT07B
-# GXIjmmd3aY6JkPcJaKn/TMzxFaYO4KHYraOHaI4o3AxmQsCd35dAy9h2Zj74/uTV
-# Yq58BVNuFwYe/sbm1AOCQCri/4ZpI3VB4u7425maQ4At+twYGMC6VF+gApoEbZvE
-# Il5khkUZLXu/3AsJ234YFpdvocT855xPXriZrne5faS6breercjr9lslaVNaLcRw
-# VSeUCBermXzHt3t/vF2fsXG6f5JCZJDKJw0GyaL+l/pDqvnL9o8GMbWlRbAgPv59
-# tQIDAQAB
-# -----END PUBLIC KEY-----
-# """
-#     a = PublicKeyInput(pem=p_key)
+    db_public_key_objs = await db_load_all_data_class(PublicKey)
+    for obj in db_public_key_objs:
+        if isinstance(obj, PublicKey):
+            public_key_objs.append(obj)
 
-#     p_key_obj = PublicKey({"pem": p_key, "authorized_by": auth_by})
-#     await p_key_obj.save()
-#     p2_key_objs = await db_load_data_class(PublicKey, a)
-#     p2_key_obj = p2_key_objs[0]
+    for public_key in public_key_objs:
+        public_key_pems.append(public_key.pem)
 
-#     csr_pem = """-----BEGIN CERTIFICATE REQUEST-----
-# MIIDJTCCAg0CAQAwgZwxCzAJBgNVBAYTAlNFMRIwEAYDVQQIDAlTdG9ja2hvbG0x
-# EjAQBgNVBAcMCVN0b2NraG9sbTEOMAwGA1UECgwFU1VORVQxHTAbBgNVBAsMFFNV
-# TkVUIEluZnJhc3RydWN0dXJlMRkwFwYDVQQDDBBjYS10ZXN0LnN1bmV0LnNlMRsw
-# GQYJKoZIhvcNAQkBFgxzb2NAc3VuZXQuc2UwggEiMA0GCSqGSIb3DQEBAQUAA4IB
-# DwAwggEKAoIBAQDhqvb34vQ0WUVM4VLUgXSrim0tYrL3dU18Wy2FKYGSxyS9YLTQ
-# X30XDLx0oQlf2Zs267sPXixuemgXgtzstflhYveyZ6RR13zHyqdMw1iaffyaQtrQ
-# LMAFKTEzx8ZEpDR0og1iQkKk62phnLsvyUq0g0xiUMjSYwTeq1vwiR4U9nqkJiDC
-# BHKNG/XH0nDrFx/1D1s28XVejFXpB8g0OiLOZyKWd90k932gySXCGMirwL+lCk2H
-# 9ctpbwUA53Q+kwAUyJTzknTSSEch5bSMwX+3FVRHeBmMDYbcZ/c2gtLHNUF5YI+p
-# v5QZzNwZt/t0GXfEyd5xX0DSmGKPHe45JUyPAgMBAAGgQzAfBgkqhkiG9w0BCQ4x
-# EjAQMA4GA1UdDwEB/wQEAwIBhjAgBgkqhkiG9w0BCQ4xEzARMA8GA1UdEwEB/wQF
-# MAMBAf8wDQYJKoZIhvcNAQELBQADggEBAGhYVybB34e09tolj0mwQu7L298MnB9q
-# +m5qS7TWeI5cLU7vucmxfpd67ocL2ce0BgaKfsjvmP2vRo+jgjLHeEtnl+3cWG3x
-# lJ+y8PlwkeZMfzK0Rj+X+r3pcxLfTtRaLH20m1PlqXr5Pd4kuDM2SruCCeNiMhDF
-# a8X+BYfbRunWY3rjfcIQnFs5QpcNwwORk+NHC9SHXTBA4Jbo+sdhE0IorcjWJkZX
-# KZfuzkMivRr5+GOQYK5xiKc0mqaFzg5uZ1KUXTAWbVAHWGkktXDlpvFBrCNJciKh
-# WOuWRK+vlgQ76Gi6sLkXIiFiyQ/deiUzwmgNNNbQ2mScYpK7lfF0zdk=
-# -----END CERTIFICATE REQUEST-----
-# """
-#     b = CsrInput(pem=csr_pem)
-#     p_key3 = PublicKey({"pem": public_key_pem_from_csr(csr_obj.pem), "authorized_by": auth_by})
-#     await p_key3.save()
-#     csr_obj = Csr({"pem": csr_pem})
-#     await csr_obj.save()
-#     csr2_objs = await db_load_data_class(Csr, b)
-#     csr2_obj = csr2_objs[0]
+    return JSONResponse(status_code=200, content={"public_keys": public_key_pems})
 
-#     return JSONResponse(status_code=200, content={"message": "test ok"})
+
+@app.post("/public_key")
+async def post_public_key(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
+    auth_by, auth_error = await authorized_by(request)
+    if auth_error is not None or auth_by < 1:
+        return auth_error
+
+    if public_key_input.pem is None:
+        return JSONResponse(
+            status_code=400,
+            content={"message": "must have 'pem' with the public key"},
+        )
+
+    is_admin = 0
+    if isinstance(public_key_input.admin, int) and public_key_input.admin == 1:
+        is_admin = 1
+    
+    # Save Public key for new CA
+    public_key_obj = PublicKey({"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin})
+    await public_key_obj.save()
+    return JSONResponse(status_code=200, content={"public_key": public_key_obj.pem})
+
 
 # Redo this so CRLS can be fetched by perhaps the CAs common name
 @app.get("/crl")

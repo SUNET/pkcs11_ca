@@ -15,7 +15,7 @@ from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
 
 class TestCsr(unittest.TestCase):
     """
-    Test our auth.
+    Test our csrs.
     """
 
     def test_csr(self) -> None:

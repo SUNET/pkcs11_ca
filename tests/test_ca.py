@@ -15,7 +15,7 @@ from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
 
 class TestCa(unittest.TestCase):
     """
-    Test our auth.
+    Test our ca
     """
 
     def test_ca(self) -> None:

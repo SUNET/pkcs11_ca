@@ -15,12 +15,12 @@ from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
 
 class TestCrl(unittest.TestCase):
     """
-    Test our auth.
+    Test our crls
     """
 
-    def test_csr(self) -> None:
+    def test_crl(self) -> None:
         """
-        Sign csrs
+        Test crls
         """
 
         with open("trusted_pub_keys/privkey1.key", "rb") as f:
