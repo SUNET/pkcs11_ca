@@ -34,6 +34,16 @@ def pem_to_sha256_fingerprint(pem: str) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+def pem_cert_to_name_dict(pem: str) -> dict[str, str]:
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+
+    cert = asn1_x509.Certificate().load(data)
+    ret: Dict[str, str] = cert["tbs_certificate"]["subject"].native
+    return ret
+
+
 # https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
 def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
     data = pem.encode("utf-8")
@@ -73,7 +83,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
     key = PublicKeyInfo().load(data)
 
     if "rsa" == key["algorithm"].native["algorithm"]:
-        print("rsa detected")
+        # print("rsa detected")
 
         ret["kty"] = "rsa"
         ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))

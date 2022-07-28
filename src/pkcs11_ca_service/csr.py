@@ -6,6 +6,7 @@ from .error import WrongDataType
 
 class CsrInput(InputObject):
     pem: Union[str, None]
+    ca_pem: Union[str, None]
 
 
 class Csr(DataClassObject):

@@ -7,13 +7,13 @@ from .error import WrongDataType
 
 class CrlInput(InputObject):
     pem: Union[str, None]
+    ca_pem: Union[str, None]
 
 
 class Crl(DataClassObject):
 
     db_table_name = "crl"
     db_fields = {
-        "public_key": int,
         "pem": str,
         "issuer": int,
         "authorized_by": int,

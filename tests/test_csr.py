@@ -1,5 +1,5 @@
 """
-Test our auth
+Test our csr signing
 """
 import unittest
 import requests
@@ -20,29 +20,34 @@ class TestCsr(unittest.TestCase):
 
     def test_csr(self) -> None:
         """
-        Send requests with valid and invald jwt tokens
+        Sign csrs
         """
-
-        req = requests.head("http://localhost:8000/new_nonce")
-        print(req.status_code)
-        nonce = req.headers["Replay-Nonce"]
-        # self.assertTrue(req.status_code == 401)
 
         with open("trusted_pub_keys/privkey1.key", "rb") as f:
             priv_key = f.read()
-        with open("trusted_pub_keys/privkey2.key", "rb") as f:
-            priv_key2 = f.read()
         with open("trusted_pub_keys/pubkey1.pem", "rb") as f:
             pub_key = f.read()
-        with open("trusted_pub_keys/pubkey2.pem", "rb") as f:
-            pub_key2 = f.read()
 
+        # Get CAs
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
+        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/ca"}
+        jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 200)
+        cas = json.loads(req.text)["cas"]
+
+        # Sign a csr
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/sign_csr"}
         jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
         encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-        headers = {}
-        headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
-        # print (headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
 
         test_csr = """-----BEGIN CERTIFICATE REQUEST-----
 MIICtjCCAZ4CAQAwcTELMAkGA1UEBhMCQVUxDDAKBgNVBAgMA3NkZjEMMAoGA1UE
@@ -63,8 +68,18 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
 -----END CERTIFICATE REQUEST-----
 """
 
-        data = json.loads('{"pem": "' + test_csr.replace("\n", "\\n") + '"}')
-        req = requests.post("http://localhost:8000/sign_csr", headers=headers, json=data)
+        data = json.loads(
+            '{"pem": "'
+            + test_csr.replace("\n", "\\n")
+            + '"'
+            + ","
+            + '"ca_pem": '
+            + '"'
+            + cas[0].replace("\n", "\\n")
+            + '"'
+            + "}"
+        )
+        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["certificate"].encode("utf-8")

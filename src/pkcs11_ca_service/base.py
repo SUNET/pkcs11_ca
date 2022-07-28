@@ -28,12 +28,31 @@ class DataBaseObject(ABC):
 
     @classmethod
     @abstractmethod
+    async def update(
+        cls,
+        table_name: str,
+        fields: Dict[str, Union[str, int]],
+        unique_fields: List[str],
+    ) -> None:
+        pass
+
+    @classmethod
+    @abstractmethod
+    async def load_all(
+        cls,
+        table_name: str,
+        fields: List[str],
+    ) -> List[Dict[str, Union[str, int]]]:
+        pass
+
+    @classmethod
+    @abstractmethod
     async def load(
         cls,
+        table_name: str,
         input_search: Dict[str, Union[str, int]],
         fields: List[str],
         unique_fields: List[str],
-        table_name: str,
     ) -> List[Dict[str, Union[str, int]]]:
         pass
 
@@ -65,12 +84,10 @@ class DataClassObject(ABC):
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__()
-        for key, value in kwargs.items():
-            setattr(self, key, value)
         self.serial = -1
+        self.authorized_by = -1
         self.created = str(datetime.datetime.utcnow())
 
-    def set_references(self, kwargs: Dict[str, int]) -> None:
         for key, value in kwargs.items():
             setattr(self, key, value)
 
@@ -82,10 +99,14 @@ class DataClassObject(ABC):
                 data[key] = class_data[key]
         return data
 
-    async def save(self) -> int:
+    async def save(self, field_set_to_serial: Union[str, None] = None) -> int:
         serial = await self.db.save(self.db_table_name, self.db_data(), self.db_unique_fields)
         print("Saved into " + self.db_table_name + ", serial " + str(serial))
         self.serial = serial
+
+        if field_set_to_serial is not None:
+            setattr(self, field_set_to_serial, serial)
+            await self.db.update(self.db_table_name, self.db_data(), self.db_unique_fields)
         return serial
 
     async def delete(self) -> None:
@@ -111,10 +132,26 @@ async def db_load_data_class(
             input_vars[key] = value
 
     value_dict_list = await DataClassObject.db.load(
+        db_data_class.db_table_name,
         input_vars,
         ["serial"] + list(db_data_class.db_fields.keys()),
         db_data_class.db_unique_fields,
+    )
+
+    ret: List[DataClassObject] = []
+    for value_dict in value_dict_list:
+
+        class_obj = db_data_class(value_dict)
+        for name, value in value_dict.items():
+            setattr(class_obj, name, value)
+        ret.append(class_obj)
+    return ret
+
+
+async def db_load_all_data_class(db_data_class: Type[DataClassObject]) -> List[DataClassObject]:
+    value_dict_list = await DataClassObject.db.load_all(
         db_data_class.db_table_name,
+        ["serial"] + list(db_data_class.db_fields.keys()),
     )
 
     ret: List[DataClassObject] = []

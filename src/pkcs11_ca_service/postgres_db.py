@@ -12,7 +12,7 @@ from asyncpg import create_pool
 from asyncpg.pool import Pool
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from python_x509_pkcs11.root_ca import create as create_root_ca
+from python_x509_pkcs11.ca import create as create
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
@@ -52,6 +52,24 @@ class PostgresDB(DataBaseObject):
                     query,
                     data,
                 )
+
+    @classmethod
+    async def update(
+        cls,
+        table_name: str,
+        fields: Dict[str, Union[str, int]],
+        unique_fields: List[str],
+    ) -> None:
+        async with cls.pool.acquire() as conn:
+            async with conn.transaction():
+                args = ()
+                query = "UPDATE " + table_name + " SET "
+                for index, key in enumerate(fields):
+                    query += key + " = $" + str(index + 1) + ","
+                    args = args + (fields[key],)  # type: ignore
+                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(index + 1)
+                print(query)
+                rows = await conn.fetch(query, *args, fields[unique_fields[0]])
 
     @classmethod
     async def save(
@@ -101,12 +119,31 @@ class PostgresDB(DataBaseObject):
         return ret
 
     @classmethod
+    async def load_all(
+        cls,
+        table_name: str,
+        fields: List[str],
+    ) -> List[Dict[str, Union[str, int]]]:
+
+        async with cls.pool.acquire() as conn:
+            async with conn.transaction():
+
+                fields_list: List[Dict[str, Union[str, int]]] = []
+                query = "SELECT "
+                for field in fields:
+                    query += field + ","
+                query = query[:-1] + " FROM " + table_name
+                rows = await conn.fetch(query)
+                fields_list += cls._rows_to_class_objects(rows, fields)
+        return fields_list
+
+    @classmethod
     async def load(
         cls,
+        table_name: str,
         input_search: Dict[str, Union[str, int]],
         fields: List[str],
         unique_fields: List[str],
-        table_name: str,
     ) -> List[Dict[str, Union[str, int]]]:
 
         search: Dict[str, Union[str, int]] = {}
@@ -293,17 +330,14 @@ class PostgresDB(DataBaseObject):
                 )
                 not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
 
-                root_ca_csr_pem, root_ca_pem = await create_root_ca(
+                root_ca_csr_pem, root_ca_pem = await create(
                     ROOT_CA_KEY_LABEL,
                     ROOT_CA_NAME_DICT,
                     ROOT_CA_KEY_SIZE,
                     not_before=not_before,
                     not_after=not_after,
                 )
-                public_key_info, identifier = await PKCS11Session.public_key_data(
-                    ROOT_CA_KEY_LABEL
-                )
-                public_key_pem = public_key_info_to_pem(public_key_info)
+                public_key_pem, identifier = await PKCS11Session.public_key_data(ROOT_CA_KEY_LABEL)
 
                 # Insert into 'public_key' table
                 query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
@@ -316,23 +350,31 @@ class PostgresDB(DataBaseObject):
                     identifier.hex(),
                     str(datetime.datetime.utcnow()),
                 )
+                # Insert into 'pkcs11_key' table
+                query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
+                await conn.execute(
+                    query,
+                    1,
+                    ROOT_CA_KEY_LABEL,
+                    1,
+                    str(datetime.datetime.utcnow()),
+                )
 
-            # Insert into 'csr' table
-            query = cls._insert_root_item_query(classes_info["csr"], "csr")
-            await conn.execute(query, 1, root_ca_csr_pem, 1, str(datetime.datetime.utcnow()))
+                # Insert into 'csr' table
+                query = cls._insert_root_item_query(classes_info["csr"], "csr")
+                await conn.execute(query, 1, root_ca_csr_pem, 1, str(datetime.datetime.utcnow()))
 
-            # Insert into 'ca' table
-            query = cls._insert_root_item_query(classes_info["ca"], "ca")
-            await conn.execute(
-                query,
-                1,
-                ROOT_CA_KEY_LABEL,
-                root_ca_pem,
-                1,
-                1,
-                1,
-                pem_to_sha256_fingerprint(root_ca_pem),
-                str(not_before),
-                str(not_after),
-                str(datetime.datetime.utcnow()),
-            )
+                # Insert into 'ca' table
+                query = cls._insert_root_item_query(classes_info["ca"], "ca")
+                await conn.execute(
+                    query,
+                    1,
+                    root_ca_pem,
+                    1,
+                    1,
+                    1,
+                    pem_to_sha256_fingerprint(root_ca_pem),
+                    str(not_before),
+                    str(not_after),
+                    str(datetime.datetime.utcnow()),
+                )

@@ -1,4 +1,4 @@
-from typing import Tuple, Union
+from typing import Tuple, Union, List
 import json
 
 from fastapi.responses import JSONResponse
@@ -14,8 +14,8 @@ from .nonce import verify_nonce
 
 async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None]]:
     pub_key_input = PublicKeyInput(pem=pem)
-    pub_key_obj_list = await db_load_data_class(PublicKey, pub_key_input)
-    if not pub_key_obj_list:
+    pub_keys = await db_load_data_class(PublicKey, pub_key_input)
+    if not pub_keys:
         print("Rejecting pub key not in DB")
         return (
             "",
@@ -23,16 +23,15 @@ async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None
             JSONResponse(status_code=401, content={"message": "public key not registered"}),
         )
 
-    pub_key_vars = vars(pub_key_obj_list[0])
-
-    if "admin" not in pub_key_vars:
+    pub_key = pub_keys[0]
+    if not isinstance(pub_key, PublicKey):
         return (
             "",
             -1,
-            JSONResponse(status_code=401, content={"message": "public key invalid"}),
+            JSONResponse(status_code=401, content={"message": "public key not registered"}),
         )
-    pub_key_admin: int = pub_key_vars["admin"]
-    if pub_key_admin != 1:
+
+    if pub_key.admin != 1:
         print("Rejecting non admin pub key")
         return (
             "",
@@ -40,15 +39,13 @@ async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None
             JSONResponse(status_code=401, content={"message": "public key is not admin"}),
         )
 
-    if "pem" not in pub_key_vars or "serial" not in pub_key_vars or pub_key_vars["serial"] < 1:
+    if pub_key.serial < 1:
         return (
             "",
             -1,
             JSONResponse(status_code=401, content={"message": "public key invalid"}),
         )
-    pub_key_pem: str = pub_key_vars["pem"]
-    auth_by: int = pub_key_vars["serial"]
-    return pub_key_pem, auth_by, None
+    return pub_key.pem, pub_key.serial, None
 
 
 async def _token_from_headers(request: Request) -> Tuple[bool, str]:

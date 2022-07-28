@@ -28,3 +28,4 @@ uvicorn src.pkcs11_ca_service.main:app --workers 1
 
 
 # TODO: lookup extract RSA sig from GPG sig, should be possible so we can sign with current gpg yubikey signs
+# Check, create and insert root ca in main.py not in postgres.py

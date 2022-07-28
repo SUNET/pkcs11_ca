@@ -21,6 +21,7 @@ class PublicKey(DataClassObject):
         "fingerprint": str,
         "created": str,
     }
+
     db_reference_fields: Dict[str, str] = {}
     db_unique_fields = ["pem", "fingerprint"]
 

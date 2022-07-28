@@ -20,36 +20,77 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invald jwt tokens
         """
 
-        req = requests.head("http://localhost:8000/new_nonce")
-        print(req.status_code)
-        nonce = req.headers["Replay-Nonce"]
-        # self.assertTrue(req.status_code == 401)
-
         with open("trusted_pub_keys/privkey1.key", "rb") as f:
-            priv_key = f.read()
+            priv_key1 = f.read()
         with open("trusted_pub_keys/privkey2.key", "rb") as f:
             priv_key2 = f.read()
         with open("trusted_pub_keys/pubkey1.pem", "rb") as f:
-            pub_key = f.read()
+            pub_key1 = f.read()
 
-        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/public_key"}
-        jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-        headers = {}
-        headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
-        # print (headers)
-        req = requests.post("http://localhost:8000/public_key", headers=headers)
+        # Sign with key2 but send key1 as public key
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
+        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/ca"}
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key2, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 401)
+
+        # No nonce
+        jwt_headers = {"url": "http://localhost:8000/ca"}
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 401)
+
+        # Wrong nonce
+        jwt_headers = {
+            "nonce": "AJCmF5Qw-7Dhp93FWDFY1jyQ506UNSz7brPG35bx6sR-3s8pyMhjgEqbXQqN2CQOr_kyZKcyWfyDiGRaK9HQgg",
+            "url": "http://localhost:8000/ca",
+        }
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 401)
+
+        # No url in token
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
-
-        jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key2, algorithm="PS256")
-        headers = {}
-        headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
-        req = requests.post("http://localhost:8000/public_key", headers=headers)
-
+        jwt_headers = {"nonce": nonce}
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
         self.assertTrue(req.status_code == 401)
 
-        req = requests.post("http://localhost:8000/public_key")
+        # Wrong url in token
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
+        self.assertTrue(req.status_code == 200)
+        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/ca_wrong_url"}
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
         self.assertTrue(req.status_code == 401)
 
-        # self.assertTrue(isinstance(test_cert, asn1_x509.Certificate))
+        # Correct auth
+        req = requests.head("http://localhost:8000/new_nonce")
+        nonce = req.headers["Replay-Nonce"]
+        self.assertTrue(req.status_code == 200)
+        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/ca"}
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 200)
