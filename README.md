@@ -14,18 +14,13 @@
 #echo "alter user pkcs11_testuser1 with password 'DBUserPassword';"
 
 
-export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
-export PKCS11_TOKEN='my_test_token_1'
-export PKCS11_PIN='1234'
+# Run the code
+bash dev-run.sh
 
-softhsm2-util --delete-token --token my_test_token_1
-softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN
-
-# mypy  --strict --namespace-packages --ignore-missing-imports src/pkcs11_ca_service/*.py
-
-# In another shell, start the server with
-uvicorn src.pkcs11_ca_service.main:app --workers 1
-
+# To run some tests, sign csrs, test the authorization, create crls
+# Must be run while the uvicorn command above is running
+# In another shell run:
+# python3 -m unittest
 
 # TODO: lookup extract RSA sig from GPG sig, should be possible so we can sign with current gpg yubikey signs
 # Check, create and insert root ca in main.py not in postgres.py
