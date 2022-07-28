@@ -105,7 +105,6 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        print(new_key_label)
         data = json.loads('{"key_label": ' + '"' + new_key_label[:-1] + '"' + "}")
         data["name_dict"] = name_dict
         data["issuer_pem"] = cas[-1]
