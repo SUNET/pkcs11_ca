@@ -1,7 +1,9 @@
-from typing import Tuple, Union, List
+"""Module  which handle the authorization"""
+
+from typing import Tuple
 import json
 
-from fastapi.responses import JSONResponse
+from fastapi import HTTPException
 from fastapi import Request
 import jwt
 
@@ -12,136 +14,108 @@ from .config import JWT_ALGOS
 from .nonce import verify_nonce
 
 
-async def _pub_key_from_db(pem: str) -> Tuple[str, int, Union[JSONResponse, None]]:
+async def _pub_key_from_db(pem: str) -> Tuple[str, int]:
     pub_key_input = PublicKeyInput(pem=pem)
     pub_keys = await db_load_data_class(PublicKey, pub_key_input)
     if not pub_keys:
-        print("Rejecting pub key not in DB")
-        return (
-            "",
-            -1,
-            JSONResponse(status_code=401, content={"message": "public key not registered"}),
-        )
+        raise HTTPException(status_code=401, detail="public key not registered")
 
     pub_key = pub_keys[0]
     if not isinstance(pub_key, PublicKey):
-        return (
-            "",
-            -1,
-            JSONResponse(status_code=401, content={"message": "public key not registered"}),
-        )
+        raise HTTPException(status_code=401, detail="public key not registered")
 
     if pub_key.admin != 1:
-        print("Rejecting non admin pub key")
-        return (
-            "",
-            -1,
-            JSONResponse(status_code=401, content={"message": "public key is not admin"}),
-        )
+        raise HTTPException(status_code=401, detail="public key is non admin")
 
     if pub_key.serial < 1:
-        return (
-            "",
-            -1,
-            JSONResponse(status_code=401, content={"message": "public key invalid"}),
-        )
-    return pub_key.pem, pub_key.serial, None
+        raise HTTPException(status_code=401, detail="public key is invalid")
+
+    return pub_key.pem, pub_key.serial
 
 
-async def _token_from_headers(request: Request) -> Tuple[bool, str]:
+async def _token_from_headers(request: Request) -> str:
     if "Authorization" not in request.headers:
-        return False, ""
+        raise HTTPException(status_code=401, detail="token missing")
 
-    token = request.headers["Authorization"].strip()
+    token: str = request.headers["Authorization"].strip()
     if token.startswith("Bearer "):
-        token = token.split("Bearer ")[1]
-    return True, token
+        token = token.replace("Bearer ", "")
+    return token
 
 
-async def _validate_token(
-    request: Request,
-) -> Tuple[int, str, Union[JSONResponse, None]]:
-    has_token, token = await _token_from_headers(request)
-    if not has_token:
-        return (
-            -1,
-            "",
-            JSONResponse(status_code=401, content={"message": "missing token"}),
-        )
+async def _validate_token(request: Request) -> Tuple[int, str]:
+    token = await _token_from_headers(request)
 
     # Load jwt public key from DB
     try:
         decoded_jwt = jwt.decode(token, algorithms=JWT_ALGOS, options={"verify_signature": False})
-    except BaseException as exeption:  # pylint: disable=broad-except
-        print(exeption)
-        return (
-            -1,
-            "",
-            JSONResponse(status_code=401, content={"message": "token invalid"}),
-        )
-    pub_key_pem, auth_by, auth_error = await _pub_key_from_db(jwk_key_to_pem(decoded_jwt))
-    if auth_error is not None or auth_by < 1:
-        return -1, "", auth_error
+    except BaseException as exception:  # pylint: disable=broad-except
+        # Log this
+        print(exception)
+        raise HTTPException(status_code=401, detail="token invalid") from exception
+
+    pub_key_pem, auth_by = await _pub_key_from_db(jwk_key_to_pem(decoded_jwt))
 
     # Verify signature with public key from db
     try:
         decoded_jwt = jwt.decode(token, key=pub_key_pem.encode("utf-8"), algorithms=JWT_ALGOS)
-    except BaseException as exeption:  # pylint: disable=broad-except
-        print(exeption)
-        return (
-            -1,
-            "",
-            JSONResponse(status_code=401, content={"message": "token signature invalid"}),
-        )
-    print("Verified signature with public key")
+    except BaseException as exception:  # pylint: disable=broad-except
+        # Log this
+        print(exception)
+        raise HTTPException(status_code=401, detail="token invalid signature") from exception
 
-    return auth_by, token, None
+    return auth_by, token
 
 
-async def _validate_url(request: Request, token: str) -> Union[JSONResponse, None]:
+async def _validate_url(request: Request, token: str) -> None:
     # https://ietf-wg-acme.github.io/acme/circle-test/draft-ietf-acme-acme.html#request-url-integrity
     jwt_header_decoded = json.loads(from_base64url(token.split(".")[0]))
     if "url" not in jwt_header_decoded:
-        return JSONResponse(status_code=401, content={"message": "url missing in token"})
+        raise HTTPException(status_code=401, detail="url missing in token")
 
-    if jwt_header_decoded["url"] == str(request.url):
-        print("Verified url in token")
-        return None
-    return JSONResponse(status_code=401, content={"message": "url in token verification failed"})
+    if jwt_header_decoded["url"] != str(request.url):
+        raise HTTPException(status_code=401, detail="url in token verification failed")
 
 
-async def _validate_nonce(token: str) -> Union[JSONResponse, None]:
+async def _validate_nonce(token: str) -> None:
     jwt_header_decoded = json.loads(from_base64url(token.split(".")[0]))
     if "nonce" not in jwt_header_decoded:
-        return JSONResponse(status_code=401, content={"message": "nonce missing in token"})
+        raise HTTPException(status_code=401, detail="nonce missing in token")
 
-    if await verify_nonce(jwt_header_decoded["nonce"]):
-        print("Verified nonce in token")
-        return None
-    return JSONResponse(status_code=401, content={"message": "nonce in token verification failed"})
+    if not await verify_nonce(jwt_header_decoded["nonce"]):
+        raise HTTPException(status_code=401, detail="nonce in token verification failed")
 
 
-async def _authorized_by(request: Request) -> Tuple[int, Union[JSONResponse, None]]:
-    auth_by, token, auth_error = await _validate_token(request)
-    if auth_error is not None or auth_by < 1:
-        return -1, auth_error
+async def _authorized_by(request: Request) -> int:
+    auth_by, token = await _validate_token(request)
 
     # Must be after token signature validate
-    auth_error = await _validate_url(request, token)
-    if auth_error is not None:
-        return -1, auth_error
+    await _validate_url(request, token)
 
     # Must be after token signature validate
-    auth_error = await _validate_nonce(token)
-    if auth_error is not None:
-        return -1, auth_error
+    await _validate_nonce(token)
 
-    return auth_by, None
+    return auth_by
 
 
-async def authorized_by(request: Request) -> Tuple[int, Union[JSONResponse, None]]:
+# Write this
+# raise HTTPException(status_code=401, detail="Unauthorized token.")
+async def authorized_by(request: Request) -> int:
+    """Authorize a request to to our http server.
+
+    Returns the ID of the public key in DB whoch was used to authorize the request.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request which we can extract the JWT and nonce from.
+
+    Returns:
+    int
+    """
+
     try:
         return await _authorized_by(request)
-    except BaseException as exeption:  # pylint: disable=broad-except
-        print(exeption)
-        return -1, JSONResponse(status_code=401, content={"message": "authorization failed"})
+    except HTTPException as exception:
+        raise exception
+    except BaseException as exception:
+        # Log this important error
+        raise HTTPException(status_code=401, detail="token verification failed") from exception

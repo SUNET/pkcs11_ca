@@ -1,5 +1,8 @@
+"""Base file which contains the abstract base classes"""
+
 from __future__ import annotations
 from typing import Union, Dict, List, Type
+
 from abc import ABC, abstractmethod
 import datetime
 
@@ -8,13 +11,23 @@ from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 
 class DataBaseObject(ABC):
+    """Abstract base class for database classes"""
 
     pkcs11_session: PKCS11Session
 
     @classmethod
     @abstractmethod
     async def delete(cls, table_name: str, unique_field: str, data: Union[str, int]) -> None:
-        pass
+        """Delete data object in DB.
+
+        Parameters:
+        table_name (str): Name of the DB table.
+        unique_field (str): Name of a unique_field.
+        data (Union[str, int]): The data in the unique field to delete.
+
+        Returns:
+        None
+        """
 
     @classmethod
     @abstractmethod
@@ -24,7 +37,16 @@ class DataBaseObject(ABC):
         fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> int:
-        pass
+        """Save data object in DB. Return the DB ID for the data object.
+
+        Parameters:
+        table_name (str): Name of the DB table.
+        fields (Dict[str, Union[str, int]]): Data for the fields.
+        unique_fields (List[str]): Data for the unique fields.
+
+        Returns:
+        int
+        """
 
     @classmethod
     @abstractmethod
@@ -34,16 +56,16 @@ class DataBaseObject(ABC):
         fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> None:
-        pass
+        """Update data object in DB.
 
-    @classmethod
-    @abstractmethod
-    async def load_all(
-        cls,
-        table_name: str,
-        fields: List[str],
-    ) -> List[Dict[str, Union[str, int]]]:
-        pass
+        Parameters:
+        table_name (str): Name of the DB table.
+        fields (Dict[str, Union[str, int]]): Data for the fields.
+        unique_fields (List[str]): Data for the unique fields.
+
+        Returns:
+        None
+        """
 
     @classmethod
     @abstractmethod
@@ -54,26 +76,58 @@ class DataBaseObject(ABC):
         fields: List[str],
         unique_fields: List[str],
     ) -> List[Dict[str, Union[str, int]]]:
-        pass
+        """Load data objects from DB, returns a list of dict with fields as keys
 
-    # Creates all tables, create and insert the root ca if not exists and loads trusted admin keys
+        Parameters:
+        table_name (str): Name of the DB table.
+        input_search (Dict[str, Union[str, int]]): Data to_search for.
+        fields (List[str]): Fields to retrieve.
+        unique_fields (List[str]): Data for the unique fields.
+
+        Returns:
+        List[Dict[str, Union[str, int]]]
+        """
+
     @classmethod
     @abstractmethod
-    async def init(
+    async def startup(
         cls,
         tables: List[str],
         fields: List[Dict[str, Union[Type[str], Type[int]]]],
         reference_fields: List[Dict[str, str]],
         unique_fields: List[List[str]],
     ) -> None:
-        pass
+        """Startup for the database.
+        Creates all tables, create and insert the root ca
+        if not exists and loads trusted admin keys.
+
+        Parameters:
+        tables (List[str]): Table names.
+        fields (List[Dict[str, Union[Type[str], Type[int]]]]): Fields and their data type.
+        reference_fields (List[Dict[str, str]]): Reference field names and their references.
+        unique_fields (List[List[str]]): Unique field names.
+
+        Returns:
+        None
+        """
 
 
 class InputObject(BaseModel):
-    pass
+    """FastAPI input object for HTTP post data"""
+
+    # pem: Union[str, None]
+    # fingerprint: Union[str, None]
+    # admin: Union[int, None]
+    # name_dict: Union[Dict[str, str], None]
+    # key_label: Union[str, None]
+    # issuer_pem: Union[str, None]
+    # key_size: Union[int, None]
+    # ca_pem: Union[str, None]
+    # serial: Union[int, None]
 
 
 class DataClassObject(ABC):
+    """Abstract base class for data classes"""
 
     db: DataBaseObject
 
@@ -92,6 +146,12 @@ class DataClassObject(ABC):
             setattr(self, key, value)
 
     def db_data(self) -> Dict[str, Union[str, int]]:
+        """Gather only the data vars matching the DB fields.
+
+        Returns:
+        Dict[str, Union[str, int]]
+        """
+
         data = {}
         class_data = vars(self)
         for key in class_data:
@@ -100,6 +160,15 @@ class DataClassObject(ABC):
         return data
 
     async def save(self, field_set_to_serial: Union[str, None] = None) -> int:
+        """Save data object to its database. Return its serial/ID.
+
+        Parameters:
+        field_set_to_serial (Union[str, None] = None): Set a field to its serial/ID field.
+
+        Returns:
+        int
+        """
+
         serial = await self.db.save(self.db_table_name, self.db_data(), self.db_unique_fields)
         print("Saved into " + self.db_table_name + ", serial " + str(serial))
         self.serial = serial
@@ -110,25 +179,34 @@ class DataClassObject(ABC):
         return serial
 
     async def delete(self) -> None:
+        """Delete data object from its database.
+
+        Returns:
+        None
+        """
+
         unique_field = self.db_unique_fields[0]
         self.db.delete(self.db_table_name, unique_field, self.db_data()[unique_field])
         print(
-            "Deleted from "
-            + self.db_table_name
-            + ", WHERE "
-            + unique_field
-            + " = "
-            + str(self.db_data()[unique_field])
+            "Deleted from " + self.db_table_name + ", WHERE " + unique_field + " = " + str(self.db_data()[unique_field])
         )
 
 
-async def db_load_data_class(
-    db_data_class: Type[DataClassObject], input_object: InputObject
-) -> List[DataClassObject]:
+async def db_load_data_class(db_data_class: Type[DataClassObject], input_object: InputObject) -> List[DataClassObject]:
+    """Load data objects from search data from its data fields in DB.
+
+    Parameters:
+    db_data_class (Type[DataClassObject]): Which class the object will be.
+    input_object (InputObject): Object with search data.
+
+    Returns:
+    int
+    """
 
     input_vars: Dict[str, Union[str, int]] = {}
+
     for key, value in vars(input_object).items():
-        if value is not None:
+        if value is not None and key in db_data_class.db_fields.keys():
             input_vars[key] = value
 
     value_dict_list = await DataClassObject.db.load(
@@ -136,22 +214,6 @@ async def db_load_data_class(
         input_vars,
         ["serial"] + list(db_data_class.db_fields.keys()),
         db_data_class.db_unique_fields,
-    )
-
-    ret: List[DataClassObject] = []
-    for value_dict in value_dict_list:
-
-        class_obj = db_data_class(value_dict)
-        for name, value in value_dict.items():
-            setattr(class_obj, name, value)
-        ret.append(class_obj)
-    return ret
-
-
-async def db_load_all_data_class(db_data_class: Type[DataClassObject]) -> List[DataClassObject]:
-    value_dict_list = await DataClassObject.db.load_all(
-        db_data_class.db_table_name,
-        ["serial"] + list(db_data_class.db_fields.keys()),
     )
 
     ret: List[DataClassObject] = []

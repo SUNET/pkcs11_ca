@@ -1,14 +1,14 @@
+"""Startup module"""
 from typing import Dict, List, Union, Type
 from importlib import import_module
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-# from .base import DataClassObject, DataBaseObject, db_data_classes, db_classes
-from .base import DataClassObject, DataBaseObject  # db_data_classes, db_classes
+from .base import DataClassObject, DataBaseObject
 from .config import DB_TABLE_MODULES, DB_MODULE, ROOT_CA_KEY_LABEL
 
 
-def load_db_data_modules() -> List[DataClassObject]:
+def _load_db_data_classes() -> List[DataClassObject]:
     db_data_classes: List[DataClassObject] = []
 
     for module_name in DB_TABLE_MODULES:
@@ -20,14 +20,12 @@ def load_db_data_modules() -> List[DataClassObject]:
         class_name = module_name[0].upper() + module_name[1:]
         if "_" in class_name:
             index = class_name.index("_")
-            class_name = (
-                class_name[:index] + class_name[index + 1].upper() + class_name[index + 2 :]
-            )
+            class_name = class_name[:index] + class_name[index + 1].upper() + class_name[index + 2 :]
         db_data_classes.append(getattr(db_data_module, class_name))
     return db_data_classes
 
 
-def load_db_module() -> DataBaseObject:
+def _load_db_module() -> DataBaseObject:
     try:
         module = import_module("." + DB_MODULE, "src.pkcs11_ca_service")
     except ModuleNotFoundError:
@@ -45,7 +43,7 @@ def load_db_module() -> DataBaseObject:
     return db_obj
 
 
-async def db_init(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]) -> None:
+async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]) -> None:
     tables: List[str] = []
     fields: List[Dict[str, Union[Type[str], Type[int]]]] = []
     reference_fields: List[Dict[str, str]] = []
@@ -57,17 +55,23 @@ async def db_init(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]
         reference_fields.append(db_data_class.db_reference_fields)
         unique_fields.append(db_data_class.db_unique_fields)
 
-    await db_obj.init(tables, fields, reference_fields, unique_fields)
+    await db_obj.startup(tables, fields, reference_fields, unique_fields)
 
 
-async def pkcs11_init(db_obj: DataBaseObject) -> None:
+async def _pkcs11_startup(db_obj: DataBaseObject) -> None:
     _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL)
     print("PKCS11 Session OK")
 
 
 async def startup() -> None:
-    db_obj = load_db_module()
-    db_data_classes = load_db_data_modules()
+    """Startup main function
 
-    await db_init(db_obj, db_data_classes)
-    await pkcs11_init(db_obj)
+    Returns:
+    None
+    """
+
+    db_obj = _load_db_module()
+    db_data_classes = _load_db_data_classes()
+
+    await _db_startup(db_obj, db_data_classes)
+    await _pkcs11_startup(db_obj)

@@ -1,29 +1,26 @@
-from typing import Union, List
+"""Main module, FastAPI runs from here"""
+from typing import Union
+import asyncio
+
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-import sys
-
-from .base import db_load_data_class, db_load_all_data_class
-from .csr import Csr, CsrInput
-from .certificate import Certificate
-from .crl import Crl, CrlInput
-from .ca import Ca, CaInput
-from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
-from .public_key import PublicKey, PublicKeyInput
-from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict
-from .nonce import generate_nonce, hash_nonce, nonces
-from .auth import authorized_by
-from .config import ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT
-
+from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.csr import sign_csr
+from python_x509_pkcs11.ca import create as create_ca
 
-from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from python_x509_pkcs11.ca import create as create
+from .base import db_load_data_class, InputObject
+from .csr import Csr, CsrInput, search as csr_search
+from .certificate import Certificate, CertificateInput, search as certificate_search
+from .crl import Crl, CrlInput, search as crl_search
+from .ca import Ca, CaInput, search as ca_search
+from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
+from .public_key import PublicKey, PublicKeyInput, search as public_key_search
+from .startup import startup
+from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict
+from .nonce import nonce_response
+from .auth import authorized_by
 
-
-import asyncio
 
 loop = asyncio.get_running_loop()
 loop.create_task(startup())
@@ -51,52 +48,244 @@ app = FastAPI()
 #                             media_type="application/x-pem-file")
 
 
-@app.head("/new_nonce")
-async def head_new_nonce() -> Response:
-    new_nonce = generate_nonce()
-    nonces.append(hash_nonce(new_nonce))
-    response = Response()
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["Replay-Nonce"] = new_nonce
-    return response
-
-
 @app.get("/new_nonce")
 async def get_new_nonce() -> Response:
-    response = Response()
-    new_nonce = generate_nonce()
-    nonces.append(hash_nonce(new_nonce))
-    response.headers["Cache-Control"] = "no-store"
-    response.headers["Replay-Nonce"] = new_nonce
-    return response
+    """Get new nonce, GET method.
+
+    Returns:
+    fastapi.Response
+    """
+
+    return nonce_response()
 
 
-# Redo this so CRLS can be fetched by perhaps the CAs common name
-@app.get("/public_key")
-async def get_public_key(request: Request) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
+@app.head("/new_nonce")
+async def head_new_nonce() -> Response:
+    """Get new nonce, HEAD method.
 
-    public_key_objs: List[PublicKey] = []
-    public_key_pems: List[str] = []
+    Returns:
+    fastapi.Response
+    """
 
-    db_public_key_objs = await db_load_all_data_class(PublicKey)
-    for obj in db_public_key_objs:
-        if isinstance(obj, PublicKey):
-            public_key_objs.append(obj)
-
-    for public_key in public_key_objs:
-        public_key_pems.append(public_key.pem)
-
-    return JSONResponse(status_code=200, content={"public_keys": public_key_pems})
+    return nonce_response()
 
 
+# DO THIS IN BASE OUTSIDE OF CLAss SEND CLASS TYPE AND INPUTOBJECT AS ARG not in publickey as now
+# try:
+#    for cls in load_db_data_classes():
+# app.post("/search/" + cls.db_table_name)(cls.search)
+
+
+@app.get("/search/public_key")
+async def get_public_key_search(request: Request) -> JSONResponse:
+    """/search/public_key, GET method.
+
+    Fetch all public keys.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await public_key_search(InputObject())
+
+
+@app.post("/search/public_key")
+async def post_public_key_search(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
+    """/search/public_key, POST method.
+
+    Fetch all public keys which matches the search pattern.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    public_key_input (PublicKeyInput): The search pattern.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await public_key_search(public_key_input)
+
+
+@app.get("/search/ca")
+async def get_ca_search(request: Request) -> JSONResponse:
+    """/search/ca, GET method.
+
+    Fetch all cas.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await ca_search(InputObject())
+
+
+@app.post("/search/ca")
+async def post_ca_search(request: Request, ca_input: CaInput) -> JSONResponse:
+    """/search/ca, POST method.
+
+    Fetch all cas which matches the search pattern.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    ca_input (CaInput): The search pattern.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await ca_search(ca_input)
+
+
+@app.get("/search/crl")
+async def get_crl_search(request: Request) -> JSONResponse:
+    """/search/crl, GET method.
+
+    Fetch all crls.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await crl_search(InputObject())
+
+
+@app.post("/search/crl")
+async def post_crl_search(request: Request, crl_input: CrlInput) -> JSONResponse:
+    """/search/crl, POST method.
+
+    Fetch all crls which matches the search pattern.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    crl_input (CrlInput): The search pattern.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await crl_search(crl_input)
+
+
+@app.get("/search/csr")
+async def get_csr_search(request: Request) -> JSONResponse:
+    """/search/csr, GET method.
+
+    Fetch all csrs.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await csr_search(InputObject())
+
+
+@app.post("/search/csr")
+async def post_csr_search(request: Request, csr_input: CsrInput) -> JSONResponse:
+    """/search/csr, POST method.
+
+    Fetch all csrs which matches the search pattern.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    csr_input (CsrInput): The search pattern.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await csr_search(csr_input)
+
+
+@app.get("/search/certificate")
+async def get_certificate_search(request: Request) -> JSONResponse:
+    """/search/certificate, GET method.
+
+    Fetch all certificates.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await certificate_search(InputObject())
+
+
+@app.post("/search/certificate")
+async def post_certificate_search(request: Request, certificate_input: CertificateInput) -> JSONResponse:
+    """/search/certificate, POST method.
+
+    Fetch all certificates which matches the search pattern.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    certificate_input (CertificateInput): The search pattern.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+    return await certificate_search(certificate_input)
+
+
+# except Exception as e:
+#    print(e)
+
+
+# @app.post("/public_key")
+# async def post_public_key(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
+
+
+# # for data_object in data_objects():
+
+# Dynamicly create search/DB_CLASS, t.ex. search/PublicKey
+# for all DB classes with ClassInput for all
+# Example
+# @app.post("/search/public_key")
+# async def post_search(request: Request,
+# input_obj: PublicKey (or atleast input_obj: InputObj abstract class) -> Response:
+
+# # Write this in auth
+# # raise HTTPException(status_code=401, detail="Unauthorized token.")
+# # So we only need to write auth_by = await authorized_by(request)
 @app.post("/public_key")
 async def post_public_key(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
+    """/public_key, POST method.
+
+    Post/create a new public key.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    public_key_input (PublicKeyInput): The public key data.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
 
     if public_key_input.pem is None:
         return JSONResponse(
@@ -104,45 +293,33 @@ async def post_public_key(request: Request, public_key_input: PublicKeyInput) ->
             content={"message": "must have 'pem' with the public key"},
         )
 
+    # remove is_admin check
     is_admin = 0
     if isinstance(public_key_input.admin, int) and public_key_input.admin == 1:
         is_admin = 1
 
     # Save Public key for new CA
-    public_key_obj = PublicKey(
-        {"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin}
-    )
+    public_key_obj = PublicKey({"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin})
     await public_key_obj.save()
     return JSONResponse(status_code=200, content={"public_key": public_key_obj.pem})
 
 
-# Redo this so CRLS can be fetched by perhaps the CAs common name
-@app.get("/crl")
-async def get_crl(request: Request) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
-
-    crl_objs: List[Crl] = []
-    crl_pems: List[str] = []
-
-    db_crl_objs = await db_load_all_data_class(Crl)
-    for obj in db_crl_objs:
-        if isinstance(obj, Crl):
-            crl_objs.append(obj)
-
-    for crl in crl_objs:
-        crl_pems.append(crl.pem)
-
-    return JSONResponse(status_code=200, content={"crls": crl_pems})
-
-
-# Redo this so CRLS are generated in the background and this fetches the last one
+# # Redo this so CRLS are generated in the background and this fetches the last one
 @app.post("/crl")
 async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
+    """/crl, POST method.
+
+    Post/create a new crl.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    crl_input (CrlInput): The crl data.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
 
     if crl_input.ca_pem is None:
         return JSONResponse(
@@ -157,22 +334,14 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     if not isinstance(issuer_obj, Ca):
         return JSONResponse(status_code=400, content={"message": "No such CA to sign with"})
 
-    issuer_pkcs11_key_objs = await db_load_data_class(
-        Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key)
-    )
+    issuer_pkcs11_key_objs = await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
     if not issuer_pkcs11_key_objs:
-        return JSONResponse(
-            status_code=400, content={"message": "CA to sign with has no pkcs11 key"}
-        )
+        return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
     issuer_pkcs11_key_obj = issuer_pkcs11_key_objs[0]
     if not isinstance(issuer_pkcs11_key_obj, Pkcs11Key):
-        return JSONResponse(
-            status_code=400, content={"message": "CA to sign with has no pkcs11 key"}
-        )
+        return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
 
-    crl_pem = await create_crl(
-        issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem)
-    )
+    crl_pem = await create_crl(issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem))
 
     crl_obj = Crl(
         {
@@ -186,64 +355,26 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     return JSONResponse(status_code=200, content={"crl": crl_pem})
 
 
-# @app.get("/crl")
-# def get_crl() -> str:
-# return create("test_4", root_ca_name_dict)
-
-## POST HTTP ##
-# @app.post("/has_csr")
-# def has_csr(c: csr.Csr):
-#    return post_path.has_csr(c)
-
-# @app.post("/has_issued_cert")
-# def has_issued_cert(c: cert.CertInput):
-#    return post_path.has_issued_cert(c)
-
-# @app.post("/add_public_key")
-# async def post_sign_csr(request: Request, public_key_input: PublicKeyInput) -> JSONResponse:
-#     auth_by, auth_error = await authorized_by(request)
-#     if auth_error is not None or auth_by < 1:
-#         return auth_error
-
-#     new_public_key = PublicKey(
-#         {"pem": public_key_pem_from_csr(csr_input.pem),
-#          "authorized_by": auth_by}
-#     )
-#     await new_public_key.save()
-
-
-@app.get("/ca")
-async def get_ca(request: Request) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
-
-    ca_objs: List[Ca] = []
-    ca_pems: List[str] = []
-
-    db_ca_objs = await db_load_all_data_class(Ca)
-    for obj in db_ca_objs:
-        if isinstance(obj, Ca):
-            ca_objs.append(obj)
-
-    for ca in ca_objs:
-        ca_pems.append(ca.pem)
-
-    return JSONResponse(status_code=200, content={"cas": ca_pems})
-
-
 @app.post("/ca")
 async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
+    """/ca, POST method.
+
+    Post/create a new ca.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    ca_input (CaInput): The ca data.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
 
     if ca_input.name_dict is None or ca_input.key_label is None:
         return JSONResponse(
             status_code=400,
-            content={
-                "message": "must have json dict with key 'pem' with a csr and 'ca_pem' with the signing CA"
-            },
+            content={"message": "missing json dict key 'pem' with a csr and 'ca_pem' with the signing CA"},
         )
 
     signer_key_label: Union[str, None] = None
@@ -257,21 +388,15 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         if not isinstance(issuer_obj, Ca):
             return JSONResponse(status_code=400, content={"message": "No such CA to sign with"})
 
-        issuer_pkcs11_key_objs = await db_load_data_class(
-            Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key)
-        )
+        issuer_pkcs11_key_objs = await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
         if not issuer_pkcs11_key_objs:
-            return JSONResponse(
-                status_code=400, content={"message": "CA to sign with has no pkcs11 key"}
-            )
+            return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
         issuer_pkcs11_key_obj = issuer_pkcs11_key_objs[0]
         if not isinstance(issuer_pkcs11_key_obj, Pkcs11Key):
-            return JSONResponse(
-                status_code=400, content={"message": "CA to sign with has no pkcs11 key"}
-            )
+            return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
         signer_key_label = issuer_pkcs11_key_obj.key_label
 
-    ca_csr_pem, ca_pem = await create(
+    ca_csr_pem, ca_pem = await create_ca(
         ca_input.key_label,
         ca_input.name_dict,
         ca_input.key_size,
@@ -279,7 +404,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
     )
 
     # Save Public key for new CA
-    public_key_pem, identifier = await PKCS11Session.public_key_data(ca_input.key_label)
+    public_key_pem, _ = await PKCS11Session.public_key_data(ca_input.key_label)
     public_key_obj = PublicKey({"pem": public_key_pem, "authorized_by": auth_by})
     await public_key_obj.save()
 
@@ -294,9 +419,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
     await pkcs11_key_obj.save()
 
     # Save csr for new CA
-    csr_obj = Csr(
-        {"pem": ca_csr_pem, "authorized_by": auth_by, "public_key": public_key_obj.serial}
-    )
+    csr_obj = Csr({"pem": ca_csr_pem, "authorized_by": auth_by, "public_key": public_key_obj.serial})
     await csr_obj.save()
 
     # Save new CA
@@ -321,38 +444,41 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
                 "csr": csr_obj.serial,
             }
         )
-        # Cant know issuer before we know serial which is only after we call save() so hack this when the field_set_to_serial parameter
+        # Cant know issuer before we know serial which is only after we call save()
+        # so hack this when the field_set_to_serial parameter
         await ca_obj.save(field_set_to_serial="issuer")
 
     return JSONResponse(status_code=200, content={"certificate": ca_pem})
 
 
-# FIXME allow request to specify which CA to sign with, perhaps the CAs pem or the CAs pub_key pem
-# Perhaps a 'replaced_by' field for CAs and/or error message trying to use a revoked/old CA to sign with
 @app.post("/sign_csr")
 async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
-    auth_by, auth_error = await authorized_by(request)
-    if auth_error is not None or auth_by < 1:
-        return auth_error
+    """/sign_csr, POST method.
+
+    Post/create a new csr, will create and return certificate.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    csr_input (CrlInput): The csr data.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
 
     if csr_input.pem is None or csr_input.ca_pem is None:
         return JSONResponse(
             status_code=400,
-            content={
-                "message": "must have json dict with key 'pem' with a csr and 'ca_pem' with the signing CA"
-            },
+            content={"message": "missing json dict key 'pem' with a csr and 'ca_pem' with the signing CA"},
         )
 
     # Get public key from csr
-    public_key_obj = PublicKey(
-        {"pem": public_key_pem_from_csr(csr_input.pem), "authorized_by": auth_by}
-    )
+    public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_input.pem), "authorized_by": auth_by})
     await public_key_obj.save()
 
     # Save csr
-    csr_obj = Csr(
-        {"pem": csr_input.pem, "authorized_by": auth_by, "public_key": public_key_obj.serial}
-    )
+    csr_obj = Csr({"pem": csr_input.pem, "authorized_by": auth_by, "public_key": public_key_obj.serial})
     await csr_obj.save()
 
     # Get CA to sign csr with
@@ -374,9 +500,7 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
         return JSONResponse(status_code=400, content={"message": "CA has no pkcs11 key"})
 
     # Sign csr
-    cert_pem = await sign_csr(
-        pkcs11_key_obj.key_label, pem_cert_to_name_dict(ca_obj.pem), csr_obj.pem
-    )
+    cert_pem = await sign_csr(pkcs11_key_obj.key_label, pem_cert_to_name_dict(ca_obj.pem), csr_obj.pem)
 
     # Save cert
     cert_obj = Certificate(

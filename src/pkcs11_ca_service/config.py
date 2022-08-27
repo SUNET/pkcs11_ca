@@ -1,3 +1,5 @@
+"""Config module"""
+
 # Folder for the initial trusted pub_keys
 ROOT_ADMIN_KEYS_FOLDER = "trusted_pub_keys"
 

@@ -2,15 +2,13 @@
 Test our CRL creation
 """
 import unittest
-import requests
-import datetime
-import os
-import jwt
 import json
 
+import requests
 from asn1crypto import crl as asn1_crl
 from asn1crypto import pem as asn1_pem
-from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
+
+from .lib import get_cas, create_jwt_header_str
 
 
 class TestCrl(unittest.TestCase):
@@ -23,37 +21,40 @@ class TestCrl(unittest.TestCase):
         Test crls
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f:
-            priv_key = f.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f:
-            pub_key = f.read()
+        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+            pub_key = f_data.read()
+        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:  # pylint:disable=duplicate-code
+            priv_key = f_data.read()
 
-        # Get CAs
-        req = requests.head("http://localhost:8000/new_nonce")
-        nonce = req.headers["Replay-Nonce"]
-        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/ca"}
-        jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-        request_headers = {}
-        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
-        req = requests.get("http://localhost:8000/ca", headers=request_headers)
-        self.assertTrue(req.status_code == 200)
-        cas = json.loads(req.text)["cas"]
+        # Get all CAs
+        cas = get_cas(pub_key, priv_key)
 
-        # Sign a csr
-        req = requests.head("http://localhost:8000/new_nonce")
-        nonce = req.headers["Replay-Nonce"]
-        jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/crl"}
-        jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
+        # create a crl
         request_headers = {}
-        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/crl")
 
         data = json.loads('{"ca_pem": ' + '"' + cas[0].replace("\n", "\\n") + '"' + "}")
         req = requests.post("http://localhost:8000/crl", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
 
+        crl1 = json.loads(req.text)["crl"]
         data = json.loads(req.text)["crl"].encode("utf-8")
+        if asn1_pem.detect(data):
+            _, _, data = asn1_pem.unarmor(data)
+
+        test_crl = asn1_crl.CertificateList.load(data)
+        self.assertTrue(isinstance(test_crl, asn1_crl.CertificateList))
+
+        # get the crl
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/search/crl")
+
+        data = json.loads('{"pem": ' + '"' + crl1.replace("\n", "\\n") + '"' + "}")
+        req = requests.post("http://localhost:8000/search/crl", headers=request_headers, json=data)
+        self.assertTrue(req.status_code == 200)
+        self.assertTrue(len(json.loads(req.text)["crls"]) == 1)
+
+        data = json.loads(req.text)["crls"][0].encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
 

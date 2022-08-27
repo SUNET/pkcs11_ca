@@ -1,3 +1,5 @@
+"""ASN1 module, mstly using asn1crypto"""
+
 from typing import Tuple, Dict
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 import hashlib
@@ -16,11 +18,29 @@ from .error import UnsupportedJWTAlgorithm
 
 
 def to_base64url(data: bytes) -> str:
+    """Encode to base64url.
+
+    Parameters:
+    data (bytes): input data
+
+    Returns:
+    str
+    """
+
     enc = urlsafe_b64encode(data).strip(b"=")
     return enc.decode("utf-8")
 
 
 def from_base64url(b64url: str) -> bytes:
+    """Decode base64url.
+
+    Parameters:
+    b64url (str): input data
+
+    Returns:
+    bytes
+    """
+
     data = b64url.encode("utf-8")
     padding = b"=" * (4 - (len(data) % 4))
     dec = urlsafe_b64decode(data + padding)
@@ -28,13 +48,31 @@ def from_base64url(b64url: str) -> bytes:
 
 
 def pem_to_sha256_fingerprint(pem: str) -> str:
+    """Get the sha256 hash from pem data.
+
+    Parameters:
+    pem (str): input data
+
+    Returns:
+    str
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
     return hashlib.sha256(data).hexdigest()
 
 
-def pem_cert_to_name_dict(pem: str) -> dict[str, str]:
+def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
+    """Get the subject name dict from pem data as a dict.
+
+    Parameters:
+    pem (bytes): input data
+
+    Returns:
+    Dict[str, str]
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -44,8 +82,18 @@ def pem_cert_to_name_dict(pem: str) -> dict[str, str]:
     return ret
 
 
-# https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
 def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
+    """Get the sha1 fingerprint for the public key in pem data.
+
+    See https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
+
+    Parameters:
+    pem (str): input data
+
+    Returns:
+    str
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -55,11 +103,29 @@ def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
 
 
 def public_key_info_to_pem(public_key_info: PublicKeyInfo) -> str:
+    """Get pem from public key info data
+
+    Parameters:
+    public_key_info (asn1crypto.keys.PublicKeyInfo): input data
+
+    Returns:
+    str
+    """
+
     pem: bytes = asn1_pem.armor("PUBLIC KEY", public_key_info.dump())
     return pem.decode("utf-8")
 
 
 def jwk_key_to_pem(data: Dict[str, str]) -> str:
+    """Get pem for public key from jwk key
+
+    Parameters:
+    data (Dict[str, str]): input data
+
+    Returns:
+    str
+    """
+
     rsa = RSAPublicKey()
     rsa["modulus"] = int(from_base64url(data["modulus"]).decode("utf-8"))
     rsa["public_exponent"] = int(from_base64url(data["public_exponent"]).decode("utf-8"))
@@ -74,6 +140,15 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
 
 
 def pem_key_to_jwk(pem: str) -> Dict[str, str]:
+    """Get jwk key from pem
+
+    Parameters:
+    pem (str): input data
+
+    Returns:
+    Dict[str, str]
+    """
+
     ret: Dict[str, str] = {}
 
     data = pem.encode("utf-8")
@@ -87,9 +162,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
         ret["kty"] = "rsa"
         ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
-        ret["public_exponent"] = to_base64url(
-            str(key["public_key"].native["public_exponent"]).encode("utf-8")
-        )
+        ret["public_exponent"] = to_base64url(str(key["public_key"].native["public_exponent"]).encode("utf-8"))
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
         return ret
 
@@ -99,6 +172,15 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
 
 def public_key_pem_from_csr(pem: str) -> str:
+    """Get public key in pem from csr
+
+    Parameters:
+    pem (str): csr input data
+
+    Returns:
+    str
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -107,6 +189,15 @@ def public_key_pem_from_csr(pem: str) -> str:
 
 
 def public_key_pem_from_cert(pem: str) -> str:
+    """Get public key in pem from cert
+
+    Parameters:
+    pem (str): cert input data
+
+    Returns:
+    str
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -115,6 +206,15 @@ def public_key_pem_from_cert(pem: str) -> str:
 
 
 def not_before_not_after_from_cert(pem: str) -> Tuple[str, str]:
+    """Get not_before and not_after from cert
+
+    Parameters:
+    pem (str): cert input data
+
+    Returns:
+    Tuple[str, str]
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -125,6 +225,15 @@ def not_before_not_after_from_cert(pem: str) -> Tuple[str, str]:
 
 
 def this_update_next_update_from_crl(pem: str) -> Tuple[str, str]:
+    """Get this_update and next_update from crl
+
+    Parameters:
+    pem (str): crl input data
+
+    Returns:
+    Tuple[str, str]
+    """
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)

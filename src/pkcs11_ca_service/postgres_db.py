@@ -1,5 +1,5 @@
 """
-Module which handlas database actions
+Module which handles database queries
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ from asyncpg import create_pool
 from asyncpg.pool import Pool
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from python_x509_pkcs11.ca import create as create
+from python_x509_pkcs11.ca import create as create_ca
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
@@ -34,12 +34,12 @@ from .error import WrongDataType
 from .asn1 import (
     public_key_pem_to_sha1_fingerprint,
     pem_to_sha256_fingerprint,
-    public_key_info_to_pem,
 )
 from .base import DataBaseObject
 
 
 class PostgresDB(DataBaseObject):
+    """Class to use with Postgres DB"""
 
     pool: Pool
 
@@ -60,6 +60,10 @@ class PostgresDB(DataBaseObject):
         fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> None:
+
+        if not fields:
+            raise WrongDataType("Cant update DB row, 'fields' dict was empty")
+
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
                 args = ()
@@ -67,9 +71,9 @@ class PostgresDB(DataBaseObject):
                 for index, key in enumerate(fields):
                     query += key + " = $" + str(index + 1) + ","
                     args = args + (fields[key],)  # type: ignore
-                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(index + 1)
-                print(query)
-                rows = await conn.fetch(query, *args, fields[unique_fields[0]])
+                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(len(fields))
+                # print(query)
+                await conn.fetch(query, *args, fields[unique_fields[0]])
 
     @classmethod
     async def save(
@@ -106,9 +110,7 @@ class PostgresDB(DataBaseObject):
         return serial
 
     @classmethod
-    def _rows_to_class_objects(
-        cls, rows: List[Tuple[str, int]], fields: List[str]
-    ) -> List[Dict[str, Union[str, int]]]:
+    def _rows_to_class_objects(cls, rows: List[Tuple[str, int]], fields: List[str]) -> List[Dict[str, Union[str, int]]]:
 
         ret: List[Dict[str, Union[str, int]]] = []
         for row in rows:
@@ -117,25 +119,6 @@ class PostgresDB(DataBaseObject):
                 value_dict[field] = row[index]
             ret.append(value_dict)
         return ret
-
-    @classmethod
-    async def load_all(
-        cls,
-        table_name: str,
-        fields: List[str],
-    ) -> List[Dict[str, Union[str, int]]]:
-
-        async with cls.pool.acquire() as conn:
-            async with conn.transaction():
-
-                fields_list: List[Dict[str, Union[str, int]]] = []
-                query = "SELECT "
-                for field in fields:
-                    query += field + ","
-                query = query[:-1] + " FROM " + table_name
-                rows = await conn.fetch(query)
-                fields_list += cls._rows_to_class_objects(rows, fields)
-        return fields_list
 
     @classmethod
     async def load(
@@ -158,13 +141,26 @@ class PostgresDB(DataBaseObject):
             async with conn.transaction():
 
                 fields_list: List[Dict[str, Union[str, int]]] = []
-                for key in search:
+
+                # If search argument exists
+                if input_search:
+                    for key in search:
+                        query = "SELECT "
+                        for field in fields:
+                            query += field + ","
+                        query = query[:-1] + " FROM " + table_name + " WHERE " + key + " = $1"
+                        rows = await conn.fetch(query, search[key])
+                        fields_list += cls._rows_to_class_objects(rows, fields)
+
+                # If no search argument exists
+                else:
                     query = "SELECT "
                     for field in fields:
                         query += field + ","
-                    query = query[:-1] + " FROM " + table_name + " WHERE " + key + " = $1"
-                    rows = await conn.fetch(query, search[key])
+                    query = query[:-1] + " FROM " + table_name
+                    rows = await conn.fetch(query)
                     fields_list += cls._rows_to_class_objects(rows, fields)
+
         return fields_list
 
     @classmethod
@@ -188,9 +184,7 @@ class PostgresDB(DataBaseObject):
             async with conn.transaction():
 
                 query = (
-                    "CREATE TABLE IF NOT EXISTS "
-                    + table
-                    + " (serial BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
+                    "CREATE TABLE IF NOT EXISTS " + table + " (serial BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
                 )
 
                 for field in fields:
@@ -201,9 +195,7 @@ class PostgresDB(DataBaseObject):
                     elif fields[field] == str:
                         query += "TEXT "
                     else:
-                        raise WrongDataType(
-                            "Currently only supports 'int' and 'str' database field types"
-                        )
+                        raise WrongDataType("Currently only supports 'int' and 'str' database field types")
 
                     if field in unique_fields:
                         query += "UNIQUE "
@@ -228,9 +220,7 @@ class PostgresDB(DataBaseObject):
 
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
                         key_pem = file_data.read().decode("utf-8")
-                    print(
-                        "Saved admin key " + ROOT_ADMIN_KEYS_FOLDER + "/" + key_file + " into DB"
-                    )
+                    print("Saved admin key " + ROOT_ADMIN_KEYS_FOLDER + "/" + key_file + " into DB")
 
                     query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
                     await conn.execute(
@@ -246,7 +236,7 @@ class PostgresDB(DataBaseObject):
                     )
 
     @classmethod
-    async def init(
+    async def startup(
         cls,
         tables: List[str],
         fields: List[Dict[str, Union[Type[str], Type[int]]]],
@@ -255,16 +245,7 @@ class PostgresDB(DataBaseObject):
     ) -> None:
 
         cls.pool = await create_pool(
-            dsn="postgres://"
-            + DB_USER
-            + ":"
-            + DB_PASSWORD
-            + "@"
-            + DB_HOST
-            + ":"
-            + DB_PORT
-            + "/"
-            + DB_DATABASE,
+            dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
             min_size=5,
             max_size=50,
             command_timeout=DB_TIMEOUT,
@@ -277,9 +258,7 @@ class PostgresDB(DataBaseObject):
         await cls._drop_all_tables(tables)
 
         for index, table in enumerate(tables):
-            await cls._init_table(
-                table, fields[index], reference_fields[index], unique_fields[index]
-            )
+            await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
             classes_info[table] = list(fields[index].keys())
 
         if not await cls._has_root_ca():
@@ -293,7 +272,7 @@ class PostgresDB(DataBaseObject):
         async with cls.pool.acquire() as conn:
             try:
                 query = "SELECT serial FROM ca WHERE serial = issuer"
-                rows = await conn.fetch(query)
+                await conn.fetch(query)
             except UndefinedTableError:
                 pass
 
@@ -325,12 +304,10 @@ class PostgresDB(DataBaseObject):
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
-                not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(
-                    minutes=2
-                )
+                not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)
                 not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
 
-                root_ca_csr_pem, root_ca_pem = await create(
+                root_ca_csr_pem, root_ca_pem = await create_ca(
                     ROOT_CA_KEY_LABEL,
                     ROOT_CA_NAME_DICT,
                     ROOT_CA_KEY_SIZE,
@@ -368,8 +345,8 @@ class PostgresDB(DataBaseObject):
                 query = cls._insert_root_item_query(classes_info["ca"], "ca")
                 await conn.execute(
                     query,
-                    1,
                     root_ca_pem,
+                    1,
                     1,
                     1,
                     1,

@@ -23,7 +23,10 @@ mypy --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/nul
 # echo "Running tests"
 # python3 -m unittest
 
-black --line-length 99 src/pkcs11_ca_service/*.py || exit 1
-black --line-length 99 tests/*.py || exit 1
+black --line-length 120 src/pkcs11_ca_service/*.py || exit 1
+black --line-length 120 tests/*.py || exit 1
 
-uvicorn src.pkcs11_ca_service.main:app --workers 1
+pylint --max-line-length 120 src/pkcs11_ca_service/*.py || exit 1
+pylint --max-line-length 120 tests/*.py || exit 1
+
+uvicorn src.pkcs11_ca_service.main:app --workers 1 --header server:pkcs11_ca_service

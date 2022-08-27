@@ -1,3 +1,4 @@
+"""Module to handle pkcs11 keys"""
 from typing import Union, Dict
 from .base import DataClassObject, InputObject
 
@@ -5,11 +6,14 @@ from .error import WrongDataType
 
 
 class Pkcs11KeyInput(InputObject):
+    """Class to represent PKCS11 key matching from HTTP post data """
+
     key_label: Union[str, None]
     serial: Union[int, None]
 
 
 class Pkcs11Key(DataClassObject):
+    """Class to represent a PKCS11 key"""
 
     db_table_name = "pkcs11_key"
     db_fields = {
