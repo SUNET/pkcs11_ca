@@ -90,6 +90,18 @@ class DataBaseObject(ABC):
 
     @classmethod
     @abstractmethod
+    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
+        """Get last CRL for an CA
+
+        Parameters:
+        pem (str): The database row serial for the CA
+
+        Returns:
+        str
+        """
+
+    @classmethod
+    @abstractmethod
     async def startup(
         cls,
         tables: List[str],

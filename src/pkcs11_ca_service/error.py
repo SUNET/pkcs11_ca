@@ -31,7 +31,7 @@ class UnsupportedJWTAlgorithm(Exception):
 
 
 class WrongDataType(Exception):
-    """Class to handle wtong data types"""
+    """Class to handle wrong data types"""
 
     def __init__(self, message: str = "Wrong data type") -> None:
 

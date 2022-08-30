@@ -17,13 +17,14 @@ from .ca import Ca, CaInput, search as ca_search
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict
+from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca
 from .nonce import nonce_response
 from .auth import authorized_by
 
 
 loop = asyncio.get_running_loop()
 loop.create_task(startup())
+
 
 # Create fastapi app
 app = FastAPI()
@@ -309,7 +310,7 @@ async def post_public_key(request: Request, public_key_input: PublicKeyInput) ->
 async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     """/crl, POST method.
 
-    Post/create a new crl.
+    Create a new crl.
 
     Parameters:
     request (fastapi.Request): The entire HTTP request.
@@ -341,8 +342,10 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     if not isinstance(issuer_pkcs11_key_obj, Pkcs11Key):
         return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
 
-    crl_pem = await create_crl(issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem))
-
+    revoke_data = await issuer_obj.db.revoke_data_for_ca(issuer_obj.serial)
+    crl_pem = await create_crl(
+        issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=revoke_data["crl"]
+    )
     crl_obj = Crl(
         {
             "pem": crl_pem,
@@ -448,6 +451,15 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         # so hack this when the field_set_to_serial parameter
         await ca_obj.save(field_set_to_serial="issuer")
 
+    # Create an empty CRL for the CA
+    await Crl(
+        {
+            "pem": await create_crl(ca_input.key_label, pem_cert_to_name_dict(ca_pem)),
+            "authorized_by": auth_by,
+            "issuer": ca_obj.serial,
+        }
+    ).save()
+
     return JSONResponse(status_code=200, content={"certificate": ca_pem})
 
 
@@ -457,9 +469,11 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
 
     Post/create a new csr, will create and return certificate.
 
+    If a cert has CA:TRUE then treat it as a normal cert since we dont have its public key
+
     Parameters:
     request (fastapi.Request): The entire HTTP request.
-    csr_input (CrlInput): The csr data.
+    csr_input (CsrInput): The csr data.
 
     Returns:
     fastapi.responses.JSONResponse
@@ -513,9 +527,59 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
         }
     )
     await cert_obj.save()
+    if cert_is_ca(cert_pem):
+        print("Note treating CA as a certificate since we dont have the private key")
 
     # Return cert
     return JSONResponse(status_code=200, content={"certificate": cert_obj.pem})
+
+
+class RevokeInput(InputObject):
+    """Class to represent revoke specification matching from HTTP post data """
+
+    pem: str
+    # pem: Union[str, None]
+    # fingerprint: Union[str, None]
+    # serial: Union[int, None]
+
+
+@app.post("/revoke")
+async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONResponse:
+    """/revoke, POST method.
+
+    Revoke a certificate/certificate authority as a CA is really just a certificate.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    revoke_input (PublicKeyInput): The revoke specification
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
+
+    db_certificate_objs = await db_load_data_class(Certificate, CertificateInput(pem=revoke_input.pem))
+    for obj in db_certificate_objs:
+        if isinstance(obj, Certificate):
+            crl_pem = await obj.revoke(auth_by)
+            return JSONResponse(
+                status_code=200,
+                content={"crl": crl_pem},
+            )
+    db_ca_objs = await db_load_data_class(Ca, CaInput(pem=revoke_input.pem))
+    for obj in db_ca_objs:
+        if isinstance(obj, Ca):
+            crl_pem = await obj.revoke(auth_by)
+            return JSONResponse(
+                status_code=200,
+                content={"crl": crl_pem},
+            )
+
+    return JSONResponse(
+        status_code=400,
+        content={"message": "No such certificate or CA"},
+    )
 
 
 # Special for compatibility

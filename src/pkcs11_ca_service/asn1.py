@@ -241,3 +241,44 @@ def this_update_next_update_from_crl(pem: str) -> Tuple[str, str]:
     this_update = crl["tbs_cert_list"]["this_update"].native
     next_update = crl["tbs_cert_list"]["next_update"].native
     return str(this_update), str(next_update)
+
+
+def cert_pem_serial_number(pem: str) -> int:
+    """Get serial number from cert in pem form.
+
+    Parameters:
+    pem (str): Cert input data in pem form.
+
+    Returns:
+    str
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    cert = asn1_x509.Certificate().load(data)
+
+    ret: int = cert["tbs_certificate"]["serial_number"]
+    return ret
+
+
+def cert_is_ca(pem: str) -> bool:
+    """If certificate is a CA
+
+    Parameters:
+    pem (str): Cert input data in pem form.
+
+    Returns:
+    bool
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    cert = asn1_x509.Certificate().load(data)
+
+    for _, ext in enumerate(cert["tbs_certificate"]["extensions"]):
+        if ext[0].dotted == "2.5.29.19":
+            ret: bool = ext[1].native
+            return ret
+    return False

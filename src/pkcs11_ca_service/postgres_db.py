@@ -13,6 +13,9 @@ from asyncpg.pool import Pool
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.ca import create as create_ca
+from python_x509_pkcs11.crl import create as create_crl
+
+from .asn1 import this_update_next_update_from_crl
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
@@ -236,6 +239,33 @@ class PostgresDB(DataBaseObject):
                     )
 
     @classmethod
+    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
+        async with cls.pool.acquire() as conn:
+            async with conn.transaction():
+
+                query = (
+                    "SELECT crl.pem, ca.pem FROM crl INNER JOIN ca ON crl.issuer = ca.serial "
+                    + "WHERE ca.serial = $1 ORDER BY crl.serial DESC LIMIT 1"
+                )
+                rows = await conn.fetch(query, ca_serial)
+                crl: str = rows[0][0]
+                cert_auth: str = rows[0][1]
+
+                query = (
+                    "SELECT pkcs11_key.key_label from pkcs11_key INNER JOIN ca "
+                    + "ON ca.pkcs11_key = pkcs11_key.serial WHERE ca.serial = $1"
+                )
+                rows = await conn.fetch(query, ca_serial)
+                key_label: str = rows[0][0]
+
+                ret = {}
+                ret["crl"] = crl
+                ret["ca"] = cert_auth
+                ret["key_label"] = key_label
+
+                return ret
+
+    @classmethod
     async def startup(
         cls,
         tables: List[str],
@@ -353,5 +383,19 @@ class PostgresDB(DataBaseObject):
                     pem_to_sha256_fingerprint(root_ca_pem),
                     str(not_before),
                     str(not_after),
+                    str(datetime.datetime.utcnow()),
+                )
+
+                # Create CRL for root CA
+                crl_pem = await create_crl(ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT)
+                this_update, next_update = this_update_next_update_from_crl(crl_pem)
+                query = cls._insert_root_item_query(classes_info["crl"], "crl")
+                await conn.execute(
+                    query,
+                    crl_pem,
+                    1,
+                    1,
+                    this_update,
+                    next_update,
                     str(datetime.datetime.utcnow()),
                 )

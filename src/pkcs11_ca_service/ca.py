@@ -1,9 +1,13 @@
 """Module to handle certificate authorities"""
 from typing import Dict, Union, List
 from fastapi.responses import JSONResponse
-from .base import DataClassObject, InputObject, db_load_data_class
-from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert
+from fastapi import HTTPException
+from python_x509_pkcs11.crl import create as create_crl
 
+from .crl import Crl
+from .asn1 import pem_cert_to_name_dict
+from .base import DataClassObject, InputObject, db_load_data_class
+from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert, cert_pem_serial_number
 from .error import WrongDataType
 
 
@@ -53,6 +57,41 @@ class Ca(DataClassObject):
 
         self.fingerprint = pem_to_sha256_fingerprint(self.pem)
         self.not_before, self.not_after = not_before_not_after_from_cert(self.pem)
+
+    async def revoke(self, auth_by: int) -> str:
+        """Revoke the certificate authority
+        https://github.com/wbond/asn1crypto/blob/b5f03e6f9797c691a3b812a5bb1acade3a1f4eeb/asn1crypto/crl.py#L97
+
+        Parameters:
+        auth_by (int): The revoker public key DB id
+
+        Returns:
+        str
+        """
+
+        issuer = vars(self).get("issuer")
+        if issuer is None or issuer < 1:
+            raise HTTPException(status_code=400, detail="Cannot revoke a non existing ca.")
+
+        revoke_data = await self.db.revoke_data_for_ca(issuer)
+        crl_pem: str = await create_crl(
+            revoke_data["key_label"],
+            pem_cert_to_name_dict(revoke_data["ca"]),
+            old_crl_pem=revoke_data["crl"],
+            serial_number=cert_pem_serial_number(self.pem),
+            reason=5,
+        )
+        crl_obj = Crl(
+            {
+                "pem": crl_pem,
+                "issuer": issuer,
+                "authorized_by": auth_by,
+            }
+        )
+        await crl_obj.save()
+
+        print("Revoked " + self.pem)
+        return crl_pem
 
 
 async def search(input_object: InputObject) -> JSONResponse:
