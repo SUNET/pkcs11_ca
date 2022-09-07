@@ -118,7 +118,6 @@ class Ca(DataClassObject):
         ca_pem: str = self.pem
 
         while True:
-            print(revoke_data)
             ca_issuer = revoke_data["ca_issuer"]
             if not isinstance(ca_issuer, int):  # pylint:disable=duplicate-code
                 raise HTTPException(status_code=400, detail="Error with CA")

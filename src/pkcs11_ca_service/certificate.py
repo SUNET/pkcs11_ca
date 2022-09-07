@@ -112,7 +112,6 @@ class Certificate(DataClassObject):
         ca_pem: str = self.pem
 
         while True:
-            print(revoke_data)
             ca_serial = revoke_data["ca_serial"]
             if not isinstance(ca_serial, int):  # pylint:disable=duplicate-code
                 raise HTTPException(status_code=400, detail="Error with CA")
