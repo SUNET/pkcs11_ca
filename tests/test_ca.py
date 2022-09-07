@@ -142,5 +142,4 @@ class TestCa(unittest.TestCase):
         for _, extension in enumerate(tbs["extensions"]):
             if extension["extn_id"].dotted == "2.5.29.35":
                 aki = extension["extn_value"].native["key_identifier"]
-
-        self.assertTrue(ski != aki)
+        self.assertTrue(ski == aki)
