@@ -19,7 +19,7 @@ from .ca import Ca, CaInput, search as ca_search
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca
+from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, crl_expired
 from .nonce import nonce_response
 from .auth import authorized_by
 
@@ -346,17 +346,24 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
         return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
 
     revoke_data = await issuer_obj.db.revoke_data_for_ca(issuer_obj.serial)
-    crl_pem = await create_crl(
-        issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=revoke_data["crl"]
-    )
-    crl_obj = Crl(
-        {
-            "pem": crl_pem,
-            "authorized_by": auth_by,
-            "issuer": issuer_obj.serial,
-        }
-    )
-    await crl_obj.save()
+
+    # If CRL has not expired
+    if not crl_expired(revoke_data["crl"]):
+        crl_pem = revoke_data["crl"]
+
+    else:
+        # Create a new CRL
+        crl_pem = await create_crl(
+            issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=revoke_data["crl"]
+        )
+        crl_obj = Crl(
+            {
+                "pem": crl_pem,
+                "authorized_by": auth_by,
+                "issuer": issuer_obj.serial,
+            }
+        )
+        await crl_obj.save()
 
     return JSONResponse(status_code=200, content={"crl": crl_pem})
 

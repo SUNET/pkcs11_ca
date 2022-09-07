@@ -3,6 +3,8 @@
 from typing import Tuple, Dict
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 import hashlib
+import datetime
+
 from asn1crypto import pem as asn1_pem
 from asn1crypto import csr as asn1_csr
 from asn1crypto import crl as asn1_crl
@@ -282,3 +284,23 @@ def cert_is_ca(pem: str) -> bool:
             ret: bool = ext[1].native
             return ret
     return False
+
+
+def crl_expired(pem: str) -> bool:
+    """Check if CRL has expired from its next_update field compared to current time
+
+    Parameters:
+    pem (str): crl input data
+
+    Returns:
+    bool
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    crl = asn1_crl.CertificateList().load(data)
+
+    next_update: datetime.datetime = crl["tbs_cert_list"]["next_update"].native
+    utc_time = datetime.datetime.now(datetime.timezone.utc)
+    return next_update < utc_time
