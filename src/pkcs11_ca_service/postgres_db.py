@@ -236,17 +236,19 @@ class PostgresDB(DataBaseObject):
                     )
 
     @classmethod
-    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
+    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, Union[str, int]]:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
                 query = (
-                    "SELECT crl.pem, ca.pem FROM crl INNER JOIN ca ON crl.issuer = ca.serial "
+                    "SELECT crl.pem, ca.pem, ca.issuer, ca.serial FROM crl INNER JOIN ca ON crl.issuer = ca.serial "
                     + "WHERE ca.serial = $1 ORDER BY crl.serial DESC LIMIT 1"
                 )
                 rows = await conn.fetch(query, ca_serial)
                 crl: str = rows[0][0]
                 cert_auth: str = rows[0][1]
+                cert_auth_issuer: int = rows[0][2]
+                cert_serial: int = rows[0][3]
 
                 query = (
                     "SELECT pkcs11_key.key_label from pkcs11_key INNER JOIN ca "
@@ -255,9 +257,11 @@ class PostgresDB(DataBaseObject):
                 rows = await conn.fetch(query, ca_serial)
                 key_label: str = rows[0][0]
 
-                ret = {}
+                ret: Dict[str, Union[str, int]] = {}
                 ret["crl"] = crl
                 ret["ca"] = cert_auth
+                ret["ca_issuer"] = cert_auth_issuer
+                ret["ca_serial"] = cert_serial
                 ret["key_label"] = key_label
 
                 return ret

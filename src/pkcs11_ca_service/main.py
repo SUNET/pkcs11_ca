@@ -6,6 +6,7 @@ import time
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
+from fastapi import HTTPException
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.csr import sign_csr
@@ -348,13 +349,17 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     revoke_data = await issuer_obj.db.revoke_data_for_ca(issuer_obj.serial)
 
     # If CRL has not expired
-    if not crl_expired(revoke_data["crl"]):
-        crl_pem = revoke_data["crl"]
+    curr_crl = revoke_data["crl"]
+    if not isinstance(curr_crl, str):  # pylint:disable=duplicate-code
+        raise HTTPException(status_code=400, detail="Error with CRL")
+
+    if not crl_expired(curr_crl):
+        crl_pem = curr_crl
 
     else:
         # Create a new CRL
         crl_pem = await create_crl(
-            issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=revoke_data["crl"]
+            issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
         )
         crl_obj = Crl(
             {
@@ -553,11 +558,50 @@ class RevokeInput(InputObject):
     # serial: Union[int, None]
 
 
+@app.post("/is_revoked")
+async def is_revoked(request: Request, revoke_input: RevokeInput) -> JSONResponse:
+    """/is_revoked, POST method.
+
+    If a certificate/CA is revoked
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    revoke_input (PublicKeyInput): The revoke specification
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    await authorized_by(request)
+
+    db_certificate_objs = await db_load_data_class(Certificate, CertificateInput(pem=revoke_input.pem))
+    for obj in db_certificate_objs:
+        if isinstance(obj, Certificate):
+            revoked = await obj.is_revoked()
+            return JSONResponse(
+                status_code=200,
+                content={"revoked": revoked},
+            )
+    db_ca_objs = await db_load_data_class(Ca, CaInput(pem=revoke_input.pem))
+    for obj in db_ca_objs:
+        if isinstance(obj, Ca):
+            revoked = await obj.is_revoked()
+            return JSONResponse(
+                status_code=200,
+                content={"revoked": revoked},
+            )
+
+    return JSONResponse(
+        status_code=400,
+        content={"message": "No such certificate or CA"},
+    )
+
+
 @app.post("/revoke")
 async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONResponse:
     """/revoke, POST method.
 
-    Revoke a certificate/certificate authority as a CA is really just a certificate.
+    Revoke a certificate/CA as a CA is really just a certificate.
 
     Parameters:
     request (fastapi.Request): The entire HTTP request.

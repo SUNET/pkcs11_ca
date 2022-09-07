@@ -260,7 +260,7 @@ def cert_pem_serial_number(pem: str) -> int:
         _, _, data = asn1_pem.unarmor(data)
     cert = asn1_x509.Certificate().load(data)
 
-    ret: int = cert["tbs_certificate"]["serial_number"]
+    ret: int = cert["tbs_certificate"]["serial_number"].native
     return ret
 
 
@@ -304,3 +304,29 @@ def crl_expired(pem: str) -> bool:
     next_update: datetime.datetime = crl["tbs_cert_list"]["next_update"].native
     utc_time = datetime.datetime.now(datetime.timezone.utc)
     return next_update < utc_time
+
+
+def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
+    """Check if CRL has expired from its next_update field compared to current time
+
+    Parameters:
+    cert_pem (str): cert input data
+    crl_pem (str): crl input data
+
+    Returns:
+    bool
+    """
+
+    data = crl_pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    crl = asn1_crl.CertificateList().load(data)
+
+    serial_number = cert_pem_serial_number(cert_pem)
+
+    if len(crl["tbs_cert_list"]["revoked_certificates"]) != 0:
+        for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
+            if serial_number == revoked["user_certificate"].native:
+                return True
+
+    return False

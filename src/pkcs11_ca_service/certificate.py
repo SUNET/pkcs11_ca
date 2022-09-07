@@ -7,6 +7,7 @@ from python_x509_pkcs11.crl import create as create_crl
 from .base import DataClassObject, InputObject, db_load_data_class
 from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert
 from .asn1 import pem_cert_to_name_dict, cert_pem_serial_number
+from .asn1 import cert_revoked
 from .crl import Crl
 from .error import WrongDataType
 
@@ -67,12 +68,22 @@ class Certificate(DataClassObject):
             raise HTTPException(status_code=400, detail="Cannot revoke a non existing cert.")
 
         revoke_data = await self.db.revoke_data_for_ca(issuer)
+        key_label = revoke_data["key_label"]
+        if not isinstance(key_label, str):  # pylint:disable=duplicate-code
+            raise HTTPException(status_code=400, detail="Error with key_label")
+        ca_pem = revoke_data["ca"]
+        if not isinstance(ca_pem, str):  # pylint:disable=duplicate-code
+            raise HTTPException(status_code=400, detail="Error with CA")
+        crl_pem = revoke_data["crl"]
+        if not isinstance(crl_pem, str):  # pylint:disable=duplicate-code
+            raise HTTPException(status_code=400, detail="Error with CRL")
+
         crl_pem = await create_crl(
-            revoke_data["key_label"],
-            pem_cert_to_name_dict(revoke_data["ca"]),
+            key_label,
+            pem_cert_to_name_dict(ca_pem),
             serial_number=cert_pem_serial_number(self.pem),
             reason=5,
-            old_crl_pem=revoke_data["crl"],
+            old_crl_pem=crl_pem,
         )
         crl_obj = Crl(
             {
@@ -83,8 +94,47 @@ class Certificate(DataClassObject):
         )
         await crl_obj.save()
 
-        print("Revoked " + self.pem)
+        print("Revoked cert " + self.pem)
         return crl_pem
+
+    async def is_revoked(self) -> bool:
+        """If certificate has been revoked
+
+        Returns:
+        bool
+        """
+
+        issuer = vars(self).get("issuer")
+        if issuer is None or issuer < 1:
+            raise HTTPException(status_code=400, detail="Cannot revoke a non existing cert.")
+
+        revoke_data = await self.db.revoke_data_for_ca(issuer)
+        ca_pem: str = self.pem
+
+        while True:
+            print(revoke_data)
+            ca_serial = revoke_data["ca_serial"]
+            if not isinstance(ca_serial, int):  # pylint:disable=duplicate-code
+                raise HTTPException(status_code=400, detail="Error with CA")
+            ca_issuer = revoke_data["ca_issuer"]
+            if not isinstance(ca_issuer, int):  # pylint:disable=duplicate-code
+                raise HTTPException(status_code=400, detail="Error with CA")
+            crl_pem = revoke_data["crl"]
+            if not isinstance(crl_pem, str):  # pylint:disable=duplicate-code
+                raise HTTPException(status_code=400, detail="Error with CRL")
+
+            if cert_revoked(ca_pem, crl_pem):
+                return True
+
+            if ca_serial == ca_issuer:
+                return False
+
+            ca_pem_new = revoke_data["ca"]
+            if not isinstance(ca_pem_new, str):  # pylint:disable=duplicate-code
+                raise HTTPException(status_code=400, detail="Error with CA")
+            ca_pem = ca_pem_new
+
+            revoke_data = await self.db.revoke_data_for_ca(ca_issuer)
 
 
 async def search(input_object: InputObject) -> JSONResponse:

@@ -76,18 +76,27 @@ CXG0k5gblEYXmZc/
         data = json.loads('{"pem": "' + cert.replace("\n", "\\n") + '"' + "}")
         req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
-
         # crl1 = json.loads(req.text)["crl"]
         # print(crl1)
+
+    def test_is_revoked(self) -> None:
+        """
+        Test revoke
+        """
+
+        with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+            pub_key = file_data.read()
+        with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
+            priv_key = file_data.read()
 
         # Revoke CA
         name_dict = {
             "country_name": "SE",
-            "state_or_province_name": "Stockholm",
-            "locality_name": "Stockholm",
+            "state_or_province_name": "Stockholm_test",
+            "locality_name": "Stockholm_test",
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
-            "common_name": "ca-test-revoke-17.sunet.se",
+            "common_name": "ca-test-revoke-18.sunet.se",
             "email_address": "soc@sunet.se",
         }
 
@@ -97,18 +106,58 @@ CXG0k5gblEYXmZc/
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
         data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
         data["name_dict"] = name_dict
+        all_cas = get_cas(pub_key, priv_key)
         data["issuer_pem"] = all_cas[0]
 
         req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
+        old_ca = json.loads(req.text)["certificate"]
 
+        # Revoke CA
+        name_dict = {
+            "country_name": "SE",
+            "state_or_province_name": "Stockholm_test",
+            "locality_name": "Stockholm_test",
+            "organization_name": "SUNET",
+            "organizational_unit_name": "SUNET Infrastructure",
+            "common_name": "ca-test-revoke-19.sunet.se",
+            "email_address": "soc@sunet.se",
+        }
+
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
+
+        new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
+        data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
+        data["name_dict"] = name_dict
+        data["issuer_pem"] = old_ca
+
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        self.assertTrue(req.status_code == 200)
         curr_ca = json.loads(req.text)["certificate"]
-        # print(curr_ca)
+
+        # Check revoked status
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/is_revoked")
+        data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
+        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data)
+        self.assertTrue(req.status_code == 200)
+        revoked = json.loads(req.text)["revoked"]
+        self.assertTrue(revoked is False)
+
+        # Revoke CA
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
 
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
-        # curr_crl = json.loads(req.text)["crl"]
-        # print(curr_crl)
+
+        # Check revoked status
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/is_revoked")
+        data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
+        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data)
+        self.assertTrue(req.status_code == 200)
+        revoked = json.loads(req.text)["revoked"]
+        self.assertTrue(revoked is True)
