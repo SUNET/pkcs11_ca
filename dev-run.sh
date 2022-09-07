@@ -26,7 +26,18 @@ mypy --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/nul
 black --line-length 120 src/pkcs11_ca_service/*.py || exit 1
 black --line-length 120 tests/*.py || exit 1
 
-pylint --max-line-length 120 src/pkcs11_ca_service/*.py || exit 1
-pylint --max-line-length 120 tests/*.py || exit 1
+pylint --max-line-length 120 src/pkcs11_ca_service/*.py
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+    echo "pylint failed, please fix"
+    exit 1
+fi
+
+pylint --max-line-length 120 tests/*.py
+RESULT=$?
+if [ $RESULT -ne 0 ]; then
+    echo "pylint failed for tests, please fix"
+    exit 1
+fi
 
 uvicorn src.pkcs11_ca_service.main:app --workers 1 --header server:pkcs11_ca_service

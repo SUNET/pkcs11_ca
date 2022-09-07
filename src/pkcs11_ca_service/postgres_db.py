@@ -51,10 +51,7 @@ class PostgresDB(DataBaseObject):
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
                 query = "DELETE FROM " + table_name + " WHERE " + unique_field + " = $1"
-                await conn.execute(
-                    query,
-                    data,
-                )
+                await conn.execute(query, data)
 
     @classmethod
     async def update(
@@ -74,9 +71,9 @@ class PostgresDB(DataBaseObject):
                 for index, key in enumerate(fields):
                     query += key + " = $" + str(index + 1) + ","
                     args = args + (fields[key],)  # type: ignore
-                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(len(fields))
-                # print(query)
-                await conn.fetch(query, *args, fields[unique_fields[0]])
+                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(len(fields) + 1)
+                args = args + (fields[unique_fields[0]],)  # type: ignore
+                await conn.fetch(query, *args)
 
     @classmethod
     async def save(

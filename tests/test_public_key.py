@@ -74,9 +74,9 @@ class TestPublicKey(unittest.TestCase):
         Test public keys
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:
+        with open("trusted_keys/privkey1.key", "rb") as f_data:
             priv_key = f_data.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
 
         self.public_key_load(pub_key, priv_key)
@@ -104,9 +104,9 @@ class TestPublicKey(unittest.TestCase):
         Test public keys admin setting
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:
+        with open("trusted_keys/privkey1.key", "rb") as f_data:
             priv_key = f_data.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
 
         # Create and post a non admin key

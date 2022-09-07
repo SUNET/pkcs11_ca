@@ -176,10 +176,14 @@ class DataClassObject(ABC):
 
         Parameters:
         field_set_to_serial (Union[str, None] = None): Set a field to its serial/ID field.
+        For example if CA is a root CA then set its 'issuer' to its own 'serial' number
 
         Returns:
         int
         """
+
+        if field_set_to_serial is not None:
+            setattr(self, field_set_to_serial, 1)
 
         serial = await self.db.save(self.db_table_name, self.db_data(), self.db_unique_fields)
         print("Saved into " + self.db_table_name + ", serial " + str(serial))

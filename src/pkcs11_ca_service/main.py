@@ -1,6 +1,8 @@
 """Main module, FastAPI runs from here"""
+
 from typing import Union
 import asyncio
+import time
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
@@ -24,7 +26,8 @@ from .auth import authorized_by
 
 loop = asyncio.get_running_loop()
 loop.create_task(startup())
-
+# Allow the startup task to complete before starting FastAPI
+time.sleep(1)
 
 # Create fastapi app
 app = FastAPI()
@@ -469,7 +472,7 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
 
     Post/create a new csr, will create and return certificate.
 
-    If a cert has CA:TRUE then treat it as a normal cert since we dont have its public key
+    If a cert has CA:TRUE then treat it as a normal cert since we dont have its private key
 
     Parameters:
     request (fastapi.Request): The entire HTTP request.

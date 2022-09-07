@@ -20,9 +20,9 @@ class TestAuth(unittest.TestCase):
         Test url nonce
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:
+        with open("trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # No nonce
@@ -51,9 +51,9 @@ class TestAuth(unittest.TestCase):
         Test url auth
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:
+        with open("trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # No url in token
@@ -85,11 +85,11 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invald jwt tokens
         """
 
-        with open("trusted_pub_keys/privkey1.key", "rb") as f_data:
+        with open("trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_pub_keys/privkey2.key", "rb") as f_data:
+        with open("trusted_keys/privkey2.key", "rb") as f_data:
             priv_key2 = f_data.read()
-        with open("trusted_pub_keys/pubkey1.pem", "rb") as f_data:
+        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # Sign with key2 but send key1 as public key
