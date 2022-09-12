@@ -336,7 +336,7 @@ async def get_crl(request: Request, crl_path: str) -> JSONResponse:
 
     auth_by = await authorized_by(request)
 
-    path = crl_path.replace(".crl", "").replace("/crl/", "")
+    path = crl_path.replace("/crl/", "")
 
     issuer_obj = await ca_request(CaInput(path=path))
     crl_pem = await crl_request(auth_by, issuer_obj)
@@ -359,7 +359,7 @@ async def get_ca(request: Request, ca_path: str) -> JSONResponse:
 
     _ = await authorized_by(request)
 
-    path = ca_path.replace(".pem", "").replace("/ca/", "")
+    path = ca_path.replace("/ca/", "")
 
     issuer_obj = await ca_request(CaInput(path=path))
     return JSONResponse(status_code=200, content={"certificate": issuer_obj.pem})
@@ -504,8 +504,15 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
     # Get pkcs11 and its key label to sign the csr with from the CA
     issuer_pkcs11_key_obj = await pkcs11_key_request(issuer_obj)
 
+    extra_extensions = aia_and_cdp_exts(issuer_obj.path)
+
     # Sign csr
-    cert_pem = await sign_csr(issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), csr_obj.pem)
+    cert_pem = await sign_csr(
+        issuer_pkcs11_key_obj.key_label,
+        pem_cert_to_name_dict(issuer_obj.pem),
+        csr_obj.pem,
+        extra_extensions=extra_extensions,
+    )
 
     # Save cert
     cert_obj = Certificate(

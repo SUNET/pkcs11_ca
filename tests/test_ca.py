@@ -186,7 +186,7 @@ class TestCa(unittest.TestCase):
         for _, extension in enumerate(tbs["extensions"]):
             if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
                 for _, descr in enumerate(extension["extn_value"].native):
-                    if "/ca/" in descr["access_location"] and ".pem" in descr["access_location"]:
+                    if "/ca/" in descr["access_location"]:
                         self.assertTrue("/ca/" in descr["access_location"])
                         found = True
                         url = descr["access_location"]
@@ -208,7 +208,7 @@ class TestCa(unittest.TestCase):
             if extension["extn_id"].dotted == "2.5.29.31":
                 for _, point in enumerate(extension["extn_value"].native):
                     for _, name in enumerate(point["distribution_point"]):
-                        if "/crl/" in name and ".crl" in name:
+                        if "/crl/" in name:
                             self.assertTrue("/crl/" in name)
                             url = name
                             found = True
