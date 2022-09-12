@@ -208,8 +208,8 @@ class TestCa(unittest.TestCase):
             if extension["extn_id"].dotted == "2.5.29.31":
                 for _, point in enumerate(extension["extn_value"].native):
                     for _, name in enumerate(point["distribution_point"]):
-                        if "/ca/" in name and ".crl" in name:
-                            self.assertTrue("/ca/" in name)
+                        if "/crl/" in name and ".crl" in name:
+                            self.assertTrue("/crl/" in name)
                             url = name
                             found = True
         self.assertTrue(found)

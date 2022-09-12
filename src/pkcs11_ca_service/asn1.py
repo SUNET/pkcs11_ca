@@ -359,7 +359,7 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     aia_ext["extn_value"] = aia
 
     # CDP
-    g_n = asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/ca/" + issuer_path + ".crl"))
+    g_n = asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/crl/" + issuer_path + ".crl"))
     g_ns = asn1_x509.GeneralNames()
     g_ns.append(g_n)
     dist_point = asn1_x509.DistributionPoint()
