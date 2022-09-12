@@ -9,6 +9,7 @@ import json
 import requests
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
+from asn1crypto import crl as asn1_crl
 
 from .lib import get_cas, create_jwt_header_str
 
@@ -68,7 +69,6 @@ class TestCa(unittest.TestCase):
         data = json.loads(req.text)["certificate"].encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
-
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
 
         # Get CAs
@@ -143,3 +143,83 @@ class TestCa(unittest.TestCase):
             if extension["extn_id"].dotted == "2.5.29.35":
                 aki = extension["extn_value"].native["key_identifier"]
         self.assertTrue(ski == aki)
+
+    def test_aia_and_cdp_ca(self) -> None:
+        """
+        create aia and cdp extensions ca
+        """
+
+        with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
+            priv_key = file_data.read()
+        with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+            pub_key = file_data.read()
+
+        name_dict = {
+            "country_name": "SE",
+            "state_or_province_name": "Stockholm",
+            "locality_name": "Stockholm_test",
+            "organization_name": "SUNET",
+            "organizational_unit_name": "SUNET Infrastructure",
+            "common_name": "ca-test-create-19.sunet.se",
+            "email_address": "soc@sunet.se",
+        }
+
+        # Create another ca
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
+
+        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
+        data["name_dict"] = name_dict
+        data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
+
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        self.assertTrue(req.status_code == 200)
+        data = json.loads(req.text)["certificate"].encode("utf-8")
+
+        data = json.loads(req.text)["certificate"].encode("utf-8")
+        if asn1_pem.detect(data):
+            _, _, data = asn1_pem.unarmor(data)
+        tbs = asn1_x509.Certificate().load(data)["tbs_certificate"]
+
+        # AIA
+        found = False
+        for _, extension in enumerate(tbs["extensions"]):
+            if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
+                for _, descr in enumerate(extension["extn_value"].native):
+                    if "/ca/" in descr["access_location"] and ".pem" in descr["access_location"]:
+                        self.assertTrue("/ca/" in descr["access_location"])
+                        found = True
+                        url = descr["access_location"]
+        self.assertTrue(found)
+
+        # Get AIA
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
+        req = requests.get(url, headers=request_headers)
+        self.assertTrue(req.status_code == 200)
+        data = json.loads(req.text)["certificate"].encode("utf-8")
+        if asn1_pem.detect(data):
+            _, _, data = asn1_pem.unarmor(data)
+        self.assertTrue(isinstance(asn1_x509.Certificate().load(data), asn1_x509.Certificate))
+
+        # CDP
+        found = False
+        for _, extension in enumerate(tbs["extensions"]):
+            if extension["extn_id"].dotted == "2.5.29.31":
+                for _, point in enumerate(extension["extn_value"].native):
+                    for _, name in enumerate(point["distribution_point"]):
+                        if "/ca/" in name and ".crl" in name:
+                            self.assertTrue("/ca/" in name)
+                            url = name
+                            found = True
+        self.assertTrue(found)
+
+        # Get CDP
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
+        req = requests.get(url, headers=request_headers)
+        self.assertTrue(req.status_code == 200)
+        data = json.loads(req.text)["crl"].encode("utf-8")
+        if asn1_pem.detect(data):
+            _, _, data = asn1_pem.unarmor(data)
+        self.assertTrue(isinstance(asn1_crl.CertificateList.load(data), asn1_crl.CertificateList))

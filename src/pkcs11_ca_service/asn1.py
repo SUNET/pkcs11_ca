@@ -16,6 +16,7 @@ from asn1crypto.keys import (
     PublicKeyAlgorithmId,
 )
 
+from .config import ROOT_URL
 from .error import UnsupportedJWTAlgorithm
 
 
@@ -23,7 +24,7 @@ def to_base64url(data: bytes) -> str:
     """Encode to base64url.
 
     Parameters:
-    data (bytes): input data
+    data (bytes): Input data.
 
     Returns:
     str
@@ -37,7 +38,7 @@ def from_base64url(b64url: str) -> bytes:
     """Decode base64url.
 
     Parameters:
-    b64url (str): input data
+    b64url (str): Input data,
 
     Returns:
     bytes
@@ -53,7 +54,7 @@ def pem_to_sha256_fingerprint(pem: str) -> str:
     """Get the sha256 hash from pem data.
 
     Parameters:
-    pem (str): input data
+    pem (str): PEM input data.
 
     Returns:
     str
@@ -69,7 +70,7 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     """Get the subject name dict from pem data as a dict.
 
     Parameters:
-    pem (bytes): input data
+    pem (bytes): PEM input data.
 
     Returns:
     Dict[str, str]
@@ -90,7 +91,7 @@ def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
     See https://datatracker.ietf.org/doc/html/rfc5280#section-4.2.1.2
 
     Parameters:
-    pem (str): input data
+    pem (str): PEM input data.
 
     Returns:
     str
@@ -105,10 +106,10 @@ def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
 
 
 def public_key_info_to_pem(public_key_info: PublicKeyInfo) -> str:
-    """Get pem from public key info data
+    """Get pem from public key info data.
 
     Parameters:
-    public_key_info (asn1crypto.keys.PublicKeyInfo): input data
+    public_key_info (asn1crypto.keys.PublicKeyInfo): Input data.
 
     Returns:
     str
@@ -119,10 +120,10 @@ def public_key_info_to_pem(public_key_info: PublicKeyInfo) -> str:
 
 
 def jwk_key_to_pem(data: Dict[str, str]) -> str:
-    """Get pem for public key from jwk key
+    """Get pem for public key from jwk key.
 
     Parameters:
-    data (Dict[str, str]): input data
+    data (Dict[str, str]): Input data.
 
     Returns:
     str
@@ -142,10 +143,10 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
 
 
 def pem_key_to_jwk(pem: str) -> Dict[str, str]:
-    """Get jwk key from pem
+    """Get jwk key from pem.
 
     Parameters:
-    pem (str): input data
+    pem (str): Input data.
 
     Returns:
     Dict[str, str]
@@ -163,6 +164,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         # print("rsa detected")
 
         ret["kty"] = "rsa"
+        ret["use"] = "sig"
         ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
         ret["public_exponent"] = to_base64url(str(key["public_key"].native["public_exponent"]).encode("utf-8"))
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
@@ -174,10 +176,10 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
 
 def public_key_pem_from_csr(pem: str) -> str:
-    """Get public key in pem from csr
+    """Get public key in pem from csr.
 
     Parameters:
-    pem (str): csr input data
+    pem (str): csr input data.
 
     Returns:
     str
@@ -191,10 +193,10 @@ def public_key_pem_from_csr(pem: str) -> str:
 
 
 def public_key_pem_from_cert(pem: str) -> str:
-    """Get public key in pem from cert
+    """Get public key in pem from cert.
 
     Parameters:
-    pem (str): cert input data
+    pem (str): PEM certificate input data.
 
     Returns:
     str
@@ -208,10 +210,10 @@ def public_key_pem_from_cert(pem: str) -> str:
 
 
 def not_before_not_after_from_cert(pem: str) -> Tuple[str, str]:
-    """Get not_before and not_after from cert
+    """Get not_before and not_after from cert.
 
     Parameters:
-    pem (str): cert input data
+    pem (str): PEM certificate input data.
 
     Returns:
     Tuple[str, str]
@@ -227,10 +229,10 @@ def not_before_not_after_from_cert(pem: str) -> Tuple[str, str]:
 
 
 def this_update_next_update_from_crl(pem: str) -> Tuple[str, str]:
-    """Get this_update and next_update from crl
+    """Get this_update and next_update from crl.
 
     Parameters:
-    pem (str): crl input data
+    pem (str): PEM CRL input data.
 
     Returns:
     Tuple[str, str]
@@ -249,7 +251,7 @@ def cert_pem_serial_number(pem: str) -> int:
     """Get serial number from cert in pem form.
 
     Parameters:
-    pem (str): Cert input data in pem form.
+    pem (str): PEM certificate input data.
 
     Returns:
     str
@@ -265,10 +267,10 @@ def cert_pem_serial_number(pem: str) -> int:
 
 
 def cert_is_ca(pem: str) -> bool:
-    """If certificate is a CA
+    """If certificate is a CA.
 
     Parameters:
-    pem (str): Cert input data in pem form.
+    pem (str): PEM certificate input data.
 
     Returns:
     bool
@@ -287,10 +289,10 @@ def cert_is_ca(pem: str) -> bool:
 
 
 def crl_expired(pem: str) -> bool:
-    """Check if CRL has expired from its next_update field compared to current time
+    """Check if CRL has expired from its next_update field compared to current time.
 
     Parameters:
-    pem (str): crl input data
+    pem (str): PEM CRL input data.
 
     Returns:
     bool
@@ -307,11 +309,11 @@ def crl_expired(pem: str) -> bool:
 
 
 def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
-    """Check if CRL has expired from its next_update field compared to current time
+    """Check if CRL has expired from its next_update field compared to current time.
 
     Parameters:
-    cert_pem (str): cert input data
-    crl_pem (str): crl input data
+    cert_pem (str): PEM certificate input data.
+    crl_pem (str): PEN CRL input data.
 
     Returns:
     bool
@@ -330,3 +332,45 @@ def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
                 return True
 
     return False
+
+
+def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
+    """Check if CRL has expired from its next_update field compared to current time
+
+    Parameters:
+    issuer_path (str): Path to issuer CA.
+
+    Returns:
+    bool
+    """
+
+    # AIA
+    access_description = asn1_x509.AccessDescription(
+        {
+            "access_method": "ca_issuers",
+            "access_location": asn1_x509.GeneralName(
+                name="uniform_resource_identifier", value=(ROOT_URL + "/ca/" + issuer_path + ".pem")
+            ),
+        }
+    )
+    aia = asn1_x509.AuthorityInfoAccessSyntax([access_description])
+    aia_ext = asn1_x509.Extension()
+    aia_ext["extn_id"] = asn1_x509.ExtensionId("1.3.6.1.5.5.7.1.1")
+    aia_ext["extn_value"] = aia
+
+    # CDP
+    g_n = asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/ca/" + issuer_path + ".crl"))
+    g_ns = asn1_x509.GeneralNames()
+    g_ns.append(g_n)
+    dist_point = asn1_x509.DistributionPoint()
+    dist_point["distribution_point"] = asn1_x509.DistributionPointName(name="full_name", value=g_ns)
+    crl_dist_points = asn1_x509.CRLDistributionPoints()
+    crl_dist_points.append(dist_point)
+    cdp_ext = asn1_x509.Extension()
+    cdp_ext["extn_id"] = asn1_x509.ExtensionId("2.5.29.31")
+    cdp_ext["extn_value"] = crl_dist_points
+
+    exts = asn1_x509.Extensions()
+    exts.append(aia_ext)
+    exts.append(cdp_ext)
+    return exts

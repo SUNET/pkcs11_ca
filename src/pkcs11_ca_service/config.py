@@ -3,6 +3,8 @@
 # Folder for the initial trusted pub_keys
 ROOT_ADMIN_KEYS_FOLDER = "trusted_keys"
 
+ROOT_URL = "http://localhost:8000"
+
 DB_MODULE = "postgres_db"
 # Table order is important: for example 'ca' dependes on 'public_key' so it comes after
 DB_TABLE_MODULES = ["public_key", "pkcs11_key", "csr", "ca", "certificate", "crl"]

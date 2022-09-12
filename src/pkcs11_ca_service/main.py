@@ -3,10 +3,13 @@
 from typing import Union
 import asyncio
 import time
+import hashlib
+from secrets import token_bytes
 
 from fastapi import FastAPI, Request, Response
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException
+
+from asn1crypto import x509 as asn1_x509
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.csr import sign_csr
@@ -20,7 +23,7 @@ from .ca import Ca, CaInput, search as ca_search
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, crl_expired
+from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, crl_expired, aia_and_cdp_exts
 from .nonce import nonce_response
 from .auth import authorized_by
 
@@ -325,7 +328,6 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     """
 
     auth_by = await authorized_by(request)
-
     if crl_input.ca_pem is None:
         return JSONResponse(
             status_code=400,
@@ -350,8 +352,6 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
 
     # If CRL has not expired
     curr_crl = revoke_data["crl"]
-    if not isinstance(curr_crl, str):  # pylint:disable=duplicate-code
-        raise HTTPException(status_code=400, detail="Error with CRL")
 
     if not crl_expired(curr_crl):
         crl_pem = curr_crl
@@ -370,6 +370,64 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
         )
         await crl_obj.save()
 
+    return JSONResponse(status_code=200, content={"crl": crl_pem})
+
+
+@app.get("/ca/{ca_path}")
+async def get_ca(request: Request, ca_path: str) -> JSONResponse:
+    """/ca, GET method.
+
+    Get a ca.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+    ca_path (str): The unique CA path
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    auth_by = await authorized_by(request)
+
+    path = ca_path.replace(".pem", "").replace(".crl", "").replace("/ca/", "")
+
+    issuer_objs = await db_load_data_class(Ca, CaInput(path=path))
+    if not issuer_objs:
+        return JSONResponse(status_code=400, content={"message": "No such CA"})
+    issuer_obj = issuer_objs[0]
+    if not isinstance(issuer_obj, Ca) or (".crl" not in ca_path and ".pem" not in ca_path):
+        return JSONResponse(status_code=400, content={"message": "No such CA"})
+
+    if ".pem" in ca_path:
+        return JSONResponse(status_code=200, content={"certificate": issuer_obj.pem})
+
+    revoke_data = await issuer_obj.db.revoke_data_for_ca(issuer_obj.serial)
+
+    # If CRL has not expired
+    curr_crl = revoke_data["crl"]
+
+    if not crl_expired(curr_crl):
+        crl_pem = curr_crl
+
+    else:
+        issuer_pkcs11_key_objs = await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
+        if not issuer_pkcs11_key_objs:
+            return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
+        issuer_pkcs11_key_obj = issuer_pkcs11_key_objs[0]
+        if not isinstance(issuer_pkcs11_key_obj, Pkcs11Key):
+            return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
+        # Create a new CRL
+        crl_pem = await create_crl(
+            issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
+        )
+        crl_obj = Crl(
+            {
+                "pem": crl_pem,
+                "authorized_by": auth_by,
+                "issuer": issuer_obj.serial,
+            }
+        )
+        await crl_obj.save()
     return JSONResponse(status_code=200, content={"crl": crl_pem})
 
 
@@ -396,6 +454,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         )
 
     signer_key_label: Union[str, None] = None
+    extra_extensions: Union[asn1_x509.Extensions, None] = None
 
     # If this should not be a selfsigned ca
     if ca_input.issuer_pem is not None:
@@ -414,16 +473,21 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
             return JSONResponse(status_code=400, content={"message": "CA to sign with has no pkcs11 key"})
         signer_key_label = issuer_pkcs11_key_obj.key_label
 
+        # This will be an intermidiate CA so get the AIA and CDP extensions for it
+        extra_extensions = aia_and_cdp_exts(issuer_obj.path)
+
     ca_csr_pem, ca_pem = await create_ca(
         ca_input.key_label,
         ca_input.name_dict,
         ca_input.key_size,
         signer_key_label=signer_key_label,
+        extra_extensions=extra_extensions,
     )
 
     # Save Public key for new CA
-    public_key_pem, _ = await PKCS11Session.public_key_data(ca_input.key_label)
-    public_key_obj = PublicKey({"pem": public_key_pem, "authorized_by": auth_by})
+    public_key_obj = PublicKey(
+        {"pem": (await PKCS11Session.public_key_data(ca_input.key_label))[0], "authorized_by": auth_by}
+    )
     await public_key_obj.save()
 
     # Save pkcs11 key for new CA
@@ -449,6 +513,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
                 "pkcs11_key": pkcs11_key_obj.serial,
                 "csr": csr_obj.serial,
                 "issuer": issuer_obj.serial,
+                "path": hashlib.sha256(token_bytes(256)).hexdigest(),
             }
         )
         await ca_obj.save()

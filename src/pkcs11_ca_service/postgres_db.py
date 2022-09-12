@@ -5,6 +5,8 @@ Module which handles database queries
 from __future__ import annotations
 from typing import Dict, Union, List, Tuple, Type
 import datetime
+import hashlib
+from secrets import token_bytes
 import os
 
 from asyncpg.exceptions import UndefinedTableError
@@ -236,7 +238,7 @@ class PostgresDB(DataBaseObject):
                     )
 
     @classmethod
-    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, Union[str, int]]:
+    async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
@@ -247,8 +249,8 @@ class PostgresDB(DataBaseObject):
                 rows = await conn.fetch(query, ca_serial)
                 crl: str = rows[0][0]
                 cert_auth: str = rows[0][1]
-                cert_auth_issuer: int = rows[0][2]
-                cert_serial: int = rows[0][3]
+                cert_auth_issuer: str = str(rows[0][2])
+                cert_serial: str = str(rows[0][3])
 
                 query = (
                     "SELECT pkcs11_key.key_label from pkcs11_key INNER JOIN ca "
@@ -257,7 +259,7 @@ class PostgresDB(DataBaseObject):
                 rows = await conn.fetch(query, ca_serial)
                 key_label: str = rows[0][0]
 
-                ret: Dict[str, Union[str, int]] = {}
+                ret: Dict[str, str] = {}
                 ret["crl"] = crl
                 ret["ca"] = cert_auth
                 ret["ca_issuer"] = cert_auth_issuer
@@ -381,6 +383,7 @@ class PostgresDB(DataBaseObject):
                     1,
                     1,
                     1,
+                    hashlib.sha256(token_bytes(256)).hexdigest(),
                     pem_to_sha256_fingerprint(root_ca_pem),
                     str(not_before),
                     str(not_after),
