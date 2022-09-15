@@ -1,10 +1,12 @@
-"""ASN1 module, mstly using asn1crypto"""
+"""ASN1 module, mostly using asn1crypto"""
 
 from typing import Tuple, Dict
 from base64 import urlsafe_b64encode, urlsafe_b64decode
 import hashlib
 import datetime
 
+import jwt
+import requests
 from asn1crypto import pem as asn1_pem
 from asn1crypto import csr as asn1_csr
 from asn1crypto import crl as asn1_crl
@@ -374,3 +376,13 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     exts.append(aia_ext)
     exts.append(cdp_ext)
     return exts
+
+
+def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
+    """Create jwt header string"""
+    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/" + "new_nonce")
+    nonce = req.headers["Replay-Nonce"]
+    jwt_headers = {"nonce": nonce, "url": url}
+    jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
+    encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
+    return "Bearer " + encoded.decode("utf-8")

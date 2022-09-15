@@ -11,7 +11,13 @@ from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 from asn1crypto import crl as asn1_crl
 
-from .lib import get_cas, create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from .lib import get_cas
+
+with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
+    priv_key = file_data.read()
+with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+    pub_key = file_data.read()
 
 
 class TestCa(unittest.TestCase):
@@ -19,7 +25,7 @@ class TestCa(unittest.TestCase):
     Test our ca
     """
 
-    def get_single_ca(self, pub_key: bytes, priv_key: bytes, cas: List[str]) -> None:
+    def get_single_ca(self, cas: List[str]) -> None:
         """Get single ca"""
 
         # Get a ca
@@ -38,10 +44,10 @@ class TestCa(unittest.TestCase):
         create ca
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as f_data:  # pylint:disable=duplicate-code
-            priv_key = f_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
+        # with open("trusted_keys/privkey1.key", "rb") as f_data:  # pylint:disable=duplicate-code
+        #     priv_key = f_data.read()
+        # with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        #     pub_key = f_data.read()
 
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
@@ -94,17 +100,17 @@ class TestCa(unittest.TestCase):
             _, _, data = asn1_pem.unarmor(data)
 
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
-        self.get_single_ca(pub_key, priv_key, cas)
+        self.get_single_ca(cas)
 
     def test_root_ca(self) -> None:
         """
         create ca
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
-            priv_key = file_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as file_data:
-            pub_key = file_data.read()
+        # with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
+        #     priv_key = file_data.read()
+        # with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+        #     pub_key = file_data.read()
 
         name_dict = {
             "country_name": "SE",
@@ -148,11 +154,6 @@ class TestCa(unittest.TestCase):
         """
         create aia and cdp extensions ca
         """
-
-        with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
-            priv_key = file_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as file_data:
-            pub_key = file_data.read()
 
         name_dict = {
             "country_name": "SE",
@@ -210,6 +211,10 @@ class TestCa(unittest.TestCase):
                     for _, name in enumerate(point["distribution_point"]):
                         if "/crl/" in name:
                             self.assertTrue("/crl/" in name)
+
+                            # Ensure AIA and CDP has the same string
+                            self.assertTrue(name.split("/")[-1] == url.split("/")[-1])
+
                             url = name
                             found = True
         self.assertTrue(found)

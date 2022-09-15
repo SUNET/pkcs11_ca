@@ -13,7 +13,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from asn1crypto.keys import PublicKeyInfo
 from asn1crypto import pem as asn1_pem
 
-from .lib import create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
 def generate_keypair() -> Tuple[str, str]:

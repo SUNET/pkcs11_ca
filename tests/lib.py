@@ -3,19 +3,7 @@
 from typing import List
 import json
 import requests
-import jwt
-from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
-
-
-def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
-    """Create jwt header string"""
-
-    req = requests.head("http://localhost:8000/new_nonce")
-    nonce = req.headers["Replay-Nonce"]
-    jwt_headers = {"nonce": nonce, "url": url}
-    jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-    encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-    return "Bearer " + encoded.decode("utf-8")
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
 def get_cas(pub_key: bytes, priv_key: bytes) -> List[str]:

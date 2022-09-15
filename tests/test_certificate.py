@@ -5,7 +5,7 @@ import unittest
 import json
 import requests
 
-from .lib import create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
 class TestCertificate(unittest.TestCase):

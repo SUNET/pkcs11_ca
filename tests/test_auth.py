@@ -5,9 +5,7 @@ import unittest
 import requests
 import jwt
 
-from src.pkcs11_ca_service.asn1 import pem_key_to_jwk
-
-from .lib import create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str, pem_key_to_jwk
 
 
 class TestAuth(unittest.TestCase):

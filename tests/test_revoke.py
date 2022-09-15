@@ -10,7 +10,8 @@ import requests
 # from asn1crypto import crl as asn1_crl
 # from asn1crypto import pem as asn1_pem
 
-from .lib import get_cas, create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from .lib import get_cas
 
 
 class TestRevoke(unittest.TestCase):
