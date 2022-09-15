@@ -20,5 +20,5 @@ author-email = "victor@sunet.se"
 
 requires = [
     "asn1crypto>=1.4.0",
-    "pyjwt>=0.7.1"
+    "pyjwt>=1.7.1"
 ]
