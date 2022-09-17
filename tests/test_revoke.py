@@ -97,7 +97,7 @@ CXG0k5gblEYXmZc/
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
-            "common_name": "ca-test-revoke-18.sunet.se",
+            "common_name": "ca-test-revoke-22.sunet.se",
             "email_address": "soc@sunet.se",
         }
 
@@ -121,7 +121,7 @@ CXG0k5gblEYXmZc/
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
-            "common_name": "ca-test-revoke-19.sunet.se",
+            "common_name": "ca-test-revoke-33.sunet.se",
             "email_address": "soc@sunet.se",
         }
 

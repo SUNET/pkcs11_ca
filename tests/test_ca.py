@@ -58,7 +58,7 @@ class TestCa(unittest.TestCase):
             "locality_name": "Stockholm",
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
-            "common_name": "ca-test-create-1.sunet.se",
+            "common_name": "ca-test-create-13.sunet.se",
             "email_address": "soc@sunet.se",
         }
 
@@ -161,7 +161,7 @@ class TestCa(unittest.TestCase):
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
-            "common_name": "ca-test-create-19.sunet.se",
+            "common_name": "ca-test-create-20.sunet.se",
             "email_address": "soc@sunet.se",
         }
 
@@ -198,7 +198,7 @@ class TestCa(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
         req = requests.get(url, headers=request_headers)
         self.assertTrue(req.status_code == 200)
-        data = json.loads(req.text)["certificate"].encode("utf-8")
+        data = req.content
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate().load(data), asn1_x509.Certificate))
@@ -220,11 +220,9 @@ class TestCa(unittest.TestCase):
         self.assertTrue(found)
 
         # Get CDP
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
         req = requests.get(url, headers=request_headers)
         self.assertTrue(req.status_code == 200)
-        data = json.loads(req.text)["crl"].encode("utf-8")
+        data = req.content
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_crl.CertificateList.load(data), asn1_crl.CertificateList))

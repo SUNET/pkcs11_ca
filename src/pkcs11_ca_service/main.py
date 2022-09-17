@@ -1,12 +1,12 @@
 """Main module, FastAPI runs from here"""
 
-from typing import Union
+from typing import Union, Dict
 import asyncio
 import time
 import hashlib
 from secrets import token_bytes
 
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 
 from asn1crypto import x509 as asn1_x509
@@ -23,7 +23,7 @@ from .ca import Ca, CaInput, search as ca_search
 from .pkcs11_key import Pkcs11Key
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, aia_and_cdp_exts
+from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, aia_and_cdp_exts, cert_as_der, crl_as_der
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request
@@ -321,7 +321,7 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
 
 
 @app.get("/crl/{crl_path}")
-async def get_crl(request: Request, crl_path: str) -> JSONResponse:
+async def get_crl(crl_path: str) -> Response:
     """/ca, GET method.
 
     Get a CRL.
@@ -334,17 +334,22 @@ async def get_crl(request: Request, crl_path: str) -> JSONResponse:
     fastapi.responses.JSONResponse
     """
 
-    auth_by = await authorized_by(request)
+    # auth_by = await authorized_by(request)
 
     path = crl_path.replace("/crl/", "")
-
-    issuer_obj = await ca_request(CaInput(path=path))
-    crl_pem = await crl_request(auth_by, issuer_obj)
-    return JSONResponse(status_code=200, content={"crl": crl_pem})
+    try:
+        issuer_obj = await ca_request(CaInput(path=path))
+        # Set author as id 1 (first root ca) if the CRL is created due to the old crl expired
+        # author is unknow due to no authentication so lets set the system as author.
+        # Perhaps rethink this in the future
+        crl_pem = await crl_request(1, issuer_obj)
+        return Response(status_code=200, content=crl_as_der(crl_pem), media_type="application/pkix-crl")
+    except HTTPException:
+        return Response(status_code=404, content='{"detail":"Not Found"}', media_type="application/json")
 
 
 @app.get("/ca/{ca_path}")
-async def get_ca(request: Request, ca_path: str) -> JSONResponse:
+async def get_ca(ca_path: str) -> Response:
     """/ca, GET method.
 
     Get a ca.
@@ -357,12 +362,14 @@ async def get_ca(request: Request, ca_path: str) -> JSONResponse:
     fastapi.responses.JSONResponse
     """
 
-    _ = await authorized_by(request)
+    # _ = await authorized_by(request)
 
     path = ca_path.replace("/ca/", "")
-
-    issuer_obj = await ca_request(CaInput(path=path))
-    return JSONResponse(status_code=200, content={"certificate": issuer_obj.pem})
+    try:
+        issuer_obj = await ca_request(CaInput(path=path))
+        return Response(status_code=200, content=cert_as_der(issuer_obj.pem), media_type="application/pkcs7-mime")
+    except HTTPException:
+        return Response(status_code=404, content='{"detail":"Not Found"}', media_type="application/json")
 
 
 @app.post("/ca")
@@ -387,7 +394,8 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
             content={"message": "missing json dict key 'pem' with a csr and 'ca_pem' with the signing CA"},
         )
 
-    signer_key_label: Union[str, None] = None
+    issuer_pem: Union[Dict[str, str], None] = None
+    issuer_key_label: Union[str, None] = None
     extra_extensions: Union[asn1_x509.Extensions, None] = None
 
     # If this should not be a selfsigned ca
@@ -395,7 +403,8 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         issuer_obj = await ca_request(CaInput(pem=ca_input.issuer_pem))
 
         issuer_pkcs11_key_obj = await pkcs11_key_request(issuer_obj)
-        signer_key_label = issuer_pkcs11_key_obj.key_label
+        issuer_key_label = issuer_pkcs11_key_obj.key_label
+        issuer_pem = pem_cert_to_name_dict(issuer_obj.pem)
 
         # This will be an intermidiate CA so get the AIA and CDP extensions for it
         extra_extensions = aia_and_cdp_exts(issuer_obj.path)
@@ -404,7 +413,8 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         ca_input.key_label,
         ca_input.name_dict,
         ca_input.key_size,
-        signer_key_label=signer_key_label,
+        signer_key_label=issuer_key_label,
+        signer_subject_name=issuer_pem,
         extra_extensions=extra_extensions,
     )
 

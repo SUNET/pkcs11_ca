@@ -222,7 +222,7 @@ async def db_load_data_class(db_data_class: Type[DataClassObject], input_object:
     input_vars: Dict[str, Union[str, int]] = {}
 
     for key, value in vars(input_object).items():
-        if value is not None and key in db_data_class.db_fields.keys():
+        if value is not None and (key in db_data_class.db_fields.keys() or key == "serial"):
             input_vars[key] = value
 
     value_dict_list = await DataClassObject.db.load(

@@ -40,7 +40,7 @@ def from_base64url(b64url: str) -> bytes:
     """Decode base64url.
 
     Parameters:
-    b64url (str): Input data,
+    b64url (str): Input data.
 
     Returns:
     bytes
@@ -379,10 +379,56 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
 
 
 def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
-    """Create jwt header string"""
-    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/" + "new_nonce")
+    """Create jwt header string.
+
+    Parameters:
+    pub_key (bytes): Public key bytes.
+    priv_key (bytes): Private key bytes.
+    url (str): URL to request.
+
+    Returns:
+    str
+    """
+
+    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/new_nonce")
     nonce = req.headers["Replay-Nonce"]
     jwt_headers = {"nonce": nonce, "url": url}
     jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
     encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
     return "Bearer " + encoded.decode("utf-8")
+
+
+def cert_as_der(pem: str) -> bytes:
+    """Certificate in DER form.
+
+    Parameters:
+    pem (str): PEM certificate input data.
+
+    Returns:
+    bytes
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    cert = asn1_x509.Certificate().load(data)
+    ret: bytes = cert.dump()
+    return ret
+
+
+def crl_as_der(pem: str) -> bytes:
+    """CRL in DER form.
+
+    Parameters:
+    pem (str): PEM CRL input data.
+
+    Returns:
+    bytes
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    crl = asn1_crl.CertificateList().load(data)
+    ret: bytes = crl.dump()
+    return ret
