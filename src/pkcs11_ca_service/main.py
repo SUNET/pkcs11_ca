@@ -573,7 +573,7 @@ async def is_revoked(request: Request, revoke_input: RevokeInput) -> JSONRespons
             revoked = await obj.is_revoked()
             return JSONResponse(
                 status_code=200,
-                content={"revoked": revoked},
+                content={"is_revoked": revoked},
             )
     db_ca_objs = await db_load_data_class(Ca, CaInput(pem=revoke_input.pem))
     for obj in db_ca_objs:
@@ -581,7 +581,7 @@ async def is_revoked(request: Request, revoke_input: RevokeInput) -> JSONRespons
             revoked = await obj.is_revoked()
             return JSONResponse(
                 status_code=200,
-                content={"revoked": revoked},
+                content={"is_revoked": revoked},
             )
 
     return JSONResponse(
@@ -609,18 +609,18 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     db_certificate_objs = await db_load_data_class(Certificate, CertificateInput(pem=revoke_input.pem))
     for obj in db_certificate_objs:
         if isinstance(obj, Certificate):
-            crl_pem = await obj.revoke(auth_by)
+            await obj.revoke(auth_by)
             return JSONResponse(
                 status_code=200,
-                content={"crl": crl_pem},
+                content={"revoked": revoke_input.pem},
             )
     db_ca_objs = await db_load_data_class(Ca, CaInput(pem=revoke_input.pem))
     for obj in db_ca_objs:
         if isinstance(obj, Ca):
-            crl_pem = await obj.revoke(auth_by)
+            await obj.revoke(auth_by)
             return JSONResponse(
                 status_code=200,
-                content={"crl": crl_pem},
+                content={"revoked": revoke_input.pem},
             )
 
     return JSONResponse(

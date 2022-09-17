@@ -130,3 +130,12 @@ class TestAuth(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key1, priv_key1, "http://localhost:8000/search/ca")
         req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
         self.assertTrue(req.status_code == 200)
+
+    def test_aia_cdp_auth(self) -> None:
+        """
+        No auth for these but 404 when non existing url
+        """
+        req = requests.get("http://localhost:8000/ca/acac22352343423")
+        self.assertTrue(req.status_code == 404)
+        req = requests.get("http://localhost:8000/crl/acac22352343423")
+        self.assertTrue(req.status_code == 404)

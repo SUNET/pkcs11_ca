@@ -5,6 +5,9 @@ import unittest
 import json
 import requests
 
+from asn1crypto import x509 as asn1_x509
+from asn1crypto import pem as asn1_pem
+
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
@@ -44,3 +47,8 @@ class TestCertificate(unittest.TestCase):
             self.assertTrue(req.status_code == 200)
             certs = json.loads(req.text)["certificates"]
             self.assertTrue(len(certs) == 1)
+
+            cert_data = certs[0].encode("utf-8")
+            if asn1_pem.detect(cert_data):
+                _, _, cert_data = asn1_pem.unarmor(cert_data)
+            self.assertTrue(isinstance(asn1_x509.Certificate.load(cert_data), asn1_x509.Certificate))

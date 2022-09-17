@@ -52,7 +52,7 @@ class Certificate(DataClassObject):
         self.fingerprint = pem_to_sha256_fingerprint(self.pem)
         self.not_before, self.not_after = not_before_not_after_from_cert(self.pem)
 
-    async def revoke(self, auth_by: int) -> str:
+    async def revoke(self, auth_by: int) -> None:
         """Revoke the certificate.
         https://github.com/wbond/asn1crypto/blob/b5f03e6f9797c691a3b812a5bb1acade3a1f4eeb/asn1crypto/crl.py#L97
 
@@ -87,9 +87,7 @@ class Certificate(DataClassObject):
             }
         )
         await crl_obj.save()
-
-        print("Revoked cert " + self.pem)
-        return crl_pem
+        print("Revoked cert, serial " + str(self.serial))
 
     async def is_revoked(self) -> bool:
         """If certificate has been revoked

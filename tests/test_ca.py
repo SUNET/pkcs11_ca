@@ -12,7 +12,7 @@ from asn1crypto import pem as asn1_pem
 from asn1crypto import crl as asn1_crl
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
-from .lib import get_cas
+from .lib import get_cas, cdp_url
 
 with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
     priv_key = file_data.read()
@@ -177,7 +177,6 @@ class TestCa(unittest.TestCase):
         self.assertTrue(req.status_code == 200)
         data = json.loads(req.text)["certificate"].encode("utf-8")
 
-        data = json.loads(req.text)["certificate"].encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         tbs = asn1_x509.Certificate().load(data)["tbs_certificate"]
@@ -196,31 +195,16 @@ class TestCa(unittest.TestCase):
         # Get AIA
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
-        req = requests.get(url, headers=request_headers)
+        req2 = requests.get(url, headers=request_headers)
         self.assertTrue(req.status_code == 200)
-        data = req.content
+        data = req2.content
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate().load(data), asn1_x509.Certificate))
 
-        # CDP
-        found = False
-        for _, extension in enumerate(tbs["extensions"]):
-            if extension["extn_id"].dotted == "2.5.29.31":
-                for _, point in enumerate(extension["extn_value"].native):
-                    for _, name in enumerate(point["distribution_point"]):
-                        if "/crl/" in name:
-                            self.assertTrue("/crl/" in name)
-
-                            # Ensure AIA and CDP has the same string
-                            self.assertTrue(name.split("/")[-1] == url.split("/")[-1])
-
-                            url = name
-                            found = True
-        self.assertTrue(found)
-
         # Get CDP
-        req = requests.get(url, headers=request_headers)
+        url = cdp_url(json.loads(req.text)["certificate"])
+        req = requests.get(url)
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):

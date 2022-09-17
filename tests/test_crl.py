@@ -8,7 +8,7 @@ import requests
 from asn1crypto import crl as asn1_crl
 from asn1crypto import pem as asn1_pem
 
-from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str, crl_expired
 from .lib import get_cas
 
 
@@ -61,3 +61,6 @@ class TestCrl(unittest.TestCase):
 
         test_crl = asn1_crl.CertificateList.load(data)
         self.assertTrue(isinstance(test_crl, asn1_crl.CertificateList))
+
+        # Check if expired
+        self.assertFalse(crl_expired(json.loads(req.text)["crls"][0]))

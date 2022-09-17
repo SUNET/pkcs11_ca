@@ -65,7 +65,7 @@ class Ca(DataClassObject):
 
         self.path = hashlib.sha256(token_bytes(256)).hexdigest()
 
-    async def revoke(self, auth_by: int) -> str:
+    async def revoke(self, auth_by: int) -> None:
         """Revoke the certificate authority
         https://github.com/wbond/asn1crypto/blob/b5f03e6f9797c691a3b812a5bb1acade3a1f4eeb/asn1crypto/crl.py#L97
 
@@ -101,8 +101,7 @@ class Ca(DataClassObject):
         )
         await crl_obj.save()
 
-        print("Revoked CA " + self.pem)
-        return crl_pem
+        print("Revoked CA, serial " + str(self.serial))
 
     async def is_revoked(self) -> bool:
         """If CA has been revoked

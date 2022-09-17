@@ -311,7 +311,7 @@ def crl_expired(pem: str) -> bool:
 
 
 def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
-    """Check if CRL has expired from its next_update field compared to current time.
+    """Check if certs serial number is revoked in the CRL.
 
     Parameters:
     cert_pem (str): PEM certificate input data.
@@ -337,7 +337,7 @@ def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
 
 
 def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
-    """Check if CRL has expired from its next_update field compared to current time
+    """Create AIA and CDP extensions.
 
     Parameters:
     issuer_path (str): Path to issuer CA.
