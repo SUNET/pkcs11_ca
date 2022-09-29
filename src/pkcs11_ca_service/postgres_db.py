@@ -200,7 +200,8 @@ class PostgresDB(DataBaseObject):
                         raise WrongDataType("Currently only supports 'int' and 'str' database field types")
 
                     if field in unique_fields:
-                        query += "UNIQUE "
+                        if not (fields[field] == str and field == "pem"):
+                            query += "UNIQUE "
 
                     query += "NOT NULL "
 
@@ -209,7 +210,15 @@ class PostgresDB(DataBaseObject):
                     query += ","
                 query = query[:-1] + ")"
                 await conn.execute(query)
-                print(query)
+
+                # Set 'pem' fields index to index its md5 hash instead of its value
+                # This prevents weird index bug with large strings which PEM fields can be
+                for field in fields:
+                    if field in unique_fields and fields[field] == str and field == "pem":
+                        query = (
+                            "CREATE UNIQUE INDEX " + table + "_" + field + "_key ON " + table + "(md5(" + field + "))"
+                        )
+                        await conn.execute(query)
 
     @classmethod
     async def _load_trusted_keys(cls, classes_info: Dict[str, List[str]]) -> None:

@@ -11,8 +11,10 @@ from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 from asn1crypto import crl as asn1_crl
 
+from python_x509_pkcs11.ocsp import certificate_ocsp_data
+
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
-from .lib import get_cas, cdp_url
+from .lib import get_cas, create_i_ca, cdp_url
 
 with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
     priv_key = file_data.read()
@@ -32,9 +34,7 @@ class TestCa(unittest.TestCase):
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/search/ca")
 
-        data = json.loads('{"pem": ' + '"' + cas[1].replace("\n", "\\n") + '"' + "}")
-        # data["name_dict"] = name_dict
-        # data["issuer_pem"] = cas[1]
+        data = json.loads('{"pem": ' + '"' + cas[-1].replace("\n", "\\n") + '"' + "}")
         req = requests.post("http://localhost:8000/search/ca", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["cas"]) == 1)
@@ -49,9 +49,6 @@ class TestCa(unittest.TestCase):
         # with open("trusted_keys/pubkey1.pem", "rb") as f_data:
         #     pub_key = f_data.read()
 
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
-
         name_dict = {
             "country_name": "SE",
             "state_or_province_name": "Stockholm",
@@ -62,40 +59,21 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
-        data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
-        data["name_dict"] = name_dict
-
         cas = get_cas(pub_key, priv_key)
-        data["issuer_pem"] = cas[0]
 
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["certificate"].encode("utf-8")
+        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
 
-        # Get CAs
         cas2 = get_cas(pub_key, priv_key)
 
-        # Ensure we now have one more ca than before
-        self.assertTrue(len(cas2) == len(cas) + 1)
-        cas = cas2
+        # Ensure we now have more ca than before
+        self.assertTrue(len(cas2) > len(cas))
 
-        # Create another ca
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
-
-        data = json.loads('{"key_label": ' + '"' + new_key_label[:-1] + '"' + "}")
-        data["name_dict"] = name_dict
-        data["issuer_pem"] = cas[-1]
-
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["certificate"].encode("utf-8")
+        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
 
@@ -165,45 +143,41 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        # Create another ca
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
-
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data["name_dict"] = name_dict
-        data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
-
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
-        self.assertTrue(req.status_code == 200)
-        data = json.loads(req.text)["certificate"].encode("utf-8")
-
+        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         tbs = asn1_x509.Certificate().load(data)["tbs_certificate"]
 
         # AIA
-        found = False
+        found_ca, found_ocsp = False, False
         for _, extension in enumerate(tbs["extensions"]):
             if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
                 for _, descr in enumerate(extension["extn_value"].native):
-                    if "/ca/" in descr["access_location"]:
+                    if "ca_issuers" == descr["access_method"]:
                         self.assertTrue("/ca/" in descr["access_location"])
-                        found = True
-                        url = descr["access_location"]
-        self.assertTrue(found)
+                        found_ca = True
+                        url_ca = descr["access_location"]
+                    elif "ocsp" == descr["access_method"]:
+                        self.assertTrue("/ocsp/" in descr["access_location"])
+                        found_ocsp = True
+
+        self.assertTrue(found_ca)
+        self.assertTrue(found_ocsp)
 
         # Get AIA
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, url)
-        req2 = requests.get(url, headers=request_headers)
+        req = requests.get(url_ca)
         self.assertTrue(req.status_code == 200)
-        data = req2.content
+        data = req.content
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate().load(data), asn1_x509.Certificate))
 
+        # Get OCSP
+        _, _, _, _ = certificate_ocsp_data(new_ca)
+
         # Get CDP
-        url = cdp_url(json.loads(req.text)["certificate"])
+        url = cdp_url(new_ca)
         req = requests.get(url)
         self.assertTrue(req.status_code == 200)
         data = req.content

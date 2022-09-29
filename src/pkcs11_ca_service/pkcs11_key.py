@@ -10,6 +10,7 @@ class Pkcs11KeyInput(InputObject):
 
     key_label: Union[str, None]
     serial: Union[int, None]
+    public_key: Union[int, None] = None
 
 
 class Pkcs11Key(DataClassObject):
@@ -27,7 +28,7 @@ class Pkcs11Key(DataClassObject):
         "authorized_by": "public_key(serial)",
     }
 
-    db_unique_fields = ["key_label"]
+    db_unique_fields = ["public_key", "key_label"]
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)

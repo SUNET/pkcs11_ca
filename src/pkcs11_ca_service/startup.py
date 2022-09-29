@@ -75,3 +75,4 @@ async def startup() -> None:
 
     await _db_startup(db_obj, db_data_classes)
     await _pkcs11_startup(db_obj)
+    print("Startup DONE")

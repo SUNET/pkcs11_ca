@@ -13,7 +13,7 @@ from asn1crypto import crl as asn1_crl
 # from asn1crypto import crl as asn1_crl
 # from asn1crypto import pem as asn1_pem
 
-from src.pkcs11_ca_service.asn1 import create_jwt_header_str, cert_revoked, crl_expired
+from src.pkcs11_ca_service.asn1 import create_jwt_header_str, cert_revoked, crl_expired, cert_pem_serial_number
 from .lib import get_cas, cdp_url
 
 TEST_CSR1 = """-----BEGIN CERTIFICATE REQUEST-----
@@ -93,7 +93,7 @@ class TestRevoke(unittest.TestCase):
         curr_crl = asn1_crl.CertificateList.load(data)
         curr_crl_pem: str = asn1_pem.armor("X509 CRL", curr_crl.dump()).decode("utf-8")
         self.assertTrue(isinstance(curr_crl, asn1_crl.CertificateList))
-        self.assertTrue(cert_revoked(cert, curr_crl_pem))
+        self.assertTrue(cert_revoked(cert_pem_serial_number(cert), curr_crl_pem))
         self.assertFalse(crl_expired(curr_crl_pem))
 
     def test_is_revoked(self) -> None:

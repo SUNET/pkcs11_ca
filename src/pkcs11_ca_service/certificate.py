@@ -108,7 +108,7 @@ class Certificate(DataClassObject):
             ca_serial = int(revoke_data["ca_serial"])
             crl_pem = revoke_data["crl"]
 
-            if cert_revoked(ca_pem, crl_pem):
+            if cert_revoked(cert_pem_serial_number(ca_pem), crl_pem):
                 return True
 
             if ca_serial == ca_issuer:

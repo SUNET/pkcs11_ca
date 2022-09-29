@@ -44,6 +44,18 @@ class TestAuth(unittest.TestCase):
         req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
         self.assertTrue(req.status_code == 401)
 
+        # Wrong nonce, non valid base64 encoding
+        jwt_headers = {
+            "nonce": "AJCmF5Qw-7Dhp93FWDFY1jyQ506UNSz7brPG35bx6sR-3s8pyMhjgEqbXQqN2CQOr_kyZKcyWfyDiGRaK9Hasd!!Qgg",
+            "url": "http://localhost:8000/ca",
+        }
+        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key1, algorithm="PS256", headers=jwt_headers)
+        request_headers = {}
+        request_headers["Authorization"] = "Bearer " + encoded.decode("utf-8")
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        self.assertTrue(req.status_code == 401)
+
     def test_auth_url(self) -> None:
         """
         Test url auth

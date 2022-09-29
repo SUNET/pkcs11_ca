@@ -23,6 +23,7 @@ class CaInput(InputObject):
     issuer_pem: Union[str, None]
     key_size: int = 2048
     path: Union[str, None] = None
+    pkcs11_key: Union[int, None] = None
 
 
 class Ca(DataClassObject):
@@ -46,7 +47,7 @@ class Ca(DataClassObject):
         "csr": "csr(serial)",
         "authorized_by": "public_key(serial)",
     }
-    db_unique_fields = ["pem", "fingerprint", "path"]  # pylint:disable=duplicate-code
+    db_unique_fields = ["pem", "pkcs11_key", "fingerprint", "path"]  # pylint:disable=duplicate-code
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)
@@ -122,7 +123,7 @@ class Ca(DataClassObject):
             crl_pem = revoke_data["crl"]
             ca_serial = int(revoke_data["ca_serial"])
 
-            if cert_revoked(ca_pem, crl_pem):
+            if cert_revoked(cert_pem_serial_number(ca_pem), crl_pem):
                 return True
 
             if ca_issuer == ca_serial:

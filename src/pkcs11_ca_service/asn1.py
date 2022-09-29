@@ -1,9 +1,10 @@
 """ASN1 module, mostly using asn1crypto"""
 
 from typing import Tuple, Dict
-from base64 import urlsafe_b64encode, urlsafe_b64decode
+from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 import hashlib
 import datetime
+import urllib.parse
 
 import jwt
 import requests
@@ -20,6 +21,34 @@ from asn1crypto.keys import (
 
 from .config import ROOT_URL
 from .error import UnsupportedJWTAlgorithm
+
+
+def ocsp_decode(data: str) -> bytes:
+    """Decode OCSP data.
+
+    Parameters:
+    data (str): Input data.
+
+    Returns:
+    bytes
+    """
+
+    b64_request = urllib.parse.unquote(data).encode("utf-8")
+    return b64decode(b64_request)
+
+
+def ocsp_encode(data: bytes) -> str:
+    """Encode OCSP data.
+
+    Parameters:
+    data (bytes): Input data.
+
+    Returns:
+    str
+    """
+
+    b64_encoded = b64encode(data)
+    return urllib.parse.quote(b64_encoded.decode("utf-8"), safe="")
 
 
 def to_base64url(data: bytes) -> str:
@@ -310,11 +339,11 @@ def crl_expired(pem: str) -> bool:
     return next_update < utc_time
 
 
-def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
+def cert_revoked(serial_number: int, crl_pem: str) -> bool:
     """Check if certs serial number is revoked in the CRL.
 
     Parameters:
-    cert_pem (str): PEM certificate input data.
+    serial_number (int): Serial number to check
     crl_pem (str): PEN CRL input data.
 
     Returns:
@@ -325,8 +354,6 @@ def cert_revoked(cert_pem: str, crl_pem: str) -> bool:
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
     crl = asn1_crl.CertificateList().load(data)
-
-    serial_number = cert_pem_serial_number(cert_pem)
 
     if len(crl["tbs_cert_list"]["revoked_certificates"]) != 0:
         for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
@@ -347,7 +374,7 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     """
 
     # AIA
-    access_description = asn1_x509.AccessDescription(
+    access_description_ca = asn1_x509.AccessDescription(
         {
             "access_method": "ca_issuers",
             "access_location": asn1_x509.GeneralName(
@@ -355,7 +382,14 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
             ),
         }
     )
-    aia = asn1_x509.AuthorityInfoAccessSyntax([access_description])
+    # ocsp
+    access_description_ocsp = asn1_x509.AccessDescription(
+        {
+            "access_method": "ocsp",
+            "access_location": asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/ocsp/")),
+        }
+    )
+    aia = asn1_x509.AuthorityInfoAccessSyntax([access_description_ca, access_description_ocsp])
     aia_ext = asn1_x509.Extension()
     aia_ext["extn_id"] = asn1_x509.ExtensionId("1.3.6.1.5.5.7.1.1")
     aia_ext["extn_value"] = aia

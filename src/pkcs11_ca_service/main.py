@@ -16,11 +16,12 @@ from python_x509_pkcs11.csr import sign_csr
 from python_x509_pkcs11.ca import create as create_ca
 
 from .base import db_load_data_class, InputObject
+from .ocsp import ocsp_response
 from .csr import Csr, CsrInput, search as csr_search
 from .certificate import Certificate, CertificateInput, search as certificate_search
 from .crl import Crl, CrlInput, search as crl_search
 from .ca import Ca, CaInput, search as ca_search
-from .pkcs11_key import Pkcs11Key
+from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
 from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, aia_and_cdp_exts, cert_as_der, crl_as_der
@@ -320,6 +321,59 @@ async def post_crl(request: Request, crl_input: CrlInput) -> JSONResponse:
     return JSONResponse(status_code=200, content={"crl": crl_pem})
 
 
+# ALSO THE SAME FOR POST
+# APPENDIX A
+# https://www.ietf.org/rfc/rfc2560.txt
+
+
+@app.post("/ocsp/")
+async def post_ocsp(request: Request) -> Response:
+    """/ocsp, POST method.
+
+    Return an OCSP response.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.Response
+    """
+
+    # _ = await authorized_by(request)
+
+    # WORK ON BETTER ERROR HANDLING
+    ocsp_request = await request.body()
+    try:
+        ocsp_data = await ocsp_response(ocsp_request, encoded=False)
+        return Response(status_code=200, content=ocsp_data, media_type="application/ocsp-response")
+    except HTTPException:
+        return Response(status_code=404, content='{"detail":"Not Found"}', media_type="application/json")
+
+
+@app.get("/ocsp/{ocsp_path:path}")
+async def get_ocsp(ocsp_path: str) -> Response:
+    """/ocsp, GET method.
+
+    Return an OCSP response.
+
+    Parameters:
+    ocsp_path (str): OCSP path.
+
+    Returns:
+    fastapi.Response
+    """
+
+    # _ = await authorized_by(request)
+
+    # WORK ON BETTER ERROR HANDLING
+    path = ocsp_path.replace("/ocsp/", "").encode("utf-8")
+    try:
+        ocsp_data = await ocsp_response(path, encoded=True)
+        return Response(status_code=200, content=ocsp_data, media_type="application/ocsp-response")
+    except HTTPException:
+        return Response(status_code=404, content='{"detail":"Not Found"}', media_type="application/json")
+
+
 @app.get("/crl/{crl_path}")
 async def get_crl(crl_path: str) -> Response:
     """/ca, GET method.
@@ -327,11 +381,10 @@ async def get_crl(crl_path: str) -> Response:
     Get a CRL.
 
     Parameters:
-    request (fastapi.Request): The entire HTTP request.
-    crl_path (str): The unique CRL path
+    crl_path (str): The unique CRL path.
 
     Returns:
-    fastapi.responses.JSONResponse
+    fastapi.Response
     """
 
     # auth_by = await authorized_by(request)
@@ -355,11 +408,10 @@ async def get_ca(ca_path: str) -> Response:
     Get a ca.
 
     Parameters:
-    request (fastapi.Request): The entire HTTP request.
-    ca_path (str): The unique CA path
+    ca_path (str): The unique CA path.
 
     Returns:
-    fastapi.responses.JSONResponse
+    fastapi.Response
     """
 
     # _ = await authorized_by(request)
@@ -402,7 +454,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
     if ca_input.issuer_pem is not None:
         issuer_obj = await ca_request(CaInput(pem=ca_input.issuer_pem))
 
-        issuer_pkcs11_key_obj = await pkcs11_key_request(issuer_obj)
+        issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
         issuer_key_label = issuer_pkcs11_key_obj.key_label
         issuer_pem = pem_cert_to_name_dict(issuer_obj.pem)
 
@@ -512,7 +564,7 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
     issuer_obj = await ca_request(CaInput(pem=csr_input.ca_pem))
 
     # Get pkcs11 and its key label to sign the csr with from the CA
-    issuer_pkcs11_key_obj = await pkcs11_key_request(issuer_obj)
+    issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
 
     extra_extensions = aia_and_cdp_exts(issuer_obj.path)
 

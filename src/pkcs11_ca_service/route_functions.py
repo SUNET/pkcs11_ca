@@ -1,15 +1,55 @@
 """Route functions"""
+
 from fastapi import HTTPException
 
 # from fastapi.responses import JSONResponse
 
 from python_x509_pkcs11.crl import create as create_crl
 
+from .public_key import PublicKey, PublicKeyInput
 from .ca import CaInput, Ca
 from .crl import Crl
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .asn1 import crl_expired, pem_cert_to_name_dict
 from .base import db_load_data_class
+
+
+async def public_key_request(public_key_input: PublicKeyInput) -> PublicKey:
+    """Get public key object.
+
+    Parameters:
+    public_key_input (CaInput): Public key input object.
+
+    Returns:
+    PublicKey
+    """
+
+    public_key_objs = await db_load_data_class(PublicKey, public_key_input)
+    if not public_key_objs:
+        raise HTTPException(status_code=400, detail="No such public key")
+    public_key_obj = public_key_objs[0]
+    if not isinstance(public_key_obj, PublicKey):
+        raise HTTPException(status_code=400, detail="No such public key")
+    return public_key_obj
+
+
+async def pkcs11_key_request(pkcs11_key_input: Pkcs11KeyInput) -> Pkcs11Key:
+    """Get pkcs11 key object.
+
+    Parameters:
+    pkcs11_key_input (Pkcs11KeyInput): PKCS11 key input object.
+
+    Returns:
+    Pkcs11Key
+    """
+
+    pkcs11_key_objs = await db_load_data_class(Pkcs11Key, pkcs11_key_input)
+    if not pkcs11_key_objs:
+        raise HTTPException(status_code=400, detail="No such pkcs11 key")
+    pkcs11_key_obj = pkcs11_key_objs[0]
+    if not isinstance(pkcs11_key_obj, Pkcs11Key):
+        raise HTTPException(status_code=400, detail="No such pkcs11 key")
+    return pkcs11_key_obj
 
 
 async def ca_request(ca_input: CaInput) -> Ca:
@@ -29,25 +69,6 @@ async def ca_request(ca_input: CaInput) -> Ca:
     if not isinstance(issuer_obj, Ca):
         raise HTTPException(status_code=400, detail="No such CA")
     return issuer_obj
-
-
-async def pkcs11_key_request(issuer_obj: Ca) -> Pkcs11Key:
-    """Get pkcs11 object.
-
-    Parameters:
-    issuer_object (Ca): CA object of its issuer
-
-    Returns:
-    Pkcs11Key
-    """
-
-    issuer_pkcs11_key_objs = await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
-    if not issuer_pkcs11_key_objs:
-        raise HTTPException(status_code=400, detail="No such CA with PKCS11 key")
-    issuer_pkcs11_key_obj = issuer_pkcs11_key_objs[0]
-    if not isinstance(issuer_pkcs11_key_obj, Pkcs11Key):
-        raise HTTPException(status_code=400, detail="No such CA with PKCS11 key")
-    return issuer_pkcs11_key_obj
 
 
 async def crl_request(auth_by: int, issuer_obj: Ca) -> str:
@@ -71,7 +92,7 @@ async def crl_request(auth_by: int, issuer_obj: Ca) -> str:
 
     # Create a new CRL
     else:
-        issuer_pkcs11_key_obj = await pkcs11_key_request(issuer_obj)
+        issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
         crl_pem = await create_crl(
             issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
         )
