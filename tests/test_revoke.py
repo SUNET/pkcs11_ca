@@ -106,7 +106,7 @@ class TestRevoke(unittest.TestCase):
         with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
             priv_key = file_data.read()
 
-        # Revoke CA
+        # Create CA
         name_dict = {
             "country_name": "SE",
             "state_or_province_name": "Stockholm_test",

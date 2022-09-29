@@ -1,6 +1,6 @@
 """ASN1 module, mostly using asn1crypto"""
 
-from typing import Tuple, Dict
+from typing import Tuple, Dict, Union
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 import hashlib
 import datetime
@@ -337,6 +337,32 @@ def crl_expired(pem: str) -> bool:
     next_update: datetime.datetime = crl["tbs_cert_list"]["next_update"].native
     utc_time = datetime.datetime.now(datetime.timezone.utc)
     return next_update < utc_time
+
+
+def cert_revoked_time(serial_number: int, pem: str) -> Tuple[datetime.datetime, Union[asn1_crl.CRLReason, None]]:
+    """Check if CRL has expired from its next_update field compared to current time.
+
+    Parameters:
+    serial_number (int): Serial number for the revoked ceritficate.
+    pem (str): PEM CRL input data.
+
+    Returns:
+    Tuple[datetime.datetime, Union[asn1_crl.CRLReason, None]]
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    crl = asn1_crl.CertificateList().load(data)
+
+    if len(crl["tbs_cert_list"]["revoked_certificates"]) != 0:
+        for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
+            if serial_number == revoked["user_certificate"].native:
+
+                for _, ext in enumerate(revoked["crl_entry_extensions"]):
+                    if ext["extn_id"].dotted == "2.5.29.21":
+                        return revoked["revocation_date"].native, asn1_crl.CRLReason(ext["extn_value"].native)
+    raise ValueError
 
 
 def cert_revoked(serial_number: int, crl_pem: str) -> bool:

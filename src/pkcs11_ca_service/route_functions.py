@@ -88,20 +88,19 @@ async def crl_request(auth_by: int, issuer_obj: Ca) -> str:
     curr_crl: str = revoke_data["crl"]
 
     if not crl_expired(curr_crl):
-        crl_pem = curr_crl
+        return curr_crl
 
     # Create a new CRL
-    else:
-        issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
-        crl_pem = await create_crl(
-            issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
-        )
-        crl_obj = Crl(
-            {
-                "pem": crl_pem,
-                "authorized_by": auth_by,
-                "issuer": issuer_obj.serial,
-            }
-        )
-        await crl_obj.save()
+    issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
+    crl_pem = await create_crl(
+        issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
+    )
+    crl_obj = Crl(
+        {
+            "pem": crl_pem,
+            "authorized_by": auth_by,
+            "issuer": issuer_obj.serial,
+        }
+    )
+    await crl_obj.save()
     return crl_pem
