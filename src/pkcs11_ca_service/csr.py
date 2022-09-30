@@ -1,7 +1,7 @@
 """Module to handle csrs"""
 from typing import Union, Dict, List
 from fastapi.responses import JSONResponse
-from .base import DataClassObject, InputObject, db_load_data_class
+from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .error import WrongDataType
 
 
@@ -15,17 +15,19 @@ class CsrInput(InputObject):
 class Csr(DataClassObject):
     """Class to represent a csr"""
 
+    db: DataBaseObject
+
     db_table_name = "csr"
     db_fields = {"public_key": int, "pem": str, "authorized_by": int, "created": str}
     db_reference_fields = {
         "public_key": "public_key(serial)",
         "authorized_by": "public_key(serial)",
     }
-    db_unique_fields = ["pem"]  # pylint:disable=duplicate-code
+    db_unique_fields = ["pem"]
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)
-        pem = kwargs.get("pem", None)  # pylint:disable=duplicate-code
+        pem = kwargs.get("pem", None)
         if not isinstance(pem, str):
             raise WrongDataType("'pem', must be a 'str'")
         self.pem = pem

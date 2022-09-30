@@ -2,8 +2,6 @@
 
 from fastapi import HTTPException
 
-# from fastapi.responses import JSONResponse
-
 from python_x509_pkcs11.crl import create as create_crl
 
 from .public_key import PublicKey, PublicKeyInput

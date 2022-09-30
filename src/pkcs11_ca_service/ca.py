@@ -9,7 +9,7 @@ from python_x509_pkcs11.crl import create as create_crl
 
 from .crl import Crl
 from .asn1 import pem_cert_to_name_dict
-from .base import DataClassObject, InputObject, db_load_data_class
+from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert, cert_pem_serial_number, cert_revoked
 from .error import WrongDataType
 
@@ -29,12 +29,14 @@ class CaInput(InputObject):
 class Ca(DataClassObject):
     """Class to represent a certificate authority"""
 
+    db: DataBaseObject
+
     db_table_name = "ca"
     db_fields = {
         "pem": str,
         "csr": int,
         "issuer": int,
-        "pkcs11_key": int,  # pylint:disable=duplicate-code
+        "pkcs11_key": int,
         "authorized_by": int,
         "path": str,
         "fingerprint": str,
@@ -47,7 +49,7 @@ class Ca(DataClassObject):
         "csr": "csr(serial)",
         "authorized_by": "public_key(serial)",
     }
-    db_unique_fields = ["pem", "pkcs11_key", "fingerprint", "path"]  # pylint:disable=duplicate-code
+    db_unique_fields = ["pem", "pkcs11_key", "fingerprint", "path"]
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)

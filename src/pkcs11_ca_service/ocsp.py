@@ -100,17 +100,19 @@ async def ocsp_response(request: bytes, encoded: bool = False) -> bytes:
         try:
             request = ocsp_decode(request.decode("utf-8"))
         except binasciiError:
-            return "0".encode("utf-8")
+            return b"0"
 
     # Ensure valid ocsp request
     try:
         ocsp_request = asn1_ocsp.OCSPRequest.load(request)
-        if len(ocsp_request["tbs_request"]["request_list"]) == 0:
+        if not isinstance(ocsp_request, asn1_ocsp.OCSPRequest) or len(ocsp_request["tbs_request"]["request_list"]) == 0:
             raise ValueError
 
         # Get nonce if exists
         nonce = request_nonce(request)
 
         return await response(*await _ocsp_response_data(ocsp_request, nonce))
-    except (ValueError, TypeError):
+    except ValueError:
+        return b"0"
+    except TypeError:
         return await response("", {}, asn1_ocsp.Responses(), 1)

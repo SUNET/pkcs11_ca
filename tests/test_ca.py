@@ -16,7 +16,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from .lib import get_cas, create_i_ca, cdp_url
 
-with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
+with open("trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
 with open("trusted_keys/pubkey1.pem", "rb") as file_data:
     pub_key = file_data.read()
@@ -43,11 +43,6 @@ class TestCa(unittest.TestCase):
         """
         create ca
         """
-
-        # with open("trusted_keys/privkey1.key", "rb") as f_data:  # pylint:disable=duplicate-code
-        #     priv_key = f_data.read()
-        # with open("trusted_keys/pubkey1.pem", "rb") as f_data:
-        #     pub_key = f_data.read()
 
         name_dict = {
             "country_name": "SE",
@@ -84,11 +79,6 @@ class TestCa(unittest.TestCase):
         """
         create ca
         """
-
-        # with open("trusted_keys/privkey1.key", "rb") as file_data:  # pylint:disable=duplicate-code
-        #     priv_key = file_data.read()
-        # with open("trusted_keys/pubkey1.pem", "rb") as file_data:
-        #     pub_key = file_data.read()
 
         name_dict = {
             "country_name": "SE",
@@ -137,7 +127,7 @@ class TestCa(unittest.TestCase):
             "country_name": "SE",
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm_test",
-            "organization_name": "SUNET",
+            "organization_name": "SUNET_ca",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-create-20.sunet.se",
             "email_address": "soc@sunet.se",
@@ -154,14 +144,13 @@ class TestCa(unittest.TestCase):
         for _, extension in enumerate(tbs["extensions"]):
             if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
                 for _, descr in enumerate(extension["extn_value"].native):
-                    if "ca_issuers" == descr["access_method"]:
+                    if descr["access_method"] == "ca_issuers":
                         self.assertTrue("/ca/" in descr["access_location"])
                         found_ca = True
                         url_ca = descr["access_location"]
-                    elif "ocsp" == descr["access_method"]:
+                    elif descr["access_method"] == "ocsp":
                         self.assertTrue("/ocsp/" in descr["access_location"])
                         found_ocsp = True
-
         self.assertTrue(found_ca)
         self.assertTrue(found_ocsp)
 

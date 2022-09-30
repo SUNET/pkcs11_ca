@@ -1,6 +1,6 @@
 """Module to handle pkcs11 keys"""
 from typing import Union, Dict
-from .base import DataClassObject, InputObject
+from .base import DataClassObject, DataBaseObject, InputObject
 
 from .error import WrongDataType
 
@@ -15,6 +15,8 @@ class Pkcs11KeyInput(InputObject):
 
 class Pkcs11Key(DataClassObject):
     """Class to represent a PKCS11 key"""
+
+    db: DataBaseObject
 
     db_table_name = "pkcs11_key"
     db_fields = {

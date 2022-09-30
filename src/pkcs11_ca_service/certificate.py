@@ -4,7 +4,7 @@ from fastapi.responses import JSONResponse
 from fastapi import HTTPException
 from python_x509_pkcs11.crl import create as create_crl
 
-from .base import DataClassObject, InputObject, db_load_data_class
+from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert
 from .asn1 import pem_cert_to_name_dict, cert_pem_serial_number
 from .asn1 import cert_revoked
@@ -22,15 +22,17 @@ class CertificateInput(InputObject):
 class Certificate(DataClassObject):
     """Class to represent a certificate"""
 
+    db: DataBaseObject
+
     db_table_name = "certificate"
     db_fields = {
         "public_key": int,
         "pem": str,
         "csr": int,
-        "issuer": int,  # pylint:disable=duplicate-code
+        "issuer": int,
         "authorized_by": int,
         "fingerprint": str,
-        "not_before": str,  # pylint:disable=duplicate-code
+        "not_before": str,
         "not_after": str,
         "created": str,
     }
@@ -45,7 +47,7 @@ class Certificate(DataClassObject):
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)
         pem = kwargs.get("pem", None)
-        if not isinstance(pem, str):  # pylint:disable=duplicate-code
+        if not isinstance(pem, str):
             raise WrongDataType("'pem', must be a 'str'")
         self.pem = pem
 

@@ -1,7 +1,7 @@
 """Module to handle crls"""
 from typing import Union, Dict, List
 from fastapi.responses import JSONResponse
-from .base import DataClassObject, InputObject, db_load_data_class
+from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .asn1 import this_update_next_update_from_crl
 
 from .error import WrongDataType
@@ -16,6 +16,8 @@ class CrlInput(InputObject):
 
 class Crl(DataClassObject):
     """Class to represent a crl"""
+
+    db: DataBaseObject
 
     db_table_name = "crl"
     db_fields = {
@@ -35,7 +37,7 @@ class Crl(DataClassObject):
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)
-        pem = kwargs.get("pem", None)  # pylint:disable=duplicate-code
+        pem = kwargs.get("pem", None)
         if not isinstance(pem, str):
             raise WrongDataType("'pem', must be a 'str'")
         self.pem = pem

@@ -191,7 +191,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
     key = PublicKeyInfo().load(data)
 
-    if "rsa" == key["algorithm"].native["algorithm"]:
+    if key["algorithm"].native["algorithm"] == "rsa":
         # print("rsa detected")
 
         ret["kty"] = "rsa"
@@ -201,7 +201,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
         return ret
 
-    if "eliptic curve" == key["algorithm"].native["algorithm"]:
+    if key["algorithm"].native["algorithm"] == "eliptic curve":
         raise NotImplementedError
     raise UnsupportedJWTAlgorithm
 
@@ -455,7 +455,8 @@ def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
     jwt_headers = {"nonce": nonce, "url": url}
     jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
     encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-    return "Bearer " + encoded.decode("utf-8")
+    ret: str = "Bearer " + encoded.decode("utf-8")
+    return ret
 
 
 def cert_as_der(pem: str) -> bytes:

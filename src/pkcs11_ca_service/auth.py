@@ -49,7 +49,7 @@ async def _validate_token(request: Request) -> Tuple[int, str]:
     # Load jwt public key from DB
     try:
         decoded_jwt = jwt.decode(token, algorithms=JWT_ALGOS, options={"verify_signature": False})
-    except BaseException as exception:  # pylint: disable=broad-except
+    except BaseException as exception:
         # Log this
         print(exception)
         raise HTTPException(status_code=401, detail="token invalid") from exception
@@ -59,7 +59,7 @@ async def _validate_token(request: Request) -> Tuple[int, str]:
     # Verify signature with public key from db
     try:
         decoded_jwt = jwt.decode(token, key=pub_key_pem.encode("utf-8"), algorithms=JWT_ALGOS)
-    except BaseException as exception:  # pylint: disable=broad-except
+    except BaseException as exception:
         # Log this
         print(exception)
         raise HTTPException(status_code=401, detail="token invalid signature") from exception

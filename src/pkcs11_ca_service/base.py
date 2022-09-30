@@ -202,7 +202,7 @@ class DataClassObject(ABC):
         """
 
         unique_field = self.db_unique_fields[0]
-        self.db.delete(self.db_table_name, unique_field, self.db_data()[unique_field])
+        await self.db.delete(self.db_table_name, unique_field, self.db_data()[unique_field])
         print(
             "Deleted from " + self.db_table_name + ", WHERE " + unique_field + " = " + str(self.db_data()[unique_field])
         )

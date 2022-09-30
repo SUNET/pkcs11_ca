@@ -2,7 +2,6 @@
 
 from typing import Union, Dict
 import asyncio
-import time
 import hashlib
 from secrets import token_bytes
 
@@ -31,9 +30,7 @@ from .route_functions import crl_request, ca_request, pkcs11_key_request
 
 
 loop = asyncio.get_running_loop()
-loop.create_task(startup())
-# Allow the startup task to complete before starting FastAPI
-time.sleep(1)
+startup_task = loop.create_task(startup())
 
 # Create fastapi app
 app = FastAPI()

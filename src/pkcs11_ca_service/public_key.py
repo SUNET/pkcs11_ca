@@ -1,8 +1,9 @@
 """Module to handle public keys"""
+
 from typing import Union, Dict, List
 from fastapi.responses import JSONResponse
 
-from .base import DataClassObject, InputObject, db_load_data_class
+from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .asn1 import public_key_pem_to_sha1_fingerprint
 from .error import WrongDataType
 
@@ -17,6 +18,8 @@ class PublicKeyInput(InputObject):
 
 class PublicKey(DataClassObject):
     """Class to represent a public key"""
+
+    db: DataBaseObject
 
     db_table_name = "public_key"
     db_fields = {
@@ -33,7 +36,7 @@ class PublicKey(DataClassObject):
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)
-        pem = kwargs.get("pem", None)  # pylint:disable=duplicate-code
+        pem = kwargs.get("pem", None)
         if not isinstance(pem, str):
             raise WrongDataType("'pem', must be a 'str'")
         self.pem = pem
