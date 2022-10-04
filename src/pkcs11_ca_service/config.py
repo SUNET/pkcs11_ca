@@ -27,7 +27,7 @@ ROOT_CA_NAME_DICT = {
 
 CSR_EXPIRE_DATE = 365 * 1
 
-DB_HOST = "localhost"
+DB_HOST = "pkcs11_ca_service_postgres"
 DB_USER = "pkcs11_testuser1"
 DB_PASSWORD = "DBUserPassword"
 DB_PORT = "5432"

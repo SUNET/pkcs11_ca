@@ -108,10 +108,10 @@ class DataBaseObject(ABC):
         fields: List[Dict[str, Union[Type[str], Type[int]]]],
         reference_fields: List[Dict[str, str]],
         unique_fields: List[List[str]],
-    ) -> None:
+    ) -> bool:
         """Startup for the database.
         Creates all tables, create and insert the root ca
-        if not exists and loads trusted admin keys.
+        if not exists and loads trusted admin keys, return true if DB startup ok
 
         Parameters:
         tables (List[str]): Table names.
@@ -120,7 +120,7 @@ class DataBaseObject(ABC):
         unique_fields (List[List[str]]): Unique field names.
 
         Returns:
-        None
+        bool
         """
 
 

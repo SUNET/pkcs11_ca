@@ -226,13 +226,18 @@ class PostgresDB(DataBaseObject):
             async with conn.transaction():
 
                 for key_file in os.listdir(ROOT_ADMIN_KEYS_FOLDER):
-                    if not key_file.endswith(".pem"):
+                    if not (key_file.endswith(".pem") or key_file.endswith(".pub")):
                         continue
 
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
                         key_pem = file_data.read().decode("utf-8")
-                    print("Saved admin key " + ROOT_ADMIN_KEYS_FOLDER + "/" + key_file + " into DB")
 
+                    print(type(key_pem))
+                    query = "SELECT pem FROM public_key WHERE pem = $1"
+                    rows = await conn.fetch(query, key_pem)
+                    if rows:
+                        continue
+                    
                     query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
                     await conn.execute(
                         query,
@@ -245,6 +250,7 @@ class PostgresDB(DataBaseObject):
                             str(datetime.datetime.utcnow()),
                         ),
                     )
+                    print("Saved admin key " + ROOT_ADMIN_KEYS_FOLDER + "/" + key_file + " into DB")
 
     @classmethod
     async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
@@ -284,50 +290,60 @@ class PostgresDB(DataBaseObject):
         fields: List[Dict[str, Union[Type[str], Type[int]]]],
         reference_fields: List[Dict[str, str]],
         unique_fields: List[List[str]],
-    ) -> None:
+    ) -> bool:
 
-        cls.pool = await create_pool(
-            dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
-            min_size=5,
-            max_size=50,
-            command_timeout=DB_TIMEOUT,
-        )
+        try:
+            cls.pool = await create_pool(
+                dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
+                min_size=5,
+                max_size=50,
+                command_timeout=DB_TIMEOUT,
+            )
+        except:
+            print("Failed to connect to DB, please fix")
+            print("postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE, flush=True)
+            return False
 
         classes_info: Dict[str, List[str]] = {}
-        await cls._check_db()
 
         # Remove me, just here for easy testing
-        await cls._drop_all_tables(tables)
+        # await cls._drop_all_tables(tables)
 
-        for index, table in enumerate(tables):
-            await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
-            classes_info[table] = list(fields[index].keys())
-
-        if not await cls._has_root_ca():
+        # Create the tables and root ca
+        if not await cls._check_db():
+            for index, table in enumerate(tables):
+                await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
+                classes_info[table] = list(fields[index].keys())
             await cls._insert_root_ca(classes_info)
 
+        # Load trusted keys
         await cls._load_trusted_keys(classes_info)
-
+        return True
+        
     # Rewrite this code so its future proof
     @classmethod
-    async def _check_db(cls) -> None:
+    async def _check_db(cls) -> bool:
         async with cls.pool.acquire() as conn:
             try:
-                query = "SELECT serial FROM ca WHERE serial = issuer"
-                await conn.fetch(query)
-            except UndefinedTableError:
-                pass
-
-    # Rewrite this code so its future proof
-    @classmethod
-    async def _has_root_ca(cls) -> bool:
-        async with cls.pool.acquire() as conn:
-            async with conn.transaction():
-                query = "SELECT serial FROM ca WHERE serial = issuer"
+                query = "SELECT serial FROM ca ORDER BY serial DESC LIMIT 1"
                 rows = await conn.fetch(query)
                 if rows:
                     return True
-        return False
+                return False
+
+            except UndefinedTableError:
+                return False
+
+    # Rewrite this code so its future proof
+    # @classmethod
+    # async def _has_root_ca(cls) -> bool:
+    #     async with cls.pool.acquire() as conn:
+    #         async with conn.transaction():
+    #             query = "SELECT serial FROM ca WHERE serial = 1"
+    #             rows = await conn.fetch(query)
+    #             if rows:
+    #                 return True
+    #     return False
 
     @classmethod
     def _insert_root_item_query(cls, fields: List[str], table_name: str) -> str:

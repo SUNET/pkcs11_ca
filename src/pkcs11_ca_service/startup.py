@@ -1,6 +1,9 @@
 """Startup module"""
 from typing import Dict, List, Union, Type
 from importlib import import_module
+import os
+import sys
+from subprocess import check_call
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
@@ -43,7 +46,7 @@ def _load_db_module() -> DataBaseObject:
     return db_obj
 
 
-async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]) -> None:
+async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObject]) -> bool:
     tables: List[str] = []
     fields: List[Dict[str, Union[Type[str], Type[int]]]] = []
     reference_fields: List[Dict[str, str]] = []
@@ -55,7 +58,7 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
         reference_fields.append(db_data_class.db_reference_fields)
         unique_fields.append(db_data_class.db_unique_fields)
 
-    await db_obj.startup(tables, fields, reference_fields, unique_fields)
+    return await db_obj.startup(tables, fields, reference_fields, unique_fields)
 
 
 async def _pkcs11_startup(db_obj: DataBaseObject) -> None:
@@ -73,6 +76,12 @@ async def startup() -> None:
     db_obj = _load_db_module()
     db_data_classes = _load_db_data_classes()
 
-    await _db_startup(db_obj, db_data_classes)
+    if os.environ["PKCS11_MODULE"] == "/usr/lib/softhsm/libsofthsm2.so":
+        check_call("ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 || softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN", shell=True)
+    
+    if not await _db_startup(db_obj, db_data_classes):
+        sys.exit(1)
+
     await _pkcs11_startup(db_obj)
     print("Startup DONE")
+    print(flush=True)
