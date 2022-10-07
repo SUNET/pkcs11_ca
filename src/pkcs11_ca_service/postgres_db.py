@@ -312,7 +312,7 @@ class PostgresDB(DataBaseObject):
         classes_info: Dict[str, List[str]] = {}
 
         # Remove me, just here for easy testing
-        await cls._drop_all_tables(tables)
+        # await cls._drop_all_tables(tables)
 
         # Create the tables and root ca
         if not await cls._check_db():
