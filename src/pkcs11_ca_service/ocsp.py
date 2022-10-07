@@ -1,5 +1,5 @@
 """OCSP functions"""
-from typing import Dict, Tuple, Union
+from typing import Dict, Tuple, Union, List
 import datetime
 from binascii import Error as binasciiError
 
@@ -22,7 +22,7 @@ from .asn1 import cert_revoked, ocsp_decode, pem_cert_to_name_dict, cert_revoked
 # PERHAPS redo this in the future
 
 
-async def _ocsp_check_valid_cert(req: asn1_ocsp.Request) -> Tuple[str, Dict[str, str], asn1_ocsp.CertStatus]:
+async def _ocsp_check_valid_cert(req: asn1_ocsp.Request) -> Tuple[str, str, Dict[str, str], asn1_ocsp.CertStatus]:
     public_key_obj = await public_key_request(
         PublicKeyInput(fingerprint=req["req_cert"]["issuer_key_hash"].native.hex())
     )
@@ -38,18 +38,34 @@ async def _ocsp_check_valid_cert(req: asn1_ocsp.Request) -> Tuple[str, Dict[str,
         )
         return (
             pkcs11_key_obj.key_label,
+            pkcs11_key_obj.key_type,
             pem_cert_to_name_dict(issuer_obj.pem),
             asn1_ocsp.CertStatus({"revoked": revoked_info}),
         )
-    return pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), asn1_ocsp.CertStatus("good")
+    return (
+        pkcs11_key_obj.key_label,
+        pkcs11_key_obj.key_type,
+        pem_cert_to_name_dict(issuer_obj.pem),
+        asn1_ocsp.CertStatus("good"),
+    )
 
 
 async def _ocsp_response_data(
     ocsp_request: asn1_ocsp.OCSPRequest, nonce: Union[bytes, None]
-) -> Tuple[str, Dict[str, str], asn1_ocsp.Responses, int, Union[asn1_ocsp.ResponseDataExtensions, None]]:
+) -> Tuple[
+    str,
+    Dict[str, str],
+    asn1_ocsp.Responses,
+    int,
+    Union[asn1_ocsp.ResponseDataExtensions, None],
+    Union[datetime.datetime, None],
+    Union[List[str], None],
+    str,
+]:
     responses = asn1_ocsp.Responses()
     status_code: int = 6
     key_label: str = ""
+    key_type: str = ""
     name_dict: Dict[str, str] = {}
 
     for _, req in enumerate(ocsp_request["tbs_request"]["request_list"]):
@@ -57,7 +73,7 @@ async def _ocsp_response_data(
         curr_response["cert_id"] = req["req_cert"]
 
         try:
-            key_label, name_dict, cert_status = await _ocsp_check_valid_cert(req)
+            key_label, key_type, name_dict, cert_status = await _ocsp_check_valid_cert(req)
             status_code = 0
             curr_response["cert_status"] = cert_status
         except HTTPException:
@@ -82,7 +98,7 @@ async def _ocsp_response_data(
     extended_revoke_ext["extn_value"] = None
     extra_extensions.append(extended_revoke_ext)
 
-    return key_label, name_dict, responses, status_code, extra_extensions
+    return key_label, name_dict, responses, status_code, extra_extensions, None, None, key_type
 
 
 async def ocsp_response(request: bytes, encoded: bool = False) -> bytes:

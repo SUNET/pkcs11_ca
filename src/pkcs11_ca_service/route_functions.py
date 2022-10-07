@@ -91,7 +91,10 @@ async def crl_request(auth_by: int, issuer_obj: Ca) -> str:
     # Create a new CRL
     issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
     crl_pem = await create_crl(
-        issuer_pkcs11_key_obj.key_label, pem_cert_to_name_dict(issuer_obj.pem), old_crl_pem=curr_crl
+        issuer_pkcs11_key_obj.key_label,
+        pem_cert_to_name_dict(issuer_obj.pem),
+        old_crl_pem=curr_crl,
+        key_type=issuer_pkcs11_key_obj.key_type,
     )
     crl_obj = Crl(
         {

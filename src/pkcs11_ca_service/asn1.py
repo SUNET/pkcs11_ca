@@ -201,7 +201,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
         return ret
 
-    if key["algorithm"].native["algorithm"] == "eliptic curve":
+    if key["algorithm"].native["algorithm"] == "ec":
         raise NotImplementedError
     raise UnsupportedJWTAlgorithm
 

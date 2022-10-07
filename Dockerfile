@@ -1,21 +1,28 @@
+# FROM debian:stable-slim
 FROM debian:latest
 
 
-RUN apt-get update \
-    && apt-get install -y python3-pip \
-    python3-dev \
-    uvicorn \
-    python3-fastapi \
-    softhsm python3-jwt \
-    python3-asyncpg \
-    python3-requests \
-    softhsm2
+ RUN apt-get update \
+     && apt-get install -y python3-pip \
+     python3-dev \
+     uvicorn \
+     python3-fastapi \
+     softhsm python3-jwt \
+     python3-asyncpg \
+     python3-requests \
+     softhsm2
+
+#RUN apk update && apk add softhsm py3-pip gcc py3-dev
 
 RUN pip3 install python_x509_pkcs11
 
 RUN useradd pkcs11_ca_service
 
 RUN usermod -a -G softhsm pkcs11_ca_service
+
+
+# Remove dev stuff
+RUN apt-get remove gcc wget curl python3-dev -y && apt-get autoremove -y
 
 COPY . /app
  

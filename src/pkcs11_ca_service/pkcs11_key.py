@@ -6,11 +6,12 @@ from .error import WrongDataType
 
 
 class Pkcs11KeyInput(InputObject):
-    """Class to represent PKCS11 key matching from HTTP post data """
+    """Class to represent PKCS11 key matching from HTTP post data"""
 
     key_label: Union[str, None]
     serial: Union[int, None]
     public_key: Union[int, None] = None
+    key_type: Union[str, None]
 
 
 class Pkcs11Key(DataClassObject):
@@ -22,6 +23,7 @@ class Pkcs11Key(DataClassObject):
     db_fields = {
         "public_key": int,
         "key_label": str,
+        "key_type": str,
         "authorized_by": int,
         "created": str,
     }
@@ -38,3 +40,8 @@ class Pkcs11Key(DataClassObject):
         if not isinstance(key_label, str):
             raise WrongDataType("'key_label', must be a 'str'")
         self.key_label = key_label
+
+        key_type = kwargs.get("key_type", None)
+        if not isinstance(key_type, str):
+            raise WrongDataType("'key_type', must be a 'str'")
+        self.key_type = key_type

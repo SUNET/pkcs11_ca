@@ -25,6 +25,7 @@ from .asn1 import this_update_next_update_from_crl
 from .config import (
     ROOT_CA_NAME_DICT,
     ROOT_CA_KEY_LABEL,
+    ROOT_CA_KEY_TYPE,
     ROOT_CA_EXPIRE,
     ROOT_CA_KEY_SIZE,
     ROOT_ADMIN_KEYS_FOLDER,
@@ -170,7 +171,7 @@ class PostgresDB(DataBaseObject):
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
                 for table in reversed(tables):
-                    query = "DROP TABLE IF EXISTS " + table
+                    query = "DROP TABLE IF EXISTS " + table + " CASCADE"
                     await conn.execute(query)
                     print(query)
 
@@ -232,12 +233,11 @@ class PostgresDB(DataBaseObject):
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
                         key_pem = file_data.read().decode("utf-8")
 
-                    print(type(key_pem))
                     query = "SELECT pem FROM public_key WHERE pem = $1"
                     rows = await conn.fetch(query, key_pem)
                     if rows:
                         continue
-                    
+
                     query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
                     await conn.execute(
                         query,
@@ -268,11 +268,12 @@ class PostgresDB(DataBaseObject):
                 cert_serial: str = str(rows[0][3])
 
                 query = (
-                    "SELECT pkcs11_key.key_label from pkcs11_key INNER JOIN ca "
+                    "SELECT pkcs11_key.key_label,pkcs11_key.key_type from pkcs11_key INNER JOIN ca "
                     + "ON ca.pkcs11_key = pkcs11_key.serial WHERE ca.serial = $1"
                 )
                 rows = await conn.fetch(query, ca_serial)
                 key_label: str = rows[0][0]
+                key_type: str = rows[0][1]
 
                 ret: Dict[str, str] = {}
                 ret["crl"] = crl
@@ -280,6 +281,7 @@ class PostgresDB(DataBaseObject):
                 ret["ca_issuer"] = cert_auth_issuer
                 ret["ca_serial"] = cert_serial
                 ret["key_label"] = key_label
+                ret["key_type"] = key_type
 
                 return ret
 
@@ -301,13 +303,16 @@ class PostgresDB(DataBaseObject):
             )
         except:
             print("Failed to connect to DB, please fix")
-            print("postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE, flush=True)
+            print(
+                "postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
+                flush=True,
+            )
             return False
 
         classes_info: Dict[str, List[str]] = {}
 
         # Remove me, just here for easy testing
-        # await cls._drop_all_tables(tables)
+        await cls._drop_all_tables(tables)
 
         # Create the tables and root ca
         if not await cls._check_db():
@@ -319,7 +324,7 @@ class PostgresDB(DataBaseObject):
         # Load trusted keys
         await cls._load_trusted_keys(classes_info)
         return True
-        
+
     # Rewrite this code so its future proof
     @classmethod
     async def _check_db(cls) -> bool:
@@ -371,6 +376,7 @@ class PostgresDB(DataBaseObject):
                     ROOT_CA_KEY_SIZE,
                     not_before=not_before,
                     not_after=not_after,
+                    key_type=ROOT_CA_KEY_TYPE,
                 )
                 public_key_pem, identifier = await PKCS11Session.public_key_data(ROOT_CA_KEY_LABEL)
 
@@ -391,6 +397,7 @@ class PostgresDB(DataBaseObject):
                     query,
                     1,
                     ROOT_CA_KEY_LABEL,
+                    ROOT_CA_KEY_TYPE,
                     1,
                     str(datetime.datetime.utcnow()),
                 )
@@ -416,7 +423,7 @@ class PostgresDB(DataBaseObject):
                 )
 
                 # Create CRL for root CA
-                crl_pem = await create_crl(ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT)
+                crl_pem = await create_crl(ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT, key_type=ROOT_CA_KEY_TYPE)
                 this_update, next_update = this_update_next_update_from_crl(crl_pem)
                 query = cls._insert_root_item_query(classes_info["crl"], "crl")
                 await conn.execute(
@@ -428,3 +435,4 @@ class PostgresDB(DataBaseObject):
                     next_update,
                     str(datetime.datetime.utcnow()),
                 )
+                print("Created first ever root CA")

@@ -9,7 +9,7 @@ from .error import WrongDataType
 
 
 class PublicKeyInput(InputObject):
-    """Class to represent public key matching from HTTP post data """
+    """Class to represent public key matching from HTTP post data"""
 
     pem: Union[str, None]
     fingerprint: Union[str, None]

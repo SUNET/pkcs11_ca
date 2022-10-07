@@ -13,7 +13,7 @@ from .error import WrongDataType
 
 
 class CertificateInput(InputObject):
-    """Class to represent certificate matching from HTTP post data """
+    """Class to represent certificate matching from HTTP post data"""
 
     pem: Union[str, None]
     fingerprint: Union[str, None]
@@ -72,6 +72,7 @@ class Certificate(DataClassObject):
         revoke_data = await self.db.revoke_data_for_ca(issuer)
         crl = revoke_data["crl"]
         key_label = revoke_data["key_label"]
+        key_type = revoke_data["key_type"]
         ca_pem = revoke_data["ca"]
 
         crl_pem: str = await create_crl(
@@ -80,6 +81,7 @@ class Certificate(DataClassObject):
             serial_number=cert_pem_serial_number(self.pem),
             reason=5,
             old_crl_pem=crl,
+            key_type=key_type,
         )
         crl_obj = Crl(
             {

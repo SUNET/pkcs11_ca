@@ -8,7 +8,7 @@ from .error import WrongDataType
 
 
 class CrlInput(InputObject):
-    """Class to represent crl matching from HTTP post data """
+    """Class to represent crl matching from HTTP post data"""
 
     pem: Union[str, None]
     ca_pem: Union[str, None]

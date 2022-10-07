@@ -6,7 +6,7 @@ from .error import WrongDataType
 
 
 class CsrInput(InputObject):
-    """Class to represent csr matching from HTTP post data """
+    """Class to represent csr matching from HTTP post data"""
 
     pem: Union[str, None]
     ca_pem: Union[str, None]

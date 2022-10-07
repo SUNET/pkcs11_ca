@@ -443,8 +443,13 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
             content={"message": "missing json dict key 'pem' with a csr and 'ca_pem' with the signing CA"},
         )
 
+    key_type = "ed25519"
+    if ca_input.key_type is not None:
+        key_type = ca_input.key_type
+
     issuer_pem: Union[Dict[str, str], None] = None
     issuer_key_label: Union[str, None] = None
+    issuer_key_type: Union[str, None] = None
     extra_extensions: Union[asn1_x509.Extensions, None] = None
 
     # If this should not be a selfsigned ca
@@ -453,6 +458,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
 
         issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
         issuer_key_label = issuer_pkcs11_key_obj.key_label
+        issuer_key_type = issuer_pkcs11_key_obj.key_type
         issuer_pem = pem_cert_to_name_dict(issuer_obj.pem)
 
         # This will be an intermidiate CA so get the AIA and CDP extensions for it
@@ -465,11 +471,15 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         signer_key_label=issuer_key_label,
         signer_subject_name=issuer_pem,
         extra_extensions=extra_extensions,
+        key_type=key_type,
     )
 
     # Save Public key for new CA
     public_key_obj = PublicKey(
-        {"pem": (await PKCS11Session.public_key_data(ca_input.key_label))[0], "authorized_by": auth_by}
+        {
+            "pem": (await PKCS11Session.public_key_data(ca_input.key_label, key_type=key_type))[0],
+            "authorized_by": auth_by,
+        }
     )
     await public_key_obj.save()
 
@@ -478,6 +488,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
         {
             "public_key": public_key_obj.serial,
             "key_label": ca_input.key_label,
+            "key_type": key_type,
             "authorized_by": auth_by,
         }
     )
@@ -517,7 +528,9 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
     # Create an empty CRL for the CA
     await Crl(
         {
-            "pem": await create_crl(ca_input.key_label, pem_cert_to_name_dict(ca_pem)),
+            "pem": await create_crl(
+                ca_input.key_label, pem_cert_to_name_dict(ca_pem), key_type=pkcs11_key_obj.key_type
+            ),
             "authorized_by": auth_by,
             "issuer": ca_obj.serial,
         }
@@ -571,6 +584,7 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
         pem_cert_to_name_dict(issuer_obj.pem),
         csr_obj.pem,
         extra_extensions=extra_extensions,
+        key_type=issuer_pkcs11_key_obj.key_type,
     )
 
     # Save cert
@@ -592,7 +606,7 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
 
 
 class RevokeInput(InputObject):
-    """Class to represent revoke specification matching from HTTP post data """
+    """Class to represent revoke specification matching from HTTP post data"""
 
     pem: str
     # pem: Union[str, None]

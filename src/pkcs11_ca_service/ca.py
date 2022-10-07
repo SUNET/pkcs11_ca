@@ -15,11 +15,12 @@ from .error import WrongDataType
 
 
 class CaInput(InputObject):
-    """Class to represent ca matching from HTTP post data """
+    """Class to represent ca matching from HTTP post data"""
 
     name_dict: Union[Dict[str, str], None]
     pem: Union[str, None]
     key_label: Union[str, None]
+    key_type: Union[str, None]
     issuer_pem: Union[str, None]
     key_size: int = 2048
     path: Union[str, None] = None
@@ -87,6 +88,7 @@ class Ca(DataClassObject):
         curr_crl = revoke_data["crl"]
         ca_pem = revoke_data["ca"]
         key_label = revoke_data["key_label"]
+        key_type = revoke_data["key_type"]
 
         crl_pem: str = await create_crl(
             key_label,
@@ -94,6 +96,7 @@ class Ca(DataClassObject):
             old_crl_pem=curr_crl,
             serial_number=cert_pem_serial_number(self.pem),
             reason=5,
+            key_type=key_type,
         )
         crl_obj = Crl(
             {

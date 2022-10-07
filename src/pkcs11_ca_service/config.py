@@ -13,7 +13,8 @@ DB_TABLE_MODULES = ["public_key", "pkcs11_key", "csr", "ca", "certificate", "crl
 JWT_ALGOS = ["PS256", "PS384", "PS512", "ES256", "ES384", "ES521"]
 
 ROOT_CA_KEY_LABEL = "my_ROOT_CA_key_label"
-ROOT_CA_KEY_SIZE = 2048
+ROOT_CA_KEY_TYPE = "ed25519"
+ROOT_CA_KEY_SIZE = 2048  # ONLY used when key type is rsa
 ROOT_CA_EXPIRE = 365 * 15
 ROOT_CA_NAME_DICT = {
     "country_name": "SE",
@@ -28,6 +29,7 @@ ROOT_CA_NAME_DICT = {
 CSR_EXPIRE_DATE = 365 * 1
 
 DB_HOST = "pkcs11_ca_service_postgres"
+# DB_HOST = "localhost"
 DB_USER = "pkcs11_testuser1"
 DB_PASSWORD = "DBUserPassword"
 DB_PORT = "5432"
