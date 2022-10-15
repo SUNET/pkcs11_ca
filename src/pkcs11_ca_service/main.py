@@ -27,7 +27,7 @@ from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, ai
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request
-
+from .config import KEY_TYPES
 
 loop = asyncio.get_running_loop()
 startup_task = loop.create_task(startup())
@@ -422,7 +422,7 @@ async def get_ca(ca_path: str) -> Response:
 
 
 @app.post("/ca")
-async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
+async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylint: disable-msg=too-many-locals
     """/ca, POST method.
 
     Post/create a new ca.
@@ -443,9 +443,15 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
             content={"message": "missing json dict key 'pem' with a csr and 'ca_pem' with the signing CA"},
         )
 
-    key_type = "ed25519"
-    if ca_input.key_type is not None:
+    if ca_input.key_type is None:
+        key_type = "ed25519"
+    else:
         key_type = ca_input.key_type
+    if key_type not in KEY_TYPES:
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"missing valid json dict key 'key_type', must be one of {KEY_TYPES}"},
+        )
 
     issuer_pem: Union[Dict[str, str], None] = None
     issuer_key_label: Union[str, None] = None
@@ -467,8 +473,8 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:
     ca_csr_pem, ca_pem = await create_ca(
         ca_input.key_label,
         ca_input.name_dict,
-        ca_input.key_size,
         signer_key_label=issuer_key_label,
+        signer_key_type=issuer_key_type,
         signer_subject_name=issuer_pem,
         extra_extensions=extra_extensions,
         key_type=key_type,

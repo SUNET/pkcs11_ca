@@ -20,9 +20,8 @@ class CaInput(InputObject):
     name_dict: Union[Dict[str, str], None]
     pem: Union[str, None]
     key_label: Union[str, None]
-    key_type: Union[str, None]
+    key_type: Union[str, None] = None
     issuer_pem: Union[str, None]
-    key_size: int = 2048
     path: Union[str, None] = None
     pkcs11_key: Union[int, None] = None
 

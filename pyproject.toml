@@ -19,6 +19,7 @@ author-email = "victor@sunet.se"
 # home-page = "https://github.com/SUNET/python_x509_pkcs11"
 
 requires = [
-    "asn1crypto>=1.4.0",
+    "python_x509_pkcs11>=0.4.41",
+    "asn1crypto>=1.5.1",
     "pyjwt>=1.7.1"
 ]

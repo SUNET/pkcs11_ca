@@ -191,19 +191,49 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
     key = PublicKeyInfo().load(data)
 
+    # Work on https://www.rfc-editor.org/rfc/rfc7517#section-4
     if key["algorithm"].native["algorithm"] == "rsa":
-        # print("rsa detected")
-
         ret["kty"] = "rsa"
         ret["use"] = "sig"
+        # ret["alg"] = # Work on this
         ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
         ret["public_exponent"] = to_base64url(str(key["public_key"].native["public_exponent"]).encode("utf-8"))
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
-        return ret
 
-    if key["algorithm"].native["algorithm"] == "ec":
-        raise NotImplementedError
-    raise UnsupportedJWTAlgorithm
+    elif key["algorithm"].native["algorithm"] == "ec":
+        ret["kty"] = "EC"
+        ret["use"] = "sig"
+
+        if key["algorithm"].native["algorithm"] == "secp256r1":
+            ret["crv"] = "P-256"
+        elif key["algorithm"].native["algorithm"] == "secp384r1":
+            ret["crv"] = "P-384"
+        elif key["algorithm"].native["algorithm"] == "secp521r1":
+            ret["crv"] = "P-521"
+        else:
+            raise UnsupportedJWTAlgorithm
+
+        ret["x"] = to_base64url(str(key["public_key"].to_coords()[0]).encode("utf-8"))
+        ret["y"] = to_base64url(str(key["public_key"].to_coords()[1]).encode("utf-8"))
+
+        ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
+    elif key["algorithm"].native["algorithm"] in ["ed25519", "ed448"]:
+        ret["kty"] = "OKP"
+        ret["use"] = "sig"
+        ret["alg"] = "EdDSA"
+
+        if key["algorithm"].native["algorithm"] == "ed25519":
+            ret["crv"] = "Ed25519"
+        elif key["algorithm"].native["algorithm"] == "ed448":
+            ret["crv"] = "Ed448"
+        else:
+            raise UnsupportedJWTAlgorithm
+
+        print(key["public_key"].dump())
+        print(bytes(key["public_key"].dump()))
+        ret["x"] = to_base64url(key["public_key"].dump())
+        ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
+    return ret
 
 
 def public_key_pem_from_csr(pem: str) -> str:

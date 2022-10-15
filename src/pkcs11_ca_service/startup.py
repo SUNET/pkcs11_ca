@@ -78,7 +78,9 @@ async def startup() -> None:
 
     if os.environ["PKCS11_MODULE"] == "/usr/lib/softhsm/libsofthsm2.so":
         check_call(
-            "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 || softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
+            "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
+            + "|| softhsm2-util --init-token --slot 0 "
+            + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
             shell=True,
         )
 

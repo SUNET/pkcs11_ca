@@ -9,7 +9,7 @@ from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
-from .lib import get_cas
+from .lib import get_cas, verify_cert_depth1
 
 
 class TestCsr(unittest.TestCase):
@@ -72,7 +72,8 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
             _, _, data = asn1_pem.unarmor(data)
 
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
-
+        verify_cert_depth1(cert_given)
+        
         # Get cert from our csr
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(

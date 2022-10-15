@@ -2,15 +2,15 @@
 FROM debian:latest
 
 
- RUN apt-get update \
-     && apt-get install -y python3-pip \
-     python3-dev \
-     uvicorn \
-     python3-fastapi \
-     softhsm python3-jwt \
-     python3-asyncpg \
-     python3-requests \
-     softhsm2
+RUN apt-get update \
+    && apt-get install -y python3-pip \
+    python3-dev \
+    uvicorn \
+    python3-fastapi \
+    softhsm python3-jwt \
+    python3-asyncpg \
+    python3-requests \
+    softhsm2
 
 #RUN apk update && apk add softhsm py3-pip gcc py3-dev
 

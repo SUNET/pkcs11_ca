@@ -14,7 +14,8 @@ from asn1crypto import crl as asn1_crl
 from python_x509_pkcs11.ocsp import certificate_ocsp_data
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
-from .lib import get_cas, create_i_ca, cdp_url
+from src.pkcs11_ca_service.config import KEY_TYPES
+from .lib import get_cas, create_i_ca, cdp_url, verify_cert_depth1
 
 with open("trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -173,3 +174,76 @@ class TestCa(unittest.TestCase):
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_crl.CertificateList.load(data), asn1_crl.CertificateList))
+
+    def test_ca_wrong_key_type(self) -> None:
+        """
+        create aia and cdp extensions ca
+        """
+
+        name_dict = {
+            "country_name": "SE",
+            "state_or_province_name": "Stockholm",
+            "locality_name": "Stockholm_test",
+            "organization_name": "SUNET_ca",
+            "organizational_unit_name": "SUNET Infrastructure",
+            "common_name": "ca-test-create-21.sunet.se",
+            "email_address": "soc@sunet.se",
+        }
+
+        request_headers = {}
+        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
+
+        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
+        data["name_dict"] = name_dict
+        data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
+        data["key_type"] = "dummy_not_exist"
+
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        self.assertTrue(req.status_code != 200)
+
+    def test_ca_key_types(self) -> None:
+        """
+        create aia and cdp extensions ca
+        """
+
+        for key_type in KEY_TYPES:
+            name_dict = {
+                "country_name": "SE",
+                "state_or_province_name": "Stockholm",
+                "locality_name": "Stockholm_test",
+                "organization_name": "SUNET_ca",
+                "organizational_unit_name": "SUNET Infrastructure",
+                "common_name": "ca-test-create-22-" + key_type + ".sunet.se",
+                "email_address": "soc@sunet.se",
+            }
+
+            request_headers = {}
+            request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/ca")
+
+            data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
+            data["name_dict"] = name_dict
+            data["issuer_pem"] = get_cas(pub_key, priv_key)[0]  # first ca for depth level 1
+            data["key_type"] = key_type
+
+            req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+            self.assertTrue(req.status_code == 200)
+            new_ca: str = json.loads(req.text)["certificate"]
+            self.assertTrue(len(new_ca) > 9)
+
+            data = new_ca.encode("utf-8")
+            if asn1_pem.detect(data):
+                _, _, data = asn1_pem.unarmor(data)
+            self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
+            tbs = asn1_x509.Certificate().load(data)["tbs_certificate"]
+
+            if "rsa_" in key_type:
+                self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["algorithm"].native == "rsa")
+            elif "secp" in key_type:
+                self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["algorithm"].native == "ec")
+                self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["parameters"].native == key_type)
+            elif key_type == "ed25519":
+                self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["algorithm"].native == "ed25519")
+            elif key_type == "ed448":
+                self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["algorithm"].native == "ed448")
+
+            verify_cert_depth1(new_ca)

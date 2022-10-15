@@ -27,7 +27,6 @@ from .config import (
     ROOT_CA_KEY_LABEL,
     ROOT_CA_KEY_TYPE,
     ROOT_CA_EXPIRE,
-    ROOT_CA_KEY_SIZE,
     ROOT_ADMIN_KEYS_FOLDER,
     DB_HOST,
     DB_USER,
@@ -233,9 +232,11 @@ class PostgresDB(DataBaseObject):
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
                         key_pem = file_data.read().decode("utf-8")
 
+                    # If exist the skip
                     query = "SELECT pem FROM public_key WHERE pem = $1"
                     rows = await conn.fetch(query, key_pem)
                     if rows:
+                        print(f"Key {ROOT_ADMIN_KEYS_FOLDER}/{key_file} already exist in DB, skipping")
                         continue
 
                     query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
@@ -301,7 +302,7 @@ class PostgresDB(DataBaseObject):
                 max_size=50,
                 command_timeout=DB_TIMEOUT,
             )
-        except:
+        except:  # pylint: disable=bare-except
             print("Failed to connect to DB, please fix")
             print(
                 "postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
@@ -312,7 +313,7 @@ class PostgresDB(DataBaseObject):
         classes_info: Dict[str, List[str]] = {}
 
         # Remove me, just here for easy testing
-        # await cls._drop_all_tables(tables)
+        await cls._drop_all_tables(tables)
 
         # Create the tables and root ca
         if not await cls._check_db():
@@ -373,7 +374,6 @@ class PostgresDB(DataBaseObject):
                 root_ca_csr_pem, root_ca_pem = await create_ca(
                     ROOT_CA_KEY_LABEL,
                     ROOT_CA_NAME_DICT,
-                    ROOT_CA_KEY_SIZE,
                     not_before=not_before,
                     not_after=not_after,
                     key_type=ROOT_CA_KEY_TYPE,
