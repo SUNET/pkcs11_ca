@@ -58,7 +58,7 @@ async def _validate_token(request: Request) -> Tuple[int, str]:
 
     # Verify signature with public key from db
     try:
-        decoded_jwt = jwt.decode(token, key=pub_key_pem.encode("utf-8"), algorithms=JWT_ALGOS)
+        decoded_jwt = jwt.decode(token, key=pub_key_pem, algorithms=JWT_ALGOS)
     except BaseException as exception:
         # Log this
         print(exception)
@@ -115,6 +115,7 @@ async def authorized_by(request: Request) -> int:
     try:
         return await _authorized_by(request)
     except HTTPException as exception:
+        print(exception)
         raise exception
     except BaseException as exception:
         # Log this important error

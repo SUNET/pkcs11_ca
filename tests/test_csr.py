@@ -73,7 +73,7 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
 
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
         verify_cert_depth1(cert_given)
-        
+
         # Get cert from our csr
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(

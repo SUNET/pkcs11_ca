@@ -10,7 +10,7 @@ DB_MODULE = "postgres_db"
 DB_TABLE_MODULES = ["public_key", "pkcs11_key", "csr", "ca", "certificate", "crl"]
 
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
-JWT_ALGOS = ["PS256", "PS384", "PS512", "ES256", "ES384", "ES521"]
+JWT_ALGOS = ["EdDSA", "ES256", "ES384", "ES512", "PS256", "PS512"]
 
 KEY_TYPES = ["ed25519", "ed448", "secp256r1", "secp384r1", "secp521r1", "rsa_2048", "rsa_4096"]
 
@@ -30,8 +30,8 @@ ROOT_CA_NAME_DICT = {
 
 CSR_EXPIRE_DATE = 365 * 1
 
-# DB_HOST = "pkcs11_ca_service_postgres"
-DB_HOST = "localhost"
+DB_HOST = "pkcs11_ca_service_postgres"
+# DB_HOST = "localhost"
 DB_USER = "pkcs11_testuser1"
 DB_PASSWORD = "DBUserPassword"
 DB_PORT = "5432"

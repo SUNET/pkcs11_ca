@@ -229,8 +229,9 @@ class PostgresDB(DataBaseObject):
                     if not (key_file.endswith(".pem") or key_file.endswith(".pub")):
                         continue
 
-                    with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, "rb") as file_data:
-                        key_pem = file_data.read().decode("utf-8")
+                    with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file) as file_data:
+                        key_pem = file_data.read()
+                    key_pem = key_pem.strip() + "\n"  # Fix whitespaces for pem key
 
                     # If exist the skip
                     query = "SELECT pem FROM public_key WHERE pem = $1"

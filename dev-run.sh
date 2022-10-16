@@ -30,14 +30,14 @@ pylint --max-line-length 120 src/pkcs11_ca_service/*.py
 RESULT=$?
 if [ $RESULT -ne 0 ]; then
     echo "pylint failed, please fix"
-    #exit 1
+    exit 1
 fi
 
 pylint --max-line-length 120 tests/*.py
 RESULT=$?
 if [ $RESULT -ne 0 ]; then
     echo "pylint failed for tests, please fix"
-    #exit 1
+    exit 1
 fi
 
 uvicorn src.pkcs11_ca_service.main:app --workers 1 --header server:pkcs11_ca_service

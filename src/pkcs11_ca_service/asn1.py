@@ -17,6 +17,9 @@ from asn1crypto.keys import (
     RSAPublicKey,
     PublicKeyAlgorithm,
     PublicKeyAlgorithmId,
+    ECPointBitString,
+    NamedCurve,
+    ECDomainParameters,
 )
 
 from .config import ROOT_URL
@@ -160,15 +163,45 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
     str
     """
 
-    rsa = RSAPublicKey()
-    rsa["modulus"] = int(from_base64url(data["modulus"]).decode("utf-8"))
-    rsa["public_exponent"] = int(from_base64url(data["public_exponent"]).decode("utf-8"))
-
     pki = PublicKeyInfo()
     pka = PublicKeyAlgorithm()
-    pka["algorithm"] = PublicKeyAlgorithmId("rsa")
-    pki["algorithm"] = pka
-    pki["public_key"] = rsa
+
+    if data["kty"] == "RSA":
+        rsa = RSAPublicKey()
+        rsa["modulus"] = int(from_base64url(data["modulus"]).decode("utf-8"))
+        rsa["public_exponent"] = int(from_base64url(data["public_exponent"]).decode("utf-8"))
+
+        pka["algorithm"] = PublicKeyAlgorithmId("rsa")
+        pki["algorithm"] = pka
+        pki["public_key"] = rsa
+
+    elif data["kty"] == "EC":
+        pka["algorithm"] = PublicKeyAlgorithmId("ec")
+
+        if data["crv"] == "P-256":
+            pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp256r1")})
+        elif data["crv"] == "P-384":
+            pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp384r1")})
+        elif data["crv"] == "P-521":
+            pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp521r1")})
+        else:
+            raise UnsupportedJWTAlgorithm
+
+        pki["algorithm"] = pka
+        pki["public_key"] = ECPointBitString().from_coords(
+            int(from_base64url(data["x"])), int(from_base64url(data["y"]))
+        )
+
+    elif data["kty"] == "OKP":
+        if data["crv"] == "Ed25519":
+            pka["algorithm"] = PublicKeyAlgorithmId("ed25519")
+        elif data["crv"] == "Ed448":
+            pka["algorithm"] = PublicKeyAlgorithmId("ed448")
+        else:
+            raise UnsupportedJWTAlgorithm
+
+        pki["algorithm"] = pka
+        pki["public_key"] = from_base64url(data["x"])
 
     return public_key_info_to_pem(pki)
 
@@ -193,7 +226,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
     # Work on https://www.rfc-editor.org/rfc/rfc7517#section-4
     if key["algorithm"].native["algorithm"] == "rsa":
-        ret["kty"] = "rsa"
+        ret["kty"] = "RSA"
         ret["use"] = "sig"
         # ret["alg"] = # Work on this
         ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
@@ -204,12 +237,15 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         ret["kty"] = "EC"
         ret["use"] = "sig"
 
-        if key["algorithm"].native["algorithm"] == "secp256r1":
+        if key["algorithm"].native["parameters"] == "secp256r1":
             ret["crv"] = "P-256"
-        elif key["algorithm"].native["algorithm"] == "secp384r1":
+            ret["alg"] = "ES256"
+        elif key["algorithm"].native["parameters"] == "secp384r1":
             ret["crv"] = "P-384"
-        elif key["algorithm"].native["algorithm"] == "secp521r1":
+            ret["alg"] = "ES384"
+        elif key["algorithm"].native["parameters"] == "secp521r1":
             ret["crv"] = "P-521"
+            ret["alg"] = "ES512"
         else:
             raise UnsupportedJWTAlgorithm
 
@@ -224,14 +260,14 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
         if key["algorithm"].native["algorithm"] == "ed25519":
             ret["crv"] = "Ed25519"
+            ret["x"] = to_base64url(key["public_key"].contents[-32:])  # The last bytes are the key
+
         elif key["algorithm"].native["algorithm"] == "ed448":
             ret["crv"] = "Ed448"
+            ret["x"] = to_base64url(key["public_key"].contents[-57:])  # The last bytes are the key
         else:
             raise UnsupportedJWTAlgorithm
 
-        print(key["public_key"].dump())
-        print(bytes(key["public_key"].dump()))
-        ret["x"] = to_base64url(key["public_key"].dump())
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
     return ret
 
@@ -484,8 +520,8 @@ def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
     nonce = req.headers["Replay-Nonce"]
     jwt_headers = {"nonce": nonce, "url": url}
     jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
-    encoded = jwt.encode(jwk_key_data, priv_key, algorithm="PS256", headers=jwt_headers)
-    ret: str = "Bearer " + encoded.decode("utf-8")
+    encoded = jwt.encode(jwk_key_data, priv_key.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
+    ret: str = "Bearer " + encoded
     return ret
 
 
