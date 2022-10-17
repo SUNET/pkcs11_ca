@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 from typing import Union, Dict, List, Type
-
 from abc import ABC, abstractmethod
 import datetime
 
 from pydantic import BaseModel
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
+from .validate import validate_input_string
 
 
 class DataBaseObject(ABC):
@@ -127,15 +127,20 @@ class DataBaseObject(ABC):
 class InputObject(BaseModel):
     """FastAPI input object for HTTP post data"""
 
-    # pem: Union[str, None]
-    # fingerprint: Union[str, None]
-    # admin: Union[int, None]
-    # name_dict: Union[Dict[str, str], None]
-    # key_label: Union[str, None]
-    # issuer_pem: Union[str, None]
-    # key_size: Union[int, None]
-    # ca_pem: Union[str, None]
-    # serial: Union[int, None]
+    def __init__(self, **data: Union[str, int]) -> None:
+        for key in data:
+            string_data = data[key]
+
+            if isinstance(string_data, str):
+                # Fix pem whitespaces
+                if "pem" in key:
+                    data[key] = string_data.strip() + "\n"
+
+                # Validate input data
+                # Raises 400 status code if invalid
+                validate_input_string(string_data)
+
+        super().__init__(**data)
 
 
 class DataClassObject(ABC):

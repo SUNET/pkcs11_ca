@@ -286,10 +286,7 @@ async def post_public_key(request: Request, public_key_input: PublicKeyInput) ->
         is_admin = 1
 
     # Save Public key for new CA
-    # .strip() + "\n" fixes whitespaces
-    public_key_obj = PublicKey(
-        {"pem": public_key_input.pem.strip() + "\n", "authorized_by": auth_by, "admin": is_admin}
-    )
+    public_key_obj = PublicKey({"pem": public_key_input.pem, "authorized_by": auth_by, "admin": is_admin})
     await public_key_obj.save()
     return JSONResponse(status_code=200, content={"public_key": public_key_obj.pem})
 
