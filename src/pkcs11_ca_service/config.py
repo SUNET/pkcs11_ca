@@ -14,6 +14,8 @@ JWT_ALGOS = ["EdDSA", "ES256", "ES384", "ES512", "PS256", "PS512"]
 
 KEY_TYPES = ["ed25519", "ed448", "secp256r1", "secp384r1", "secp521r1", "rsa_2048", "rsa_4096"]
 
+HEALTHCHECK_KEY_LABEL = "pkcs11_ca_service_healthcheck"
+
 ROOT_CA_KEY_LABEL = "my_ROOT_CA_key_label"
 ROOT_CA_KEY_TYPE = "ed25519"  # Must be in KEY_TYPES above
 

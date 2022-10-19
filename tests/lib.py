@@ -60,15 +60,25 @@ def cdp_url(pem: str) -> str:
     raise ValueError
 
 
-def verify_cert_depth1(pem: str) -> None:
-    """Verify a cert, its issuer must be a root cert"""
-    hash_obj = sha256()
-    data = pem.encode("utf-8")
+def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
+    """Get CA for cert, recursive function"""
+    curr_chain = b""
+    if not leaf and os.path.isfile(path):
+        with open(path, "rb") as f_data:
+            curr_chain = f_data.read()
+
+    data = der
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
     cert = asn1_x509.Certificate().load(data)
-    tbs = cert["tbs_certificate"]
 
+    if not leaf:
+        with open(path, "wb") as f_data:
+            f_data.write(asn1_pem.armor("CERTIFICATE", cert.dump()))
+            if len(curr_chain) > 3:
+                f_data.write(curr_chain)
+
+    tbs = cert["tbs_certificate"]
     url_ca = ""
     for _, extension in enumerate(tbs["extensions"]):
         if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
@@ -77,38 +87,36 @@ def verify_cert_depth1(pem: str) -> None:
                     url_ca = descr["access_location"]
 
     if len(url_ca) < 3:
-        raise ValueError("Could not find CA issuers")
+        return
 
     resp = requests.get(url_ca)
     if resp.status_code != 200:
         raise ValueError("Could not download ca from ca_issuers")
 
-    with open(url_ca.split("/")[-1], "wb") as f_data:
-        f_data.write(resp.content)
+    write_ca_to_chain(resp.content, path, leaf=False)
 
+
+def verify_cert(pem: str) -> None:
+    """Verify cert"""
+
+    hash_obj = sha256()
     hash_obj.update(pem.encode("utf-8"))
     hash_digest = hash_obj.hexdigest()
 
     with open(hash_digest, "w") as f_data:
         f_data.write(pem)
 
-    subprocess.check_call(
-        "openssl x509 -inform DER -in "
-        + url_ca.split("/")[-1]
-        + " -out "
-        + url_ca.split("/")[-1]
-        + ".pem && rm -f "
-        + url_ca.split("/")[-1],
-        shell=True,
-    )
+    # Get CA chain for this cert
+    write_ca_to_chain(pem.encode("utf-8"), hash_digest + ".cafile", leaf=True)
+
     subprocess.check_call(
         "openssl verify -CAfile "
-        + url_ca.split("/")[-1]
-        + ".pem "
+        + hash_digest
+        + ".cafile "
         + hash_digest
         + " > /dev/null && rm -f "
-        + url_ca.split("/")[-1]
-        + ".pem "
+        + hash_digest
+        + ".cafile "
         + hash_digest,
         shell=True,
     )

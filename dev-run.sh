@@ -1,43 +1,35 @@
 #!/bin/bash
 
-if awk -F= '/^NAME/{print $2}' /etc/os-release | grep -i "debian\|ubuntu"
-then
-    export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
-else
-    export PKCS11_MODULE="/usr/lib64/softhsm/libsofthsm.so"
-fi
-export PKCS11_TOKEN='my_test_token_1'
-export PKCS11_PIN='1234'
-
-# Recreating the PKCS11 device token
-echo "Deleting and reinitialize the PKCS11 token"
-softhsm2-util --delete-token --token my_test_token_1
-softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN | exit 1
-
 echo "Checking package"
 mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/null src/pkcs11_ca_service/*.py || exit 1
+black --line-length 120 src/pkcs11_ca_service/*.py || exit 1
+pylint --max-line-length 120 src/pkcs11_ca_service/*.py || exit 1
 
 echo "Checking tests"
 mypy --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/null tests/*.py || exit 1
-
-# echo "Running tests"
-# python3 -m unittest
-
-black --line-length 120 src/pkcs11_ca_service/*.py || exit 1
 black --line-length 120 tests/*.py || exit 1
+pylint --max-line-length 120 tests/*.py || exit 1
 
-pylint --max-line-length 120 src/pkcs11_ca_service/*.py
-RESULT=$?
-if [ $RESULT -ne 0 ]; then
-    echo "pylint failed, please fix"
-    exit 1
-fi
+# Stop old container, build and run the new one
+docker build -t pkcs11_ca_service_http .
+docker stop /pkcs11_ca_service_http
+docker rm /pkcs11_ca_service_http
+docker run \
+       --name pkcs11_ca_service_http \
+       --net pkcs11_ca_service_network \
+       --restart always \
+       --security-opt no-new-privileges \
+       --cap-drop all \
+       --read-only \
+       --memory 256m \
+       --cpus 2.75 \
+       --mount type=tmpfs,target=/dev/shm,readonly=true \
+       -v /app_softhsm:/var/lib/softhsm/tokens \
+       -p 8000:8000 \
+       -d \
+       pkcs11_ca_service_http
 
-pylint --max-line-length 120 tests/*.py
-RESULT=$?
-if [ $RESULT -ne 0 ]; then
-    echo "pylint failed for tests, please fix"
-    exit 1
-fi
+sleep 2
+echo "Running tests"
+python3 -m unittest
 
-uvicorn src.pkcs11_ca_service.main:app --workers 1 --header server:pkcs11_ca_service

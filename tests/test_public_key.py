@@ -22,7 +22,7 @@ def generate_keypair_secp521r1() -> Tuple[str, str]:
     """Generate a secp521r1 keypair"""
 
     # Generate new key
-    new_private_key = ec.generate_private_key(ec.SECP521R1)
+    new_private_key = ec.generate_private_key(ec.SECP521R1())
     new_private_key_pem = new_private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -39,7 +39,7 @@ def generate_keypair_secp384r1() -> Tuple[str, str]:
     """Generate a secp384r1 keypair"""
 
     # Generate new key
-    new_private_key = ec.generate_private_key(ec.SECP384R1)
+    new_private_key = ec.generate_private_key(ec.SECP384R1())
     new_private_key_pem = new_private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -56,7 +56,7 @@ def generate_keypair_secp256r1() -> Tuple[str, str]:
     """Generate a secp256r1 keypair"""
 
     # Generate new key
-    new_private_key = ec.generate_private_key(ec.SECP256R1)
+    new_private_key = ec.generate_private_key(ec.SECP256R1())
     new_private_key_pem = new_private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,

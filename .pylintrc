@@ -1,3 +1,6 @@
-[MESSAGES CONTROL]
+[MASTER]
+extension-pkg-whitelist=pydantic
 
+[MESSAGES CONTROL]
 disable=duplicate-code
+

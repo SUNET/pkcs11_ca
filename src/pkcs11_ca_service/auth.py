@@ -119,4 +119,5 @@ async def authorized_by(request: Request) -> int:
         raise exception
     except BaseException as exception:
         # Log this important error
+        print(exception)
         raise HTTPException(status_code=401, detail="token verification failed") from exception

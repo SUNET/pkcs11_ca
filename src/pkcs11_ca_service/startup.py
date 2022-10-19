@@ -5,6 +5,7 @@ import os
 import sys
 from subprocess import check_call
 
+from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 from .base import DataClassObject, DataBaseObject
@@ -61,9 +62,16 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
     return await db_obj.startup(tables, fields, reference_fields, unique_fields)
 
 
-async def _pkcs11_startup(db_obj: DataBaseObject) -> None:
-    _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL)
+async def _pkcs11_startup(db_obj: DataBaseObject) -> bool:
+    try:
+        _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL)
+    except NoSuchKey:
+        print(f"Could not find pkcs11 key {ROOT_CA_KEY_LABEL} for root ca ")
+        print("You should probably empty and reset the DB since we lost the root ca key")
+        return False
+
     print("PKCS11 Session OK")
+    return True
 
 
 async def startup() -> None:
@@ -76,17 +84,26 @@ async def startup() -> None:
     db_obj = _load_db_module()
     db_data_classes = _load_db_data_classes()
 
-    if os.environ["PKCS11_MODULE"] == "/usr/lib/softhsm/libsofthsm2.so":
-        check_call(
-            "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
-            + "|| softhsm2-util --init-token --slot 0 "
-            + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
-            shell=True,
-        )
+    # Ensure pkcs11 env variables
+    if "PKCS11_MODULE" not in os.environ or "PKCS11_TOKEN" not in os.environ or "PKCS11_PIN" not in os.environ:
+        print("PKCS11_MODULE, PKCS11_TOKEN or PKCS11_PIN env variables is not set")
+        sys.exit(0)
 
+    check_call(
+        "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
+        + "|| softhsm2-util --init-token --slot 0 "
+        + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
+        shell=True,
+    )
+
+    # Check DB
     if not await _db_startup(db_obj, db_data_classes):
         sys.exit(1)
 
-    await _pkcs11_startup(db_obj)
+    # Check pkcs11
+    if not await _pkcs11_startup(db_obj):
+        sys.exit(1)
+
+    print()
     print("Startup DONE")
     print(flush=True)

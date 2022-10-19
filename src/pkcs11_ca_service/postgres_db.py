@@ -12,10 +12,10 @@ import os
 from asyncpg.exceptions import UndefinedTableError
 from asyncpg import create_pool
 from asyncpg.pool import Pool
-
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.ca import create as create_ca
 from python_x509_pkcs11.crl import create as create_crl
+from pkcs11.exceptions import MultipleObjectsReturned
 
 from .asn1 import this_update_next_update_from_crl
 
@@ -23,6 +23,7 @@ from .asn1 import this_update_next_update_from_crl
 # https://github.com/MagicStack/asyncpg/issues/822
 
 from .config import (
+    HEALTHCHECK_KEY_LABEL,
     ROOT_CA_NAME_DICT,
     ROOT_CA_KEY_LABEL,
     ROOT_CA_KEY_TYPE,
@@ -159,7 +160,7 @@ class PostgresDB(DataBaseObject):
                     query = "SELECT "
                     for field in fields:
                         query += field + ","
-                    query = query[:-1] + " FROM " + table_name
+                    query = query[:-1] + " FROM " + table_name + " ORDER BY serial DESC LIMIT 10"
                     rows = await conn.fetch(query)
                     fields_list += cls._rows_to_class_objects(rows, fields)
 
@@ -312,16 +313,19 @@ class PostgresDB(DataBaseObject):
             return False
 
         classes_info: Dict[str, List[str]] = {}
+        for index, table in enumerate(tables):
+            classes_info[table] = list(fields[index].keys())
 
         # Remove me, just here for easy testing
-        await cls._drop_all_tables(tables)
+        # await cls._drop_all_tables(tables)
 
-        # Create the tables and root ca
+        # Create the tables and root ca and healthcheck key
         if not await cls._check_db():
             for index, table in enumerate(tables):
                 await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
-                classes_info[table] = list(fields[index].keys())
-            await cls._insert_root_ca(classes_info)
+            if not await cls._insert_root_ca(classes_info):
+                return False
+            await cls._insert_healthcheck_key(classes_info)
 
         # Load trusted keys
         await cls._load_trusted_keys(classes_info)
@@ -341,17 +345,6 @@ class PostgresDB(DataBaseObject):
             except UndefinedTableError:
                 return False
 
-    # Rewrite this code so its future proof
-    # @classmethod
-    # async def _has_root_ca(cls) -> bool:
-    #     async with cls.pool.acquire() as conn:
-    #         async with conn.transaction():
-    #             query = "SELECT serial FROM ca WHERE serial = 1"
-    #             rows = await conn.fetch(query)
-    #             if rows:
-    #                 return True
-    #     return False
-
     @classmethod
     def _insert_root_item_query(cls, fields: List[str], table_name: str) -> str:
         query = "INSERT INTO " + table_name + " ("
@@ -365,20 +358,24 @@ class PostgresDB(DataBaseObject):
         return query
 
     @classmethod
-    async def _insert_root_ca(cls, classes_info: Dict[str, List[str]]) -> None:
+    async def _insert_root_ca(cls, classes_info: Dict[str, List[str]]) -> bool:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
 
                 not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)
                 not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
+                try:
+                    root_ca_csr_pem, root_ca_pem = await create_ca(
+                        ROOT_CA_KEY_LABEL,
+                        ROOT_CA_NAME_DICT,
+                        not_before=not_before,
+                        not_after=not_after,
+                        key_type=ROOT_CA_KEY_TYPE,
+                    )
+                except MultipleObjectsReturned:
+                    print("root ca PKCS11 key label already exists")
+                    return False
 
-                root_ca_csr_pem, root_ca_pem = await create_ca(
-                    ROOT_CA_KEY_LABEL,
-                    ROOT_CA_NAME_DICT,
-                    not_before=not_before,
-                    not_after=not_after,
-                    key_type=ROOT_CA_KEY_TYPE,
-                )
                 public_key_pem, identifier = await PKCS11Session.public_key_data(ROOT_CA_KEY_LABEL)
 
                 # Insert into 'public_key' table
@@ -437,3 +434,37 @@ class PostgresDB(DataBaseObject):
                     str(datetime.datetime.utcnow()),
                 )
                 print("Created first ever root CA")
+                return True
+
+    @classmethod
+    async def _insert_healthcheck_key(cls, classes_info: Dict[str, List[str]]) -> None:
+        async with cls.pool.acquire() as conn:
+            async with conn.transaction():
+
+                try:
+                    public_key_pem, identifier = await PKCS11Session.create_keypair(HEALTHCHECK_KEY_LABEL)
+                except MultipleObjectsReturned:
+                    public_key_pem, identifier = await PKCS11Session.public_key_data(HEALTHCHECK_KEY_LABEL)
+
+                # Insert into 'public_key' table
+                query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
+                await conn.execute(
+                    query,
+                    public_key_pem,
+                    "healthcheck",
+                    0,  # not an admin key
+                    1,
+                    identifier.hex(),
+                    str(datetime.datetime.utcnow()),
+                )
+                # Insert into 'pkcs11_key' table
+                query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
+                await conn.execute(
+                    query,
+                    2,
+                    HEALTHCHECK_KEY_LABEL,
+                    "ed25519",
+                    1,
+                    str(datetime.datetime.utcnow()),
+                )
+                print("Created healthcheck PKCS11 key")

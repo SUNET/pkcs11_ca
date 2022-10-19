@@ -26,7 +26,7 @@ from .startup import startup
 from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, aia_and_cdp_exts, cert_as_der, crl_as_der
 from .nonce import nonce_response
 from .auth import authorized_by
-from .route_functions import crl_request, ca_request, pkcs11_key_request
+from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck
 from .config import KEY_TYPES
 
 loop = asyncio.get_running_loop()
@@ -34,25 +34,6 @@ startup_task = loop.create_task(startup())
 
 # Create fastapi app
 app = FastAPI()
-
-
-# c,k = ca.new_ca()
-# ca.save_ca(c,k)
-
-## GET HTTP ##
-# @app.get("/" + config.ca_info_common_name + ".crl")
-# def crl_file():
-#    return get_path.crl_file()
-
-# # Special for compatibility
-# @app.get("/crl2")
-# async def sign_csr_file(): # request):
-#     #data = await request.body()
-
-#     d = await crl.Crl().create()
-#     return fastapi.Response(status_code=200,
-#                             content=d,
-#                             media_type="application/x-pem-file")
 
 
 @app.get("/new_nonce")
@@ -77,10 +58,21 @@ async def head_new_nonce() -> Response:
     return nonce_response()
 
 
-# DO THIS IN BASE OUTSIDE OF CLAss SEND CLASS TYPE AND INPUTOBJECT AS ARG not in publickey as now
-# try:
-#    for cls in load_db_data_classes():
-# app.post("/search/" + cls.db_table_name)(cls.search)
+@app.get("/healthcheck")
+async def get_healthcheck(request: Request) -> JSONResponse:
+    """/healthcheck, GET method.
+
+    Do a healthcheck. Sign some data.
+
+    Parameters:
+    request (fastapi.Request): The entire HTTP request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    _ = await authorized_by(request)
+    return await healthcheck()
 
 
 @app.get("/search/public_key")
@@ -706,3 +698,21 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
 # @app.post("/revoke")
 # def revoke(c: cert.Cert):
 #    return post_path.revoke(c)
+
+# c,k = ca.new_ca()
+# ca.save_ca(c,k)
+
+## GET HTTP ##
+# @app.get("/" + config.ca_info_common_name + ".crl")
+# def crl_file():
+#    return get_path.crl_file()
+
+# # Special for compatibility
+# @app.get("/crl2")
+# async def sign_csr_file(): # request):
+#     #data = await request.body()
+
+#     d = await crl.Crl().create()
+#     return fastapi.Response(status_code=200,
+#                             content=d,
+#                             media_type="application/x-pem-file")

@@ -1,8 +1,10 @@
 """Route functions"""
 
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 
 from python_x509_pkcs11.crl import create as create_crl
+from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 from .public_key import PublicKey, PublicKeyInput
 from .ca import CaInput, Ca
@@ -10,6 +12,34 @@ from .crl import Crl
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .asn1 import crl_expired, pem_cert_to_name_dict
 from .base import db_load_data_class
+
+from .config import HEALTHCHECK_KEY_LABEL
+
+
+async def healthcheck() -> JSONResponse:
+    """Healthcheck, query the DB, sign som data.
+    If fail then send http status code 503.
+
+    Returns:
+    JSONResponse
+    """
+
+    try:
+        # Check the DB
+        await pkcs11_key_request(Pkcs11KeyInput(key_label=HEALTHCHECK_KEY_LABEL))
+
+        # Sign some data
+        data_to_be_signed = b"healthcheck"
+        signature = await PKCS11Session.sign(
+            HEALTHCHECK_KEY_LABEL, data_to_be_signed, verify_signature=True, key_type="ed25519"
+        )
+        if len(signature) < 5:
+            raise HTTPException(status_code=503, detail="Failed healthcheck")
+
+        return JSONResponse(status_code=200, content={"healthcheck": "ok"})
+    except BaseException as exception:
+        print(exception)  # Log this
+        raise HTTPException(status_code=503, detail="Failed healthcheck") from exception
 
 
 async def public_key_request(public_key_input: PublicKeyInput) -> PublicKey:

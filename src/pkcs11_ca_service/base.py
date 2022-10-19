@@ -110,7 +110,7 @@ class DataBaseObject(ABC):
         unique_fields: List[List[str]],
     ) -> bool:
         """Startup for the database.
-        Creates all tables, create and insert the root ca
+        Creates all tables, create and insert the root ca and healthcheck PKCS11 key,
         if not exists and loads trusted admin keys, return true if DB startup ok
 
         Parameters:

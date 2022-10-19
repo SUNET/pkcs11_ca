@@ -15,7 +15,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import KEY_TYPES
-from .lib import get_cas, create_i_ca, cdp_url, verify_cert_depth1
+from .lib import get_cas, create_i_ca, cdp_url, verify_cert
 
 with open("trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -66,7 +66,7 @@ class TestCa(unittest.TestCase):
         cas2 = get_cas(pub_key, priv_key)
 
         # Ensure we now have more ca than before
-        self.assertTrue(len(cas2) > len(cas))
+        self.assertTrue(len(cas2) > len(cas) or len(cas2) >= 10)
 
         new_ca = create_i_ca(pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
@@ -246,4 +246,4 @@ class TestCa(unittest.TestCase):
             elif key_type == "ed448":
                 self.assertTrue(tbs["subject_public_key_info"]["algorithm"]["algorithm"].native == "ed448")
 
-            verify_cert_depth1(new_ca)
+            verify_cert(new_ca)

@@ -123,8 +123,8 @@ class TestRevoke(unittest.TestCase):
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
         data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
         data["name_dict"] = name_dict
-        all_cas = get_cas(pub_key, priv_key)
-        data["issuer_pem"] = all_cas[0]
+        # all_cas = get_cas(pub_key, priv_key)
+        # dta["issuer_pem"] = all_cas[0]
 
         req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
         self.assertTrue(req.status_code == 200)
