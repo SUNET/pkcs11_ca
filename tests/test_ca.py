@@ -36,7 +36,7 @@ class TestCa(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/search/ca")
 
         data = json.loads('{"pem": ' + '"' + cas[-1].replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/search/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/search/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["cas"]) == 1)
 
@@ -100,7 +100,7 @@ class TestCa(unittest.TestCase):
         data = json.loads('{"key_label": ' + '"' + new_key_label[:-2] + '"' + "}")
         data["name_dict"] = name_dict
 
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["certificate"].encode("utf-8")
@@ -156,7 +156,7 @@ class TestCa(unittest.TestCase):
         self.assertTrue(found_ocsp)
 
         # Get AIA
-        req = requests.get(url_ca)
+        req = requests.get(url_ca, timeout=5)
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -168,7 +168,7 @@ class TestCa(unittest.TestCase):
 
         # Get CDP
         url = cdp_url(new_ca)
-        req = requests.get(url)
+        req = requests.get(url, timeout=5)
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -198,7 +198,7 @@ class TestCa(unittest.TestCase):
         data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
         data["key_type"] = "dummy_not_exist"
 
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code != 200)
 
     def test_ca_key_types(self) -> None:
@@ -225,7 +225,7 @@ class TestCa(unittest.TestCase):
             data["issuer_pem"] = get_cas(pub_key, priv_key)[0]  # first ca for depth level 1
             data["key_type"] = key_type
 
-            req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+            req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
             self.assertTrue(req.status_code == 200)
             new_ca: str = json.loads(req.text)["certificate"]
             self.assertTrue(len(new_ca) > 9)

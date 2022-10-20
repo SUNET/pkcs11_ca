@@ -63,7 +63,7 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
             + '"'
             + "}"
         )
-        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["certificate"].encode("utf-8")
@@ -80,7 +80,7 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
             pub_key, priv_key, "http://localhost:8000/search/certificate"
         )
         data = json.loads('{"pem": ' + '"' + cert_given.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/search/certificate", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/search/certificate", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
         self.assertTrue(len(certs) == 1)

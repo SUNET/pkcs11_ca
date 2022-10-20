@@ -41,7 +41,7 @@ class TestValidate(unittest.TestCase):
         data = json.loads('{"key_label": ' + '"' + "dummy_string@" + '"' + "}")
         data["name_dict"] = name_dict
         data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 400)
 
         # Test char ;
@@ -55,7 +55,7 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE;ZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 400)
 
         # Test char "
@@ -71,7 +71,7 @@ Tj5zjeJiywSdOZnFPloeE"""
 -----END PUBLIC KEY-----
 """
         )
-        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 400)
 
         # Test char '
@@ -85,7 +85,7 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE'ZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 400)
 
         # Test ok chars
@@ -99,5 +99,5 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeEMZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/public_key", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)

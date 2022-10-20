@@ -230,7 +230,7 @@ class PostgresDB(DataBaseObject):
                     if not (key_file.endswith(".pem") or key_file.endswith(".pub")):
                         continue
 
-                    with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file) as file_data:
+                    with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, encoding="utf-8") as file_data:
                         key_pem = file_data.read()
                     key_pem = key_pem.strip() + "\n"  # Fix whitespaces for pem key
 

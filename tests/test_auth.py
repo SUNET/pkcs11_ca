@@ -29,7 +29,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
         # Wrong nonce
@@ -41,7 +41,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
         # Wrong nonce, non valid base64 encoding
@@ -53,7 +53,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
     def test_auth_url(self) -> None:
@@ -67,7 +67,7 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # No url in token
-        req = requests.head("http://localhost:8000/new_nonce")
+        req = requests.head("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce}
@@ -75,11 +75,11 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
         # Wrong url in token
-        req = requests.head("http://localhost:8000/new_nonce")
+        req = requests.head("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/ca_wrong_url"}
@@ -87,7 +87,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
     def test_auth(self) -> None:
@@ -103,18 +103,18 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # Sign with key2 but send key1 as public key
-        req = requests.head("http://localhost:8000/new_nonce")
+        req = requests.head("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/ca"}
         jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
         encoded = jwt.encode(jwk_key_data, priv_key2.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
         # Correct auth, HEAD nonce
-        req = requests.head("http://localhost:8000/new_nonce")
+        req = requests.head("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/ca"}
@@ -122,11 +122,11 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/ca"}
@@ -134,22 +134,22 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # Test lib auth
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key1, priv_key1, "http://localhost:8000/search/ca")
-        req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
     def test_aia_cdp_auth(self) -> None:
         """
         No auth for these but 404 when non existing url
         """
-        req = requests.get("http://localhost:8000/ca/acac22352343423")
+        req = requests.get("http://localhost:8000/ca/acac22352343423", timeout=5)
         self.assertTrue(req.status_code == 404)
-        req = requests.get("http://localhost:8000/crl/acac22352343423")
+        req = requests.get("http://localhost:8000/crl/acac22352343423", timeout=5)
         self.assertTrue(req.status_code == 404)
 
     def test_auth_secp256r1(self) -> None:
@@ -163,7 +163,7 @@ class TestAuth(unittest.TestCase):
             pub_key4 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -171,7 +171,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key4.decode("utf-8"), algorithm="ES256", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
     def test_auth_secp384r1(self) -> None:
@@ -185,7 +185,7 @@ class TestAuth(unittest.TestCase):
             pub_key5 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -193,7 +193,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key5.decode("utf-8"), algorithm="ES384", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
     def test_auth_secp521r1(self) -> None:
@@ -207,7 +207,7 @@ class TestAuth(unittest.TestCase):
             pub_key6 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -215,7 +215,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key6.decode("utf-8"), algorithm="ES512", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
     def test_auth_ed25519(self) -> None:
@@ -231,7 +231,7 @@ class TestAuth(unittest.TestCase):
             pub_key7 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -239,10 +239,10 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key7.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
 
@@ -251,7 +251,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key9.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)
 
     def test_auth_ed448(self) -> None:
@@ -267,7 +267,7 @@ class TestAuth(unittest.TestCase):
             pub_key8 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -275,10 +275,10 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key8.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get("http://localhost:8000/new_nonce")
+        req = requests.get("http://localhost:8000/new_nonce", timeout=5)
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": "http://localhost:8000/search/public_key"}
@@ -286,5 +286,5 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key10.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {}
         request_headers["Authorization"] = "Bearer " + encoded
-        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/public_key", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 401)

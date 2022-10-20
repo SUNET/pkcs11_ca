@@ -51,9 +51,9 @@ class TestOCSP(unittest.TestCase):
 
     def _submit_req(self, method: str, url: str, data: Union[bytes, None] = None) -> bytes:
         if method == "GET":
-            req = requests.get(url)
+            req = requests.get(url, timeout=5)
         else:
-            req = requests.post(url, data=data)
+            req = requests.post(url, data=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(req.content) > 0)
         self.assertTrue("content-type" in req.headers and req.headers["content-type"] == "application/ocsp-response")
@@ -126,7 +126,7 @@ class TestOCSP(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # GET
@@ -236,7 +236,7 @@ class TestOCSP(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # GET
@@ -376,7 +376,7 @@ zu/HPacJI420g3IC4vMVHeZznEM=
             + '"'
             + "}"
         )
-        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         new_cert = json.loads(req.text)["certificate"]
         self._check_ok_cert(new_cert)

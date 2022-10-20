@@ -16,7 +16,7 @@ def get_cas(pub_key: bytes, priv_key: bytes) -> List[str]:
     """Get all CAs"""
     request_headers = {}
     request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/search/ca")
-    req = requests.get("http://localhost:8000/search/ca", headers=request_headers)
+    req = requests.get("http://localhost:8000/search/ca", headers=request_headers, timeout=5)
     if req.status_code != 200:
         raise ValueError("NOT OK status when fetching all CAs")
     cas: List[str] = json.loads(req.text)["cas"]
@@ -32,7 +32,7 @@ def create_i_ca(pub_key: bytes, priv_key: bytes, name_dict: Dict[str, str]) -> s
     data["name_dict"] = name_dict
     data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
 
-    req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+    req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
     if req.status_code != 200:
         raise ValueError("NOT OK posting a new CA")
     new_ca: str = json.loads(req.text)["certificate"]
@@ -89,7 +89,7 @@ def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
     if len(url_ca) < 3:
         return
 
-    resp = requests.get(url_ca)
+    resp = requests.get(url_ca, timeout=5)
     if resp.status_code != 200:
         raise ValueError("Could not download ca from ca_issuers")
 
@@ -103,7 +103,7 @@ def verify_cert(pem: str) -> None:
     hash_obj.update(pem.encode("utf-8"))
     hash_digest = hash_obj.hexdigest()
 
-    with open(hash_digest, "w") as f_data:
+    with open(hash_digest, "w", encoding="utf-8") as f_data:
         f_data.write(pem)
 
     # Get CA chain for this cert

@@ -68,7 +68,7 @@ class TestRevoke(unittest.TestCase):
             + '"'
             + "}"
         )
-        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         cert = json.loads(req.text)["certificate"]
@@ -78,14 +78,14 @@ class TestRevoke(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
 
         data = json.loads('{"pem": "' + cert.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         self.assertTrue(cert == json.loads(req.text)["revoked"])
 
         # Check CRL
         # Get CDP
         url = cdp_url(cert)
-        req = requests.get(url, headers=request_headers)
+        req = requests.get(url, headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -126,7 +126,7 @@ class TestRevoke(unittest.TestCase):
         # all_cas = get_cas(pub_key, priv_key)
         # dta["issuer_pem"] = all_cas[0]
 
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         old_ca = json.loads(req.text)["certificate"]
 
@@ -149,7 +149,7 @@ class TestRevoke(unittest.TestCase):
         data["name_dict"] = name_dict
         data["issuer_pem"] = old_ca
 
-        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/ca", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         curr_ca = json.loads(req.text)["certificate"]
 
@@ -157,7 +157,7 @@ class TestRevoke(unittest.TestCase):
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/is_revoked")
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]
         self.assertTrue(revoked is False)
@@ -167,14 +167,14 @@ class TestRevoke(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
 
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # Check revoked status
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/is_revoked")
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/is_revoked", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]
         self.assertTrue(revoked is True)

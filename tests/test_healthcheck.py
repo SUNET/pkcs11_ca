@@ -22,11 +22,11 @@ class TesthealthCheck(unittest.TestCase):
         """
 
         # Test no auth
-        req = requests.get("http://localhost:8000/healthcheck")
+        req = requests.get("http://localhost:8000/healthcheck", timeout=5)
         self.assertTrue(req.status_code == 401)
 
         # Test ok auth
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/healthcheck")
-        req = requests.get("http://localhost:8000/healthcheck", headers=request_headers)
+        req = requests.get("http://localhost:8000/healthcheck", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)

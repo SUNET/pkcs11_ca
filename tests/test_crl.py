@@ -35,7 +35,7 @@ class TestCrl(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/crl")
 
         data = json.loads('{"ca_pem": ' + '"' + cas[0].replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/crl", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/crl", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         crl1 = json.loads(req.text)["crl"]
@@ -51,7 +51,7 @@ class TestCrl(unittest.TestCase):
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/search/crl")
 
         data = json.loads('{"pem": ' + '"' + crl1.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/search/crl", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/search/crl", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["crls"]) == 1)
 

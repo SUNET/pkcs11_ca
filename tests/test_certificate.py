@@ -52,7 +52,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 
         request_headers = {}
         request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/sign_csr")
-        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # All certificates
@@ -60,7 +60,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
         request_headers["Authorization"] = create_jwt_header_str(
             pub_key, priv_key, "http://localhost:8000/search/certificate"
         )
-        req = requests.get("http://localhost:8000/search/certificate", headers=request_headers)
+        req = requests.get("http://localhost:8000/search/certificate", headers=request_headers, timeout=5)
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
         self.assertTrue(isinstance(certs, list))
@@ -71,7 +71,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
             pub_key, priv_key, "http://localhost:8000/search/certificate"
         )
         data = json.loads('{"pem": ' + '"' + certs[0].replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/search/certificate", headers=request_headers, json=data)
+        req = requests.post("http://localhost:8000/search/certificate", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
         self.assertTrue(len(certs) == 1)

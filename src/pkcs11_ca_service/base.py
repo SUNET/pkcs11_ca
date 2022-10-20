@@ -128,17 +128,15 @@ class InputObject(BaseModel):
     """FastAPI input object for HTTP post data"""
 
     def __init__(self, **data: Union[str, int]) -> None:
-        for key in data:
-            string_data = data[key]
-
-            if isinstance(string_data, str):
+        for _, (key, value) in enumerate(data.items()):
+            if isinstance(value, str) and isinstance(key, str):
                 # Fix pem whitespaces
                 if "pem" in key:
-                    data[key] = string_data.strip() + "\n"
+                    data[key] = value.strip() + "\n"
 
                 # Validate input data
                 # Raises 400 status code if invalid
-                validate_input_string(string_data)
+                validate_input_string(value)
 
         super().__init__(**data)
 
