@@ -9,9 +9,9 @@ import requests
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from .lib import get_cas
 
-with open("trusted_keys/privkey1.key", "rb") as file_data:
+with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
-with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
     pub_key = file_data.read()
 
 

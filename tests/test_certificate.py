@@ -22,9 +22,9 @@ class TestCertificate(unittest.TestCase):
         Search for certificates
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key = f_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
 
         csr_pem = """-----BEGIN CERTIFICATE REQUEST-----

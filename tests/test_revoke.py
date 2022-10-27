@@ -47,9 +47,9 @@ class TestRevoke(unittest.TestCase):
         Test revoke
         """
 
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
-        with open("trusted_keys/privkey1.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key = f_data.read()
 
         # Sign a csr
@@ -101,9 +101,9 @@ class TestRevoke(unittest.TestCase):
         Test revoke
         """
 
-        with open("trusted_keys/pubkey1.pem", "rb") as file_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
             pub_key = file_data.read()
-        with open("trusted_keys/privkey1.key", "rb") as file_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as file_data:
             priv_key = file_data.read()
 
         # Create CA

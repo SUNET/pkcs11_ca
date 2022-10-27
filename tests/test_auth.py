@@ -18,9 +18,9 @@ class TestAuth(unittest.TestCase):
         Test url nonce
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # No nonce
@@ -61,9 +61,9 @@ class TestAuth(unittest.TestCase):
         Test url auth
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # No url in token
@@ -95,11 +95,11 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey1.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key1 = f_data.read()
-        with open("trusted_keys/privkey2.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey2.key", "rb") as f_data:
             priv_key2 = f_data.read()
-        with open("trusted_keys/pubkey1.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key1 = f_data.read()
 
         # Sign with key2 but send key1 as public key
@@ -157,9 +157,9 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey4.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey4.key", "rb") as f_data:
             priv_key4 = f_data.read()
-        with open("trusted_keys/pubkey4.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey4.pem", "rb") as f_data:
             pub_key4 = f_data.read()
 
         # Correct auth, GET nonce
@@ -179,9 +179,9 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey5.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey5.key", "rb") as f_data:
             priv_key5 = f_data.read()
-        with open("trusted_keys/pubkey5.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey5.pem", "rb") as f_data:
             pub_key5 = f_data.read()
 
         # Correct auth, GET nonce
@@ -201,9 +201,9 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey6.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey6.key", "rb") as f_data:
             priv_key6 = f_data.read()
-        with open("trusted_keys/pubkey6.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey6.pem", "rb") as f_data:
             pub_key6 = f_data.read()
 
         # Correct auth, GET nonce
@@ -223,11 +223,11 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey7.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey7.key", "rb") as f_data:
             priv_key7 = f_data.read()
-        with open("trusted_keys/privkey9.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey9.key", "rb") as f_data:
             priv_key9 = f_data.read()
-        with open("trusted_keys/pubkey7.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey7.pem", "rb") as f_data:
             pub_key7 = f_data.read()
 
         # Correct auth, GET nonce
@@ -259,11 +259,11 @@ class TestAuth(unittest.TestCase):
         Send requests with valid and invalid jwt tokens
         """
 
-        with open("trusted_keys/privkey8.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey8.key", "rb") as f_data:
             priv_key8 = f_data.read()
-        with open("trusted_keys/privkey10.key", "rb") as f_data:
+        with open("data/trusted_keys/privkey10.key", "rb") as f_data:
             priv_key10 = f_data.read()
-        with open("trusted_keys/pubkey8.pem", "rb") as f_data:
+        with open("data/trusted_keys/pubkey8.pem", "rb") as f_data:
             pub_key8 = f_data.read()
 
         # Correct auth, GET nonce

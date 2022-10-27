@@ -4,6 +4,7 @@ from importlib import import_module
 import os
 import sys
 from subprocess import check_call
+from time import sleep
 
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
@@ -52,6 +53,10 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
     fields: List[Dict[str, Union[Type[str], Type[int]]]] = []
     reference_fields: List[Dict[str, str]] = []
     unique_fields: List[List[str]] = []
+
+    # Allow DB to startup
+    print("Waiting 4s for DB to startup")
+    sleep(4)
 
     for db_data_class in db_data_classes:
         tables.append(db_data_class.db_table_name)
