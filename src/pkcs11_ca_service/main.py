@@ -11,7 +11,6 @@ from fastapi.responses import JSONResponse
 from asn1crypto import x509 as asn1_x509
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.crl import create as create_crl
-from python_x509_pkcs11.csr import sign_csr
 from python_x509_pkcs11.ca import create as create_ca
 
 from .base import db_load_data_class, InputObject
@@ -23,10 +22,16 @@ from .ca import Ca, CaInput, search as ca_search
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey, PublicKeyInput, search as public_key_search
 from .startup import startup
-from .asn1 import public_key_pem_from_csr, pem_cert_to_name_dict, cert_is_ca, aia_and_cdp_exts, cert_as_der, crl_as_der
+from .asn1 import (
+    public_key_pem_from_csr,
+    pem_cert_to_name_dict,
+    aia_and_cdp_exts,
+    cert_as_der,
+    crl_as_der,
+)
 from .nonce import nonce_response
 from .auth import authorized_by
-from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck
+from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
 from .config import KEY_TYPES
 
 loop = asyncio.get_running_loop()
@@ -436,7 +441,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
         )
 
     if ca_input.key_type is None:
-        key_type = "ed25519"
+        key_type = "secp256r1"
     else:
         key_type = ca_input.key_type
     if key_type not in KEY_TYPES:
@@ -450,7 +455,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
     issuer_key_type: Union[str, None] = None
     extra_extensions: Union[asn1_x509.Extensions, None] = None
 
-    # If this should not be a selfsigned ca
+    # If this should not be a self-signed ca
     if ca_input.issuer_pem is not None:
         issuer_obj = await ca_request(CaInput(pem=ca_input.issuer_pem))
 
@@ -571,36 +576,9 @@ async def post_sign_csr(request: Request, csr_input: CsrInput) -> JSONResponse:
 
     issuer_obj = await ca_request(CaInput(pem=csr_input.ca_pem))
 
-    # Get pkcs11 and its key label to sign the csr with from the CA
-    issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
+    data_content = await sign_csr(auth_by, issuer_obj, csr_obj, public_key_obj)
 
-    extra_extensions = aia_and_cdp_exts(issuer_obj.path)
-
-    # Sign csr
-    cert_pem = await sign_csr(
-        issuer_pkcs11_key_obj.key_label,
-        pem_cert_to_name_dict(issuer_obj.pem),
-        csr_obj.pem,
-        extra_extensions=extra_extensions,
-        key_type=issuer_pkcs11_key_obj.key_type,
-    )
-
-    # Save cert
-    cert_obj = Certificate(
-        {
-            "pem": cert_pem,
-            "authorized_by": auth_by,
-            "csr": csr_obj.serial,
-            "public_key": public_key_obj.serial,
-            "issuer": issuer_obj.serial,
-        }
-    )
-    await cert_obj.save()
-    if cert_is_ca(cert_pem):
-        print("Note treating CA as a certificate since we dont have the private key")
-
-    # Return cert
-    return JSONResponse(status_code=200, content={"certificate": cert_obj.pem})
+    return JSONResponse(status_code=200, content={"certificate": data_content})
 
 
 class RevokeInput(InputObject):
@@ -690,6 +668,31 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     )
 
 
+# TODO
+# @app.get("/sign_csr/{path}")
+# async def post_sign_csr_cmc(request: Request) -> Response:
+#     auth_by = await authorized_by(request)
+
+#     data = await request.body()
+
+#     csr_input_pem = csr_from_der(data)
+
+# Get public key from csr
+#     public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_input_pem), "authorized_by": auth_by})
+#     await public_key_obj.save()
+
+# Save csr
+#     csr_obj = Csr({"pem": csr_input_pem, "authorized_by": auth_by, "public_key": public_key_obj.serial})
+#     await csr_obj.save()
+
+#     issuer_obj = await ca_request(CaInput(path=path))
+
+#     data_content = await sign_csr(auth_by, issuer_obj)
+#     return fastapi.Response(status_code=200,
+#                             content=data_content,
+#                             media_type="application/pkcs7-mime")
+
+
 # Special for compatibility
 # @app.post("/sign_csr_file")
 # async def sign_csr_file(request: fastapi.Request):
@@ -702,7 +705,8 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
 # c,k = ca.new_ca()
 # ca.save_ca(c,k)
 
-## GET HTTP ##
+
+# GET HTTP #
 # @app.get("/" + config.ca_info_common_name + ".crl")
 # def crl_file():
 #    return get_path.crl_file()

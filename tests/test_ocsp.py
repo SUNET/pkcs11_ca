@@ -122,11 +122,10 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/revoke")}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
+        req = requests.post("http://localhost:8005/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # GET
@@ -184,26 +183,26 @@ class TestOCSP(unittest.TestCase):
         ocsp_request_bytes = asyncio.run(request(request_certs_data))
 
         # GET
-        data = self._submit_req("GET", "http://localhost:8000/ocsp/" + ocsp_encode(ocsp_request_bytes))
+        data = self._submit_req("GET", "http://localhost:8005/ocsp/" + ocsp_encode(ocsp_request_bytes))
         ocsp_response = asn1_ocsp.OCSPResponse().load(data)
         self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # POST
-        data = self._submit_req("POST", "http://localhost:8000/ocsp/", ocsp_request_bytes)
+        data = self._submit_req("POST", "http://localhost:8005/ocsp/", ocsp_request_bytes)
         ocsp_response = asn1_ocsp.OCSPResponse().load(data)
         self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # GET
-        data = self._submit_req("GET", "http://localhost:8000/ocsp/" + "sldfsf!!#¤&%¤%YARSFdfvdfv")
+        data = self._submit_req("GET", "http://localhost:8005/ocsp/" + "sldfsf!!#¤&%¤%YARSFdfvdfv")
         self.assertTrue(data == b"0")
-        data = self._submit_req("GET", "http://localhost:8000/ocsp/" + "sdfsfas/sdfsdf/d")
+        data = self._submit_req("GET", "http://localhost:8005/ocsp/" + "sdfsfas/sdfsdf/d")
         self.assertTrue(data == b"0")
 
         # POST
         data = self._submit_req(
-            "POST", "http://localhost:8000/ocsp/", b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b"
+            "POST", "http://localhost:8005/ocsp/", b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b"
         )
         self.assertTrue(data == b"0")
 
@@ -232,15 +231,14 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/revoke")
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/revoke")}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8000/revoke", headers=request_headers, json=data, timeout=5)
+        req = requests.post("http://localhost:8005/revoke", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
 
         # GET
-        data = self._submit_req("GET", "http://localhost:8000/ocsp/" + ocsp_encode(ocsp_request_bytes))
+        data = self._submit_req("GET", "http://localhost:8005/ocsp/" + ocsp_encode(ocsp_request_bytes))
         ocsp_response = asn1_ocsp.OCSPResponse().load(data)
         self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
@@ -261,7 +259,7 @@ class TestOCSP(unittest.TestCase):
         )
 
         # POST
-        data = self._submit_req("POST", "http://localhost:8000/ocsp/", ocsp_request_bytes)
+        data = self._submit_req("POST", "http://localhost:8005/ocsp/", ocsp_request_bytes)
         ocsp_response = asn1_ocsp.OCSPResponse().load(data)
         self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
@@ -362,8 +360,7 @@ zu/HPacJI420g3IC4vMVHeZznEM=
         cas = get_cas(pub_key, priv_key)
 
         # Sign a csr
-        request_headers = {}
-        request_headers["Authorization"] = create_jwt_header_str(pub_key, priv_key, "http://localhost:8000/sign_csr")
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/sign_csr")}
 
         data = json.loads(
             '{"pem": "'
@@ -376,7 +373,7 @@ zu/HPacJI420g3IC4vMVHeZznEM=
             + '"'
             + "}"
         )
-        req = requests.post("http://localhost:8000/sign_csr", headers=request_headers, json=data, timeout=5)
+        req = requests.post("http://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5)
         self.assertTrue(req.status_code == 200)
         new_cert = json.loads(req.text)["certificate"]
         self._check_ok_cert(new_cert)

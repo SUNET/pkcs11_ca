@@ -3,17 +3,20 @@
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 
+from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
 from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
+from .certificate import Certificate
+from .csr import Csr
 from .public_key import PublicKey, PublicKeyInput
 from .ca import CaInput, Ca
 from .crl import Crl
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
-from .asn1 import crl_expired, pem_cert_to_name_dict
+from .asn1 import crl_expired, pem_cert_to_name_dict, aia_and_cdp_exts, cert_is_ca
 from .base import db_load_data_class
 
-from .config import HEALTHCHECK_KEY_LABEL
+from .config import HEALTHCHECK_KEY_LABEL, HEALTHCHECK_KEY_TYPE
 
 
 async def healthcheck() -> JSONResponse:
@@ -31,7 +34,7 @@ async def healthcheck() -> JSONResponse:
         # Sign some data
         data_to_be_signed = b"healthcheck"
         signature = await PKCS11Session.sign(
-            HEALTHCHECK_KEY_LABEL, data_to_be_signed, verify_signature=True, key_type="ed25519"
+            HEALTHCHECK_KEY_LABEL, data_to_be_signed, verify_signature=True, key_type=HEALTHCHECK_KEY_TYPE
         )
         if len(signature) < 5:
             raise HTTPException(status_code=503, detail="Failed healthcheck")
@@ -135,3 +138,43 @@ async def crl_request(auth_by: int, issuer_obj: Ca) -> str:
     )
     await crl_obj.save()
     return crl_pem
+
+
+async def sign_csr(auth_by: int, issuer_obj: Ca, csr_obj: Csr, public_key_obj: PublicKey) -> str:
+    """
+
+    :param auth_by: DB public key id.
+    :param issuer_obj: Which CA should sign the CSR.
+    :param csr_obj: Which CSR object will be signed.
+    :param public_key_obj: Which public key object created this csr.
+    :return: str
+    """
+    # Get pkcs11 and its key label to sign the csr with from the CA
+    issuer_pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(serial=issuer_obj.pkcs11_key))
+
+    extra_extensions = aia_and_cdp_exts(issuer_obj.path)
+
+    # Sign csr
+    cert_pem = await pkcs11_sign_csr(
+        issuer_pkcs11_key_obj.key_label,
+        pem_cert_to_name_dict(issuer_obj.pem),
+        csr_obj.pem,
+        extra_extensions=extra_extensions,
+        key_type=issuer_pkcs11_key_obj.key_type,
+    )
+
+    # Save cert
+    cert_obj = Certificate(
+        {
+            "pem": cert_pem,
+            "authorized_by": auth_by,
+            "csr": csr_obj.serial,
+            "public_key": public_key_obj.serial,
+            "issuer": issuer_obj.serial,
+        }
+    )
+    await cert_obj.save()
+    if cert_is_ca(cert_pem):
+        print("Warning: Treating CA as a certificate since we dont have the private key")
+
+    return cert_pem

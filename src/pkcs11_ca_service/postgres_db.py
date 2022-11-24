@@ -8,6 +8,7 @@ import datetime
 import hashlib
 from secrets import token_bytes
 import os
+from time import sleep
 
 from asyncpg.exceptions import UndefinedTableError
 from asyncpg import create_pool
@@ -24,6 +25,7 @@ from .asn1 import this_update_next_update_from_crl
 
 from .config import (
     HEALTHCHECK_KEY_LABEL,
+    HEALTHCHECK_KEY_TYPE,
     ROOT_CA_NAME_DICT,
     ROOT_CA_KEY_LABEL,
     ROOT_CA_KEY_TYPE,
@@ -278,13 +280,14 @@ class PostgresDB(DataBaseObject):
                 key_label: str = rows[0][0]
                 key_type: str = rows[0][1]
 
-                ret: Dict[str, str] = {}
-                ret["crl"] = crl
-                ret["ca"] = cert_auth
-                ret["ca_issuer"] = cert_auth_issuer
-                ret["ca_serial"] = cert_serial
-                ret["key_label"] = key_label
-                ret["key_type"] = key_type
+                ret: Dict[str, str] = {
+                    "crl": crl,
+                    "ca": cert_auth,
+                    "ca_issuer": cert_auth_issuer,
+                    "ca_serial": cert_serial,
+                    "key_label": key_label,
+                    "key_type": key_type,
+                }
 
                 return ret
 
@@ -297,19 +300,32 @@ class PostgresDB(DataBaseObject):
         unique_fields: List[List[str]],
     ) -> bool:
 
-        try:
-            cls.pool = await create_pool(
-                dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
-                min_size=5,
-                max_size=50,
-                command_timeout=DB_TIMEOUT,
-            )
-        except:  # pylint: disable=bare-except
-            print("Failed to connect to DB, please fix")
-            print(
-                "postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
-                flush=True,
-            )
+        for _ in range(5):
+            try:
+                sleep(1)
+                cls.pool = await create_pool(
+                    dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
+                    min_size=5,
+                    max_size=50,
+                    command_timeout=DB_TIMEOUT,
+                )
+                break
+            except:  # pylint: disable=bare-except
+                print("Failed to connect to DB, please fix", flush=True)
+                print(
+                    "postgres://"
+                    + DB_USER
+                    + ":"
+                    + "password_redacted"
+                    + "@"
+                    + DB_HOST
+                    + ":"
+                    + DB_PORT
+                    + "/"
+                    + DB_DATABASE,
+                    flush=True,
+                )
+        else:
             return False
 
         classes_info: Dict[str, List[str]] = {}
@@ -323,15 +339,16 @@ class PostgresDB(DataBaseObject):
         if not await cls._check_db():
             for index, table in enumerate(tables):
                 await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
-            if not await cls._insert_root_ca(classes_info):
-                return False
+            await cls._insert_root_ca(classes_info)
             await cls._insert_healthcheck_key(classes_info)
 
         # Load trusted keys
         await cls._load_trusted_keys(classes_info)
+
+        print("DB startup OK")
         return True
 
-    # Rewrite this code so its future proof
+    # Rewrite this code so its future-proof
     @classmethod
     async def _check_db(cls) -> bool:
         async with cls.pool.acquire() as conn:
@@ -358,25 +375,23 @@ class PostgresDB(DataBaseObject):
         return query
 
     @classmethod
-    async def _insert_root_ca(cls, classes_info: Dict[str, List[str]]) -> bool:
+    async def _insert_root_ca(cls, classes_info: Dict[str, List[str]]) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)
                 not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
-                try:
-                    root_ca_csr_pem, root_ca_pem = await create_ca(
-                        ROOT_CA_KEY_LABEL,
-                        ROOT_CA_NAME_DICT,
-                        not_before=not_before,
-                        not_after=not_after,
-                        key_type=ROOT_CA_KEY_TYPE,
-                    )
-                except MultipleObjectsReturned:
-                    print("root ca PKCS11 key label already exists")
-                    return False
 
-                public_key_pem, identifier = await PKCS11Session.public_key_data(ROOT_CA_KEY_LABEL)
+                root_ca_csr_pem, root_ca_pem = await create_ca(
+                    ROOT_CA_KEY_LABEL,
+                    ROOT_CA_NAME_DICT,
+                    not_before=not_before,
+                    not_after=not_after,
+                    key_type=ROOT_CA_KEY_TYPE,
+                )
+
+                public_key_pem, identifier = await PKCS11Session.public_key_data(
+                    ROOT_CA_KEY_LABEL, key_type=ROOT_CA_KEY_TYPE
+                )
 
                 # Insert into 'public_key' table
                 query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
@@ -389,6 +404,7 @@ class PostgresDB(DataBaseObject):
                     identifier.hex(),
                     str(datetime.datetime.utcnow()),
                 )
+
                 # Insert into 'pkcs11_key' table
                 query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
                 await conn.execute(
@@ -433,18 +449,20 @@ class PostgresDB(DataBaseObject):
                     next_update,
                     str(datetime.datetime.utcnow()),
                 )
-                print("Created first ever root CA")
-                return True
+                print("Created first ever root CA", flush=True)
 
     @classmethod
     async def _insert_healthcheck_key(cls, classes_info: Dict[str, List[str]]) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 try:
-                    public_key_pem, identifier = await PKCS11Session.create_keypair(HEALTHCHECK_KEY_LABEL)
+                    public_key_pem, identifier = await PKCS11Session.create_keypair(
+                        HEALTHCHECK_KEY_LABEL, key_type=HEALTHCHECK_KEY_TYPE
+                    )
                 except MultipleObjectsReturned:
-                    public_key_pem, identifier = await PKCS11Session.public_key_data(HEALTHCHECK_KEY_LABEL)
+                    public_key_pem, identifier = await PKCS11Session.public_key_data(
+                        HEALTHCHECK_KEY_LABEL, key_type=HEALTHCHECK_KEY_TYPE
+                    )
 
                 # Insert into 'public_key' table
                 query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
@@ -463,8 +481,8 @@ class PostgresDB(DataBaseObject):
                     query,
                     2,
                     HEALTHCHECK_KEY_LABEL,
-                    "ed25519",
+                    HEALTHCHECK_KEY_TYPE,
                     1,
                     str(datetime.datetime.utcnow()),
                 )
-                print("Created healthcheck PKCS11 key")
+                print("Created healthcheck PKCS11 key", flush=True)

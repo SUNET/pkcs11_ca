@@ -559,3 +559,21 @@ def crl_as_der(pem: str) -> bytes:
     crl = asn1_crl.CertificateList().load(data)
     ret: bytes = crl.dump()
     return ret
+
+
+def csr_from_der(der: bytes) -> str:
+    """Get CSR from DER form.
+
+    Parameters:
+    der (bytes): DER encoded csr.
+
+    Returns:
+    bytes
+    """
+
+    data = der
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    csr = asn1_csr.CertificationRequest().load(data)
+    pem: bytes = asn1_pem.armor("CERTIFICATE REQUEST", csr.dump())
+    return pem.decode("utf-8")

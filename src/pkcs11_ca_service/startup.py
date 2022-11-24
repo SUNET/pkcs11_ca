@@ -3,14 +3,15 @@ from typing import Dict, List, Union, Type
 from importlib import import_module
 import os
 import sys
-from subprocess import check_call
-from time import sleep
+import subprocess
+
+# from time import sleep
 
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 from .base import DataClassObject, DataBaseObject
-from .config import DB_TABLE_MODULES, DB_MODULE, ROOT_CA_KEY_LABEL
+from .config import DB_TABLE_MODULES, DB_MODULE, ROOT_CA_KEY_LABEL, ROOT_CA_KEY_TYPE, PKCS11_BACKEND
 
 
 def _load_db_data_classes() -> List[DataClassObject]:
@@ -37,7 +38,7 @@ def _load_db_module() -> DataBaseObject:
         module = import_module("." + DB_MODULE, "pkcs11_ca_service")
     class_name = DB_MODULE[0].upper() + DB_MODULE[1:].replace("_db", "DB")
 
-    # Instance the DB class to ensure abstractmethods are implemented
+    # Instance the DB class to ensure abstract methods are implemented
     db_obj: DataBaseObject = object.__new__(getattr(module, class_name))
 
     # Set pkcs11 session
@@ -55,8 +56,6 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
     unique_fields: List[List[str]] = []
 
     # Allow DB to startup
-    print("Waiting 4s for DB to startup")
-    sleep(4)
 
     for db_data_class in db_data_classes:
         tables.append(db_data_class.db_table_name)
@@ -69,13 +68,13 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
 
 async def _pkcs11_startup(db_obj: DataBaseObject) -> bool:
     try:
-        _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL)
+        _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL, key_type=ROOT_CA_KEY_TYPE)
     except NoSuchKey:
-        print(f"Could not find pkcs11 key {ROOT_CA_KEY_LABEL} for root ca ")
-        print("You should probably empty and reset the DB since we lost the root ca key")
+        print(f"Could not find pkcs11 key {ROOT_CA_KEY_LABEL} for root ca", flush=True)
+        print("You should probably empty and reset the DB since we lost the root ca key", flush=True)
         return False
 
-    print("PKCS11 Session OK")
+    print("PKCS11 startup OK", flush=True)
     return True
 
 
@@ -94,12 +93,13 @@ async def startup() -> None:
         print("PKCS11_MODULE, PKCS11_TOKEN or PKCS11_PIN env variables is not set")
         sys.exit(0)
 
-    check_call(
-        "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
-        + "|| softhsm2-util --init-token --slot 0 "
-        + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
-        shell=True,
-    )
+    if PKCS11_BACKEND == "SOFTHSM":
+        subprocess.check_call(
+            "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
+            + "|| softhsm2-util --init-token --slot 0 "
+            + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
+            shell=True,
+        )
 
     # Check DB
     if not await _db_startup(db_obj, db_data_classes):
@@ -108,7 +108,3 @@ async def startup() -> None:
     # Check pkcs11
     if not await _pkcs11_startup(db_obj):
         sys.exit(1)
-
-    print()
-    print("Startup DONE")
-    print(flush=True)
