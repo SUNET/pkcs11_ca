@@ -1,4 +1,5 @@
-FROM debian:bullseye-20221114-slim@sha256:df172d92d287ec4d4a538e5db8026fcde5f91f5f90061423d69d6148ff05cc47
+# FROM debian:bullseye-20221114-slim@sha256:df172d92d287ec4d4a538e5db8026fcde5f91f5f90061423d69d6148ff05cc47
+FROM ubuntu:latest
 
 MAINTAINER victor@sunet.se
 
@@ -21,6 +22,14 @@ RUN apt-get update \
     python3-dev \
     softhsm2 \
     python3 \
+    opensc \
+    wget \
+    git-core \
+    build-essential \
+    libz-dev \
+    mercurial \
+    swig \
+    dnsutils \
     && pip3 install -r requirements.txt \
     && apt-get remove -y \
     gcc \
@@ -45,6 +54,19 @@ COPY ./data/healthcheck.sh /app/healthcheck.sh
 COPY ./data/healthcheck.py /app/healthcheck.py
 COPY ./data/logging.json /app/logging.json
 
+# HSM stuff
+WORKDIR /usr/src/luna-client
+COPY ./data/luna-client-7.4 /usr/src/luna-client
+RUN ./deb.sh
+WORKDIR /
+RUN rm -rf /usr/src/luna-client
+COPY ./data/web_container/entrypoint.sh /entrypoint.sh
+RUN chmod a+rx /entrypoint.sh
+COPY ./cert /usr/safenet/lunaclient/cert
+COPY ./50-ha-slot.conf /etc/Chrystoki.conf.d/50-ha-slot.conf
+
+WORKDIR /app
+
 # Run as user
 USER pkcs11_ca_service
 
@@ -56,7 +78,8 @@ ENV PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 # RUN softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN
 
 # Add healthcheck
-HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
-    CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
+# HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
+#     CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
-ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app",  "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca_service"]
+# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca_service"]
+ENTRYPOINT ["/entrypoint.sh"]
