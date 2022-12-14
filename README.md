@@ -1,11 +1,4 @@
-# TODO: lookup extract RSA sig from GPG sig, should be possible so we can sign with current gpg yubikey signs
-# Check, create and insert root ca in main.py not in postgres.py
-
-# * Postgres container from debian and then install postgresql, replace the 'docker official' postgres container
-# * Remove DB and pkcs11 keys created from tests
-# * Certificate Management over CMS
-# * ACME
-# * GPG JWT sigs, perhaps extract underlying RSA/ec/eddsa public key, in addition to RSA/ec/eddsa
+A modern CA with its keys in a PKCS11 device
 
 # To run, deploy, test and everything run
 bash dev-run.sh
@@ -15,3 +8,13 @@ bash dev-run.sh
 # To delete a label in the PKCS11 device:
 pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y privkey
 pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y pubkey
+
+# TODO: lookup extract RSA sig from GPG sig, should be possible so we can sign with current gpg yubikey signs
+# Check, create and insert root ca in main.py not in postgres.py
+
+# Coming soon
+* Postgres container from debian and then install postgresql, replace the 'docker official' postgres container
+* Remove DB and pkcs11 keys created from tests
+* Certificate Management over CMS
+* ACME
+* GPG JWT sigs, perhaps extract underlying RSA/ec/eddsa public key, in addition to RSA/ec/eddsa
