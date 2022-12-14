@@ -1,0 +1,7 @@
+uvicorn[standard]
+python-x509-pkcs11
+pyjwt
+fastapi
+asyncpg
+cryptography
+requests

@@ -1,0 +1,25 @@
+description = "Modern python CA with keys in a PKCS11 device"
+version = "1.03"
+
+[build-system]
+requires = [
+    "flit_core >=2.0",
+]
+
+[tool.flit.metadata]
+module = "pkcs11_ca"
+
+description-file = "README.md"
+requires-python = ">=3.7"
+
+keywords = "x509,pkcs11,CA,HSM"
+license = "MIT"
+author = "Victor Näslund"
+author-email = "victor@sunet.se"
+# home-page = "https://github.com/SUNET/pkcs11_ca"
+
+requires = [
+    "python_x509_pkcs11>=0.4.41",
+    "asn1crypto>=1.5.1",
+    "pyjwt>=2.5.1"
+]
