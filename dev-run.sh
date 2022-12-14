@@ -1,22 +1,23 @@
 #!/bin/bash
 
-## Set these ENV vars ##
-
-# export PKCS11_TOKEN=my_test_token_1
-# export PKCS11_PIN=1234
-# export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
-
-# export POSTGRES_HOST="postgres"
-# export POSTGRES_USER="pkcs11_testuser1"
-# export POSTGRES_PASSWORD="DBUserPassword"
-# export POSTGRES_PORT="5432"
-# export POSTGRES_DATABASE="pkcs11_testdb1"
-# export POSTGRES_TIMEOUT="5"
-
 # PKCS11
 if [ -z "$PKCS11_TOKEN" ]
 then
     echo "Set ENV PKCS11_TOKEN"
+    echo """
+Try with default ENV vars
+
+export PKCS11_TOKEN=my_test_token_1
+export PKCS11_PIN=1234
+export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
+
+export POSTGRES_HOST="postgres"
+export POSTGRES_USER="pkcs11_testuser1"
+export POSTGRES_PASSWORD="DBUserPassword"
+export POSTGRES_PORT="5432"
+export POSTGRES_DATABASE="pkcs11_testdb1"
+export POSTGRES_TIMEOUT="5"
+"""
     exit 1
 fi
 if [ -z "$PKCS11_PIN" ]
