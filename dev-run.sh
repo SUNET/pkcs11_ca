@@ -1,5 +1,68 @@
 #!/bin/bash
 
+# PKCS11
+if [ -z "$PKCS11_TOKEN" ]
+then
+    echo "Set ENV PKCS11_TOKEN"
+    echo """
+Try with default ENV vars
+
+export PKCS11_TOKEN=my_test_token_1
+export PKCS11_PIN=1234
+export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
+
+export POSTGRES_HOST="postgres"
+export POSTGRES_USER="pkcs11_testuser1"
+export POSTGRES_PASSWORD="DBUserPassword"
+export POSTGRES_PORT="5432"
+export POSTGRES_DATABASE="pkcs11_testdb1"
+export POSTGRES_TIMEOUT="5"
+"""
+    exit 1
+fi
+if [ -z "$PKCS11_PIN" ]
+then
+    echo "Set ENV PKCS11_PIN"
+    exit 1
+fi
+if [ -z "$PKCS11_MODULE" ]
+then
+    echo "Set ENV PKCS11_MODULE"
+    exit 1
+fi
+
+# POSTGRES
+if [ -z "$POSTGRES_HOST" ]
+then
+    echo "Set ENV POSTGRES_HOST"
+    exit 1
+fi
+if [ -z "$POSTGRES_PORT" ]
+then
+    echo "Set ENV POSTGRES_PORT"
+    exit 1
+fi
+if [ -z "$POSTGRES_DATABASE" ]
+then
+    echo "Set ENV POSTGRES_DATABASE"
+    exit 1
+fi
+if [ -z "$POSTGRES_USER" ]
+then
+    echo "Set ENV POSTGRES_USER"
+    exit 1
+fi
+if [ -z "$POSTGRES_PASSWORD" ]
+then
+    echo "Set ENV POSTGRES_PASSWORD"
+    exit 1
+fi
+if [ -z "$POSTGRES_TIMEOUT" ]
+then
+    echo "Set ENV POSTGRES_TIMEOUT"
+    exit 1
+fi
+
 # Check docker
 which docker > /dev/null
 if [ $? -ne 0 ]
