@@ -1,5 +1,7 @@
 #!/bin/bash
 
+# Ensure ENV vars are set
+
 # PKCS11
 if [ -z "$PKCS11_TOKEN" ]
 then
