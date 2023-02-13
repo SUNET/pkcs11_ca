@@ -12,6 +12,7 @@ from asn1crypto import x509 as asn1_x509
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.ca import create as create_ca
+from pkcs11.exceptions import MultipleObjectsReturned
 
 from .base import db_load_data_class, InputObject
 from .ocsp import ocsp_response
@@ -29,6 +30,7 @@ from .asn1 import (
     cert_as_der,
     crl_as_der,
 )
+from .cmc import cmc_handle_request
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
@@ -467,15 +469,21 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
         # This will be an intermidiate CA so get the AIA and CDP extensions for it
         extra_extensions = aia_and_cdp_exts(issuer_obj.path)
 
-    ca_csr_pem, ca_pem = await create_ca(
-        ca_input.key_label,
-        ca_input.name_dict,
-        signer_key_label=issuer_key_label,
-        signer_key_type=issuer_key_type,
-        signer_subject_name=issuer_pem,
-        extra_extensions=extra_extensions,
-        key_type=key_type,
-    )
+    try:
+        ca_csr_pem, ca_pem = await create_ca(
+            ca_input.key_label,
+            ca_input.name_dict,
+            signer_key_label=issuer_key_label,
+            signer_key_type=issuer_key_type,
+            signer_subject_name=issuer_pem,
+            extra_extensions=extra_extensions,
+            key_type=key_type,
+        )
+    except MultipleObjectsReturned:
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"key_label '{ca_input.key_label}' already exists"},
+        )
 
     # Save Public key for new CA
     public_key_obj = PublicKey(
@@ -668,7 +676,29 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     )
 
 
-# TODO
+@app.post("/cmc01")
+async def post_cmc(request: Request) -> Response:
+    """fixme"""
+
+    # auth_by = await authorized_by(request)
+
+    # check header media type is "application/pkcs7-mime for cmc request
+
+    content_type = request.headers.get("Content-type")
+    if content_type is None or content_type != "application/pkcs7-mime":
+        return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+
+    data = await request.body()
+    # print("cmc req")
+    # print(data.hex())
+    try:
+        data_content = await cmc_handle_request(data)
+        return Response(status_code=200, content=data_content, media_type="application/pkcs7-mime")
+    except ValueError:
+        return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+
+
+# WORK ON THIS
 # @app.get("/sign_csr/{path}")
 # async def post_sign_csr_cmc(request: Request) -> Response:
 #     auth_by = await authorized_by(request)

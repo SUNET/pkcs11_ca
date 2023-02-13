@@ -135,10 +135,10 @@ class TestPublicKey(unittest.TestCase):
 
         # Test loading public keys
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/search/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/public_key")
         }
 
-        req = requests.get("http://localhost:8005/search/public_key", headers=request_headers, timeout=5)
+        req = requests.get("https://localhost:8005/search/public_key", headers=request_headers, timeout=5, verify=False)
         self.assertTrue(req.status_code == 200)
 
         public_keys = json.loads(req.text)
@@ -181,12 +181,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_ed25519()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -212,12 +214,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_ed448()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -243,12 +247,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_secp256r1()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -275,12 +281,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_secp384r1()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -307,12 +315,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_secp521r1()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -339,12 +349,14 @@ class TestPublicKey(unittest.TestCase):
 
         # Create and post a key
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         _, new_public_key = generate_keypair_rsa()
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -371,11 +383,13 @@ class TestPublicKey(unittest.TestCase):
         new_private_key, new_public_key = generate_keypair_rsa()
 
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         # Test to ensure the create non admin key is truly not an admin key
@@ -383,20 +397,22 @@ class TestPublicKey(unittest.TestCase):
             "Authorization": create_jwt_header_str(
                 new_public_key.encode("utf-8"),
                 new_private_key.encode("utf-8"),
-                "http://localhost:8005/search/public_key",
+                "https://localhost:8005/search/public_key",
             )
         }
-        req = requests.get("http://localhost:8005/search/public_key", headers=request_headers, timeout=5)
+        req = requests.get("https://localhost:8005/search/public_key", headers=request_headers, timeout=5, verify=False)
         self.assertTrue(req.status_code == 401)
 
         # Create and post an admin key
         new_private_key, new_public_key = generate_keypair_rsa()
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
 
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + ',"admin": 1' "}")
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["public_key"].encode("utf-8")
@@ -413,8 +429,8 @@ class TestPublicKey(unittest.TestCase):
             "Authorization": create_jwt_header_str(
                 new_public_key.encode("utf-8"),
                 new_private_key.encode("utf-8"),
-                "http://localhost:8005/search/public_key",
+                "https://localhost:8005/search/public_key",
             )
         }
-        req = requests.get("http://localhost:8005/search/public_key", headers=request_headers, timeout=5)
+        req = requests.get("https://localhost:8005/search/public_key", headers=request_headers, timeout=5, verify=False)
         self.assertTrue(req.status_code == 200)

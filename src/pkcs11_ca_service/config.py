@@ -11,7 +11,8 @@ else:
 # Folder for the initial trusted pub_keys
 ROOT_ADMIN_KEYS_FOLDER = "trusted_keys"
 
-ROOT_URL = "http://localhost:8005"
+# ROOT_URL = "http://localhost:8005"
+ROOT_URL = "https://pkcs11-ca.sunet.se:8005"
 
 DB_MODULE = "postgres_db"
 # Table order is important: for example 'ca' dependes on 'public_key' so it comes after
@@ -34,6 +35,40 @@ ROOT_CA_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test.sunet.se",
+    "email_address": "soc@sunet.se",
+}
+
+CMC_ROOT_KEY_LABEL = "cmc_root_test3"
+CMC_SIGNING_KEY_LABEL = "cmc_signer_test3"
+CMC_CERT_ISSUING_KEY_LABEL = "cmc_issuer_test3"
+CMC_KEYS_TYPE = "secp256r1"  # Must be in KEY_TYPES above
+CMC_EXPIRE = 365 * 15
+
+CMC_ROOT_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-cmc3-root.sunet.se",
+    "email_address": "soc@sunet.se",
+}
+CMC_SIGNING_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-cmc3-signer.sunet.se",
+    "email_address": "soc@sunet.se",
+}
+CMC_CERT_ISSUING_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-cmc3-issuer.sunet.se",
     "email_address": "soc@sunet.se",
 }
 

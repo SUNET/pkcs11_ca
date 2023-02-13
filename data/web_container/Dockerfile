@@ -1,5 +1,4 @@
-# FROM debian:bullseye-20221114-slim@sha256:df172d92d287ec4d4a538e5db8026fcde5f91f5f90061423d69d6148ff05cc47
-FROM ubuntu:latest
+FROM debian:bullseye-20230208-slim@sha256:40febe8053827d8342f93978c541956ed0ac858016953e704939d276f62c83a3
 
 MAINTAINER victor@sunet.se
 
@@ -23,18 +22,17 @@ RUN apt-get update \
     softhsm2 \
     python3 \
     opensc \
-    wget \
-    git-core \
     build-essential \
+    wget \
     libz-dev \
-    mercurial \
     swig \
     dnsutils \
+    mercurial \
     && pip3 install -r requirements.txt \
     && apt-get remove -y \
-    gcc \
-    curl \
     wget \
+    curl \
+    gcc \
     python3-pip \
     python3-dev \
     && apt-get autoremove -y
@@ -53,6 +51,9 @@ COPY ./data/trusted_keys /app/trusted_keys
 COPY ./data/healthcheck.sh /app/healthcheck.sh
 COPY ./data/healthcheck.py /app/healthcheck.py
 COPY ./data/logging.json /app/logging.json
+COPY ./data/tls_certificate.pem /app/tls_certificate.pem
+COPY ./data/tls_key.key /app/tls_key.key
+COPY ./data/tls_password.key /app/tls_password.key
 
 # HSM stuff
 WORKDIR /usr/src/luna-client
@@ -78,8 +79,8 @@ ENV PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 # RUN softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN
 
 # Add healthcheck
-# HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
-#     CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
+HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
+    CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
-# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca_service"]
-ENTRYPOINT ["/entrypoint.sh"]
+ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--ssl-keyfile", "tls_key.key", "--ssl-certfile", "tls_certificate.pem", "--ssl-version", "2", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
+# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]

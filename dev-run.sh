@@ -65,6 +65,54 @@ then
     exit 1
 fi
 
+
+# Check docker
+which openssl > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "openssl not found, install with sudo apt-get install openssl"
+    exit 1
+fi
+
+mkdir -p data/trusted_keys
+# Generate trusted keys
+if [ ! -f data/trusted_keys/privkey1.key ]
+then
+    # FIXME add healthcheck keys here?
+
+    openssl genrsa -out data/trusted_keys/privkey1.key 4096
+    openssl rsa -in data/trusted_keys/privkey1.key -pubout -out data/trusted_keys/pubkey1.pem
+
+    openssl genrsa -out data/trusted_keys/privkey2.key 4096
+    openssl rsa -in data/trusted_keys/privkey2.key -pubout -out data/trusted_keys/pubkey2.pem
+
+    openssl genrsa -out data/trusted_keys/privkey3.key 2048
+    openssl rsa -in data/trusted_keys/privkey3.key -pubout -out data/trusted_keys/pubkey3.pem
+
+    openssl ecparam -name prime256v1 -genkey -noout -out data/trusted_keys/privkey4.key
+    openssl ec -in data/trusted_keys/privkey4.key -pubout -out data/trusted_keys/pubkey4.pem
+
+    openssl ecparam -name secp384r1 -genkey -noout -out data/trusted_keys/privkey5.key
+    openssl ec -in data/trusted_keys/privkey5.key -pubout -out data/trusted_keys/pubkey5.pem
+
+    openssl ecparam -name secp521r1 -genkey -noout -out data/trusted_keys/privkey6.key
+    openssl ec -in data/trusted_keys/privkey6.key -pubout -out data/trusted_keys/pubkey6.pem
+
+    openssl genpkey -algorithm ed25519 -out data/trusted_keys/privkey7.key
+    openssl pkey -in data/trusted_keys/privkey7.key -pubout -out data/trusted_keys/pubkey7.pem
+
+    openssl genpkey -algorithm ed448 -out data/trusted_keys/privkey8.key
+    openssl pkey -in data/trusted_keys/privkey8.key -pubout -out data/trusted_keys/pubkey8.pem
+
+    openssl genpkey -algorithm ed25519 -out data/trusted_keys/privkey9.key
+    openssl pkey -in data/trusted_keys/privkey9.key -pubout -out data/trusted_keys/pubkey9.pem
+
+    openssl genpkey -algorithm ed448 -out data/trusted_keys/privkey10.key
+    openssl pkey -in data/trusted_keys/privkey10.key -pubout -out data/trusted_keys/pubkey10.pem
+
+    chmod 644 data/trusted_keys/privkey*.key
+fi
+
 # Check docker
 which docker > /dev/null
 if [ $? -ne 0 ]
@@ -89,9 +137,11 @@ echo "Checking code package"
 which mypy > /dev/null
 if [ $? -eq 0 ]
 then
-    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/null src/pkcs11_ca_service/*.py
+    echo ""
+    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/tmp src/pkcs11_ca_service/*.py
 else
     echo "mypy is not installed, skipping..."
+    echo "Dont forget to install types-requests"
 fi
 
 which black > /dev/null
@@ -105,6 +155,7 @@ fi
 which pylint > /dev/null
 if [ $? -eq 0 ]
 then
+    echo ""
     pylint --max-line-length 120 src/pkcs11_ca_service/*.py
 else
     echo "pylint is not installed, skipping..."
@@ -113,7 +164,8 @@ fi
 which mypy > /dev/null
 if [ $? -eq 0 ]
 then
-    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/dev/null tests/*.py
+    echo ""
+    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/tmp tests/*.py
 fi
 
 which black > /dev/null
@@ -125,6 +177,7 @@ fi
 which pylint > /dev/null
 if [ $? -eq 0 ]
 then
+    echo ""
     pylint --max-line-length 120 tests/*.py
 fi
 
@@ -133,6 +186,11 @@ sudo chown -R $USER data/hsm_tokens data/db_data/
 docker-compose build || exit 1
 sudo chown -R 1500 data/hsm_tokens
 sudo chown -R 999 data/db_data
+
+# Remove git create folder files
+rm -f data/hsm_tokens/.empty
+rm -f data/db_data/.empty
+
 docker-compose -f docker-compose.yml up -d || exit 1
 
 

@@ -119,6 +119,29 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     return ret
 
 
+def pem_cert_to_key_hash(pem: str) -> bytes:
+    """Get the key hash from pem data as a dict.
+
+    Parameters:
+    pem (bytes): PEM input data.
+
+    Returns:
+    bytes
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+
+    cert = asn1_x509.Certificate().load(data)
+
+    for _, extension in enumerate(cert["tbs_certificate"]["extensions"]):
+        if extension["extn_id"].dotted == "2.5.29.14":
+            ret: bytes = extension["extn_value"].native
+            return ret
+    raise ValueError("No SKI extension in cert")
+
+
 def public_key_pem_to_sha1_fingerprint(pem: str) -> str:
     """Get the sha1 fingerprint for the public key in pem data.
 
@@ -178,19 +201,38 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
     elif data["kty"] == "EC":
         pka["algorithm"] = PublicKeyAlgorithmId("ec")
 
+        pki["algorithm"] = pka
+
         if data["crv"] == "P-256":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp256r1")})
+            pki["public_key"] = (
+                b"\x04"
+                + int(from_base64url(data["x"])).to_bytes(32, "big")
+                + int(from_base64url(data["y"])).to_bytes(32, "big")
+            )
+
         elif data["crv"] == "P-384":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp384r1")})
+            pki["public_key"] = (
+                b"\x04"
+                + int(from_base64url(data["x"])).to_bytes(48, "big")
+                + int(from_base64url(data["y"])).to_bytes(48, "big")
+            )
+
         elif data["crv"] == "P-521":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp521r1")})
+            pki["public_key"] = (
+                b"\x04"
+                + int(from_base64url(data["x"])).to_bytes(66, "big")
+                + int(from_base64url(data["y"])).to_bytes(66, "big")
+            )
+
         else:
             raise UnsupportedJWTAlgorithm
 
-        pki["algorithm"] = pka
-        pki["public_key"] = ECPointBitString().from_coords(
-            int(from_base64url(data["x"])), int(from_base64url(data["y"]))
-        )
+        # pki["public_key"] = ECPointBitString().from_coords(
+        #     int(from_base64url(data["x"])), int(from_base64url(data["y"]))
+        # )
 
     elif data["kty"] == "OKP":
         if data["crv"] == "Ed25519":
@@ -516,7 +558,7 @@ def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
     str
     """
 
-    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/new_nonce", timeout=5)
+    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/new_nonce", timeout=5, verify=False)
     nonce = req.headers["Replay-Nonce"]
     jwt_headers = {"nonce": nonce, "url": url}
     jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))

@@ -37,17 +37,17 @@ class TestValidate(unittest.TestCase):
 
         # Test @ and key_label
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
         data = json.loads('{"key_label": ' + '"' + "dummy_string@" + '"' + "}")
         data["name_dict"] = name_dict
         data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
-        req = requests.post("http://localhost:8005/ca", headers=request_headers, json=data, timeout=5)
+        req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
         self.assertTrue(req.status_code == 400)
 
         # Test char ;
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data[
@@ -57,12 +57,14 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE;ZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 400)
 
         # Test char "
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data["pem"] = (
@@ -74,12 +76,14 @@ Tj5zjeJiywSdOZnFPloeE"""
 -----END PUBLIC KEY-----
 """
         )
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 400)
 
         # Test char '
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data[
@@ -89,12 +93,14 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE'ZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 400)
 
         # Test ok chars
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/public_key")
         }
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data[
@@ -104,5 +110,7 @@ MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeEMZB6raA
 -----END PUBLIC KEY-----
 """
-        req = requests.post("http://localhost:8005/public_key", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/public_key", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)

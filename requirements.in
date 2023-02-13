@@ -1,7 +1,7 @@
 uvicorn[standard]
-python-x509-pkcs11
+python-x509-pkcs11>=0.6.3
 pyjwt
 fastapi
 asyncpg
-cryptography
+cryptography>=39.0.1
 requests

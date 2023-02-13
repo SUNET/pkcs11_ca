@@ -30,7 +30,7 @@ class TestCsr(unittest.TestCase):
         cas = get_cas(pub_key, priv_key)
 
         # Sign a csr
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/sign_csr")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/sign_csr")}
 
         test_csr = """-----BEGIN CERTIFICATE REQUEST-----
 MIICtjCCAZ4CAQAwcTELMAkGA1UEBhMCQVUxDDAKBgNVBAgMA3NkZjEMMAoGA1UE
@@ -62,7 +62,9 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
             + '"'
             + "}"
         )
-        req = requests.post("http://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["certificate"].encode("utf-8")
@@ -75,10 +77,12 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
 
         # Get cert from our csr
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/certificate")
         }
         data = json.loads('{"pem": ' + '"' + cert_given.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/search/certificate", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/search/certificate", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
         self.assertTrue(len(certs) == 1)

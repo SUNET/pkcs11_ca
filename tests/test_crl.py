@@ -31,10 +31,10 @@ class TestCrl(unittest.TestCase):
         cas = get_cas(pub_key, priv_key)
 
         # create a crl
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/crl")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/crl")}
 
         data = json.loads('{"ca_pem": ' + '"' + cas[0].replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/crl", headers=request_headers, json=data, timeout=5)
+        req = requests.post("https://localhost:8005/crl", headers=request_headers, json=data, timeout=5, verify=False)
         self.assertTrue(req.status_code == 200)
 
         crl1 = json.loads(req.text)["crl"]
@@ -47,11 +47,13 @@ class TestCrl(unittest.TestCase):
 
         # get the crl
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "http://localhost:8005/search/crl")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/crl")
         }
 
         data = json.loads('{"pem": ' + '"' + crl1.replace("\n", "\\n") + '"' + "}")
-        req = requests.post("http://localhost:8005/search/crl", headers=request_headers, json=data, timeout=5)
+        req = requests.post(
+            "https://localhost:8005/search/crl", headers=request_headers, json=data, timeout=5, verify=False
+        )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["crls"]) == 1)
 

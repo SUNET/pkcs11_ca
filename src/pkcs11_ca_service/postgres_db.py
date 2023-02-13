@@ -31,17 +31,20 @@ from .config import (
     ROOT_CA_KEY_TYPE,
     ROOT_CA_EXPIRE,
     ROOT_ADMIN_KEYS_FOLDER,
-    DB_HOST,
-    DB_USER,
-    DB_PASSWORD,
-    DB_PORT,
-    DB_DATABASE,
-    DB_TIMEOUT,
+    CMC_ROOT_KEY_LABEL,
+    CMC_SIGNING_KEY_LABEL,
+    CMC_CERT_ISSUING_KEY_LABEL,
+    CMC_KEYS_TYPE,
+    CMC_ROOT_NAME_DICT,
+    CMC_CERT_ISSUING_NAME_DICT,
+    CMC_SIGNING_NAME_DICT,
+    CMC_EXPIRE,
 )
 from .error import WrongDataType
 from .asn1 import (
     public_key_pem_to_sha1_fingerprint,
     pem_to_sha256_fingerprint,
+    aia_and_cdp_exts,
 )
 from .base import DataBaseObject
 
@@ -225,12 +228,12 @@ class PostgresDB(DataBaseObject):
 
     @classmethod
     async def _load_trusted_keys(cls, classes_info: Dict[str, List[str]]) -> None:
-        async with cls.pool.acquire() as conn:
-            async with conn.transaction():
+        for key_file in os.listdir(ROOT_ADMIN_KEYS_FOLDER):
+            if not (key_file.endswith(".pem") or key_file.endswith(".pub")):
+                continue
 
-                for key_file in os.listdir(ROOT_ADMIN_KEYS_FOLDER):
-                    if not (key_file.endswith(".pem") or key_file.endswith(".pub")):
-                        continue
+            async with cls.pool.acquire() as conn:
+                async with conn.transaction():
 
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, encoding="utf-8") as file_data:
                         key_pem = file_data.read()
@@ -339,7 +342,71 @@ class PostgresDB(DataBaseObject):
         if not await cls._check_db():
             for index, table in enumerate(tables):
                 await cls._init_table(table, fields[index], reference_fields[index], unique_fields[index])
-            await cls._insert_root_ca(classes_info)
+
+            await cls._insert_init_ca(
+                classes_info,
+                ROOT_CA_KEY_LABEL,
+                ROOT_CA_NAME_DICT,
+                "first_root_ca",
+                ROOT_CA_KEY_TYPE,
+                ROOT_CA_EXPIRE,
+                1,
+                1,
+                None,
+                None,
+                None,
+                None,
+                hashlib.sha256(token_bytes(256)).hexdigest(),
+            )
+
+            cmc_root_path = hashlib.sha256(token_bytes(256)).hexdigest()
+
+            await cls._insert_init_ca(
+                classes_info,
+                CMC_ROOT_KEY_LABEL,
+                CMC_ROOT_NAME_DICT,
+                "CMC_root_ca",
+                CMC_KEYS_TYPE,
+                CMC_EXPIRE,
+                2,
+                2,
+                None,
+                None,
+                None,
+                None,
+                cmc_root_path,
+            )
+            await cls._insert_init_ca(
+                classes_info,
+                CMC_SIGNING_KEY_LABEL,
+                CMC_SIGNING_NAME_DICT,
+                "CMC_signing_ca",
+                CMC_KEYS_TYPE,
+                CMC_EXPIRE,
+                2,
+                3,
+                CMC_ROOT_KEY_LABEL,
+                CMC_ROOT_NAME_DICT,
+                CMC_KEYS_TYPE,
+                cmc_root_path,
+                hashlib.sha256(token_bytes(256)).hexdigest(),
+            )
+            await cls._insert_init_ca(
+                classes_info,
+                CMC_CERT_ISSUING_KEY_LABEL,
+                CMC_CERT_ISSUING_NAME_DICT,
+                "CMC_cert_issuing_ca",
+                CMC_KEYS_TYPE,
+                CMC_EXPIRE,
+                2,
+                4,
+                CMC_ROOT_KEY_LABEL,
+                CMC_ROOT_NAME_DICT,
+                CMC_KEYS_TYPE,
+                cmc_root_path,
+                hashlib.sha256(token_bytes(256)).hexdigest(),
+            )
+
             await cls._insert_healthcheck_key(classes_info)
 
         # Load trusted keys
@@ -375,83 +442,6 @@ class PostgresDB(DataBaseObject):
         return query
 
     @classmethod
-    async def _insert_root_ca(cls, classes_info: Dict[str, List[str]]) -> None:
-        async with cls.pool.acquire() as conn:
-            async with conn.transaction():
-                not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)
-                not_after = not_before + datetime.timedelta(ROOT_CA_EXPIRE)
-
-                root_ca_csr_pem, root_ca_pem = await create_ca(
-                    ROOT_CA_KEY_LABEL,
-                    ROOT_CA_NAME_DICT,
-                    not_before=not_before,
-                    not_after=not_after,
-                    key_type=ROOT_CA_KEY_TYPE,
-                )
-
-                public_key_pem, identifier = await PKCS11Session.public_key_data(
-                    ROOT_CA_KEY_LABEL, key_type=ROOT_CA_KEY_TYPE
-                )
-
-                # Insert into 'public_key' table
-                query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
-                await conn.execute(
-                    query,
-                    public_key_pem,
-                    "root_ca",
-                    1,
-                    1,
-                    identifier.hex(),
-                    str(datetime.datetime.utcnow()),
-                )
-
-                # Insert into 'pkcs11_key' table
-                query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
-                await conn.execute(
-                    query,
-                    1,
-                    ROOT_CA_KEY_LABEL,
-                    ROOT_CA_KEY_TYPE,
-                    1,
-                    str(datetime.datetime.utcnow()),
-                )
-
-                # Insert into 'csr' table
-                query = cls._insert_root_item_query(classes_info["csr"], "csr")
-                await conn.execute(query, 1, root_ca_csr_pem, 1, str(datetime.datetime.utcnow()))
-
-                # Insert into 'ca' table
-                query = cls._insert_root_item_query(classes_info["ca"], "ca")
-                await conn.execute(
-                    query,
-                    root_ca_pem,
-                    1,
-                    1,
-                    1,
-                    1,
-                    hashlib.sha256(token_bytes(256)).hexdigest(),
-                    pem_to_sha256_fingerprint(root_ca_pem),
-                    str(not_before),
-                    str(not_after),
-                    str(datetime.datetime.utcnow()),
-                )
-
-                # Create CRL for root CA
-                crl_pem = await create_crl(ROOT_CA_KEY_LABEL, ROOT_CA_NAME_DICT, key_type=ROOT_CA_KEY_TYPE)
-                this_update, next_update = this_update_next_update_from_crl(crl_pem)
-                query = cls._insert_root_item_query(classes_info["crl"], "crl")
-                await conn.execute(
-                    query,
-                    crl_pem,
-                    1,
-                    1,
-                    this_update,
-                    next_update,
-                    str(datetime.datetime.utcnow()),
-                )
-                print("Created first ever root CA", flush=True)
-
-    @classmethod
     async def _insert_healthcheck_key(cls, classes_info: Dict[str, List[str]]) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
@@ -479,10 +469,110 @@ class PostgresDB(DataBaseObject):
                 query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
                 await conn.execute(
                     query,
-                    2,
+                    5,
                     HEALTHCHECK_KEY_LABEL,
                     HEALTHCHECK_KEY_TYPE,
-                    1,
+                    5,
                     str(datetime.datetime.utcnow()),
                 )
                 print("Created healthcheck PKCS11 key", flush=True)
+
+    @classmethod
+    async def _insert_init_ca(  # pylint: disable=too-many-arguments,too-many-locals
+        cls,
+        classes_info: Dict[str, List[str]],
+        key_label: str,
+        name_dict: Dict[str, str],
+        ca_info: str,
+        key_type: str,
+        ca_expire: int,
+        issuer_serial: int,
+        serial: int,
+        signer_key_label: Union[str, None],
+        signer_subject_name: Union[Dict[str, str], None],
+        signer_key_type: Union[str, None],
+        issuer_path: Union[str, None],
+        path: str,
+    ) -> None:
+
+        async with cls.pool.acquire() as conn:
+            async with conn.transaction():
+                not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)
+                not_after = not_before + datetime.timedelta(ca_expire)
+
+                if issuer_path is not None:
+                    extra_extensions = aia_and_cdp_exts(issuer_path)
+                else:
+                    extra_extensions = None
+
+                root_ca_csr_pem, root_ca_pem = await create_ca(
+                    key_label,
+                    name_dict,
+                    not_before=not_before,
+                    not_after=not_after,
+                    signer_key_label=signer_key_label,
+                    signer_key_type=signer_key_type,
+                    signer_subject_name=signer_subject_name,
+                    extra_extensions=extra_extensions,
+                    key_type=key_type,
+                )
+
+                public_key_pem, identifier = await PKCS11Session.public_key_data(key_label, key_type=key_type)
+
+                # Insert into 'public_key' table
+                query = cls._insert_root_item_query(classes_info["public_key"], "public_key")
+                await conn.execute(
+                    query,
+                    public_key_pem,
+                    ca_info,
+                    1,
+                    serial,
+                    identifier.hex(),
+                    str(datetime.datetime.utcnow()),
+                )
+
+                # Insert into 'pkcs11_key' table
+                query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
+                await conn.execute(
+                    query,
+                    serial,
+                    key_label,
+                    key_type,
+                    serial,
+                    str(datetime.datetime.utcnow()),
+                )
+
+                # Insert into 'csr' table
+                query = cls._insert_root_item_query(classes_info["csr"], "csr")
+                await conn.execute(query, serial, root_ca_csr_pem, serial, str(datetime.datetime.utcnow()))
+
+                # Insert into 'ca' table
+                query = cls._insert_root_item_query(classes_info["ca"], "ca")
+                await conn.execute(
+                    query,
+                    root_ca_pem,
+                    serial,
+                    issuer_serial,
+                    serial,
+                    issuer_serial,
+                    path,
+                    pem_to_sha256_fingerprint(root_ca_pem),
+                    str(not_before),
+                    str(not_after),
+                    str(datetime.datetime.utcnow()),
+                )
+
+                # Create CRL for root CA
+                crl_pem = await create_crl(key_label, name_dict, key_type=key_type)
+                this_update, next_update = this_update_next_update_from_crl(crl_pem)
+                query = cls._insert_root_item_query(classes_info["crl"], "crl")
+                await conn.execute(
+                    query,
+                    crl_pem,
+                    serial,
+                    serial,
+                    this_update,
+                    next_update,
+                    str(datetime.datetime.utcnow()),
+                )
+                print("Created init CA", flush=True)
