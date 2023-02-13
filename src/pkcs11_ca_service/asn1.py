@@ -17,7 +17,6 @@ from asn1crypto.keys import (
     RSAPublicKey,
     PublicKeyAlgorithm,
     PublicKeyAlgorithmId,
-    ECPointBitString,
     NamedCurve,
     ECDomainParameters,
 )
