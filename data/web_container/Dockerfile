@@ -53,7 +53,6 @@ COPY ./data/healthcheck.py /app/healthcheck.py
 COPY ./data/logging.json /app/logging.json
 COPY ./data/tls_certificate.pem /app/tls_certificate.pem
 COPY ./data/tls_key.key /app/tls_key.key
-COPY ./data/tls_password.key /app/tls_password.key
 
 # HSM stuff
 WORKDIR /usr/src/luna-client

@@ -111,6 +111,11 @@ then
     openssl pkey -in data/trusted_keys/privkey10.key -pubout -out data/trusted_keys/pubkey10.pem
 
     chmod 644 data/trusted_keys/privkey*.key
+
+
+    # Add the tls cert and key
+    openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
+    openssl req -subj "/C=SE/CN=pkcs11-ca-test.localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
 fi
 
 # Check docker
