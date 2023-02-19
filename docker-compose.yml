@@ -26,7 +26,7 @@ services:
       - PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
 
   postgres:
-    image: postgres:15.0-bullseye@sha256:e21150abf83d89aca1b61c8ccc182cc8164da2571a0d8ee0babce8790bed46ab
+    image: postgres:15.2-bullseye@sha256:cf629afce2e1faebb80b5dc0d8c0981cf32981012b782de4d6dc2bd98aaeb010
     restart: always
     # read_only: true
     # cap_drop: [ALL]
