@@ -9,8 +9,8 @@ then
     echo """
 Try with default ENV vars
 
-export CA_URL="https://dev:8005"
-export CA_DNS_NAME="dev"
+export CA_URL="https://web:8005"
+export CA_DNS_NAME="web"
 
 export PKCS11_TOKEN=my_test_token_1
 export PKCS11_PIN=1234
