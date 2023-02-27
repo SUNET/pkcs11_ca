@@ -14,6 +14,7 @@ from asn1crypto import crl as asn1_crl
 # from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, cert_revoked, crl_expired, cert_pem_serial_number
+from src.pkcs11_ca_service.config import ROOT_URL
 from .lib import get_cas, cdp_url
 
 TEST_CSR1 = """-----BEGIN CERTIFICATE REQUEST-----
@@ -42,6 +43,11 @@ class TestRevoke(unittest.TestCase):
     Test our revocation
     """
 
+    if "CA_URL" in os.environ:
+        ca_url = os.environ["CA_URL"]
+    else:
+        ca_url = ROOT_URL
+
     def test_revoke(self) -> None:
         """
         Test revoke
@@ -53,9 +59,9 @@ class TestRevoke(unittest.TestCase):
             priv_key = f_data.read()
 
         # Sign a csr
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/sign_csr")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
 
-        all_cas = get_cas(pub_key, priv_key)
+        all_cas = get_cas(self.ca_url, pub_key, priv_key)
         data = json.loads(
             '{"pem": "'
             + TEST_CSR1.replace("\n", "\\n")
@@ -68,18 +74,18 @@ class TestRevoke(unittest.TestCase):
             + "}"
         )
         req = requests.post(
-            "https://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
 
         cert = json.loads(req.text)["certificate"]
 
         # Revoke cert
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/revoke")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/revoke")}
 
         data = json.loads('{"pem": "' + cert.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/revoke", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(cert == json.loads(req.text)["revoked"])
@@ -87,7 +93,7 @@ class TestRevoke(unittest.TestCase):
         # Check CRL
         # Get CDP
         url = cdp_url(cert)
-        req = requests.get(url, headers=request_headers, timeout=5, verify=False)
+        req = requests.get(url, headers=request_headers, timeout=10, verify="./tls_certificate.pem")
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -119,15 +125,17 @@ class TestRevoke(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
         data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
         data["name_dict"] = name_dict
-        # all_cas = get_cas(pub_key, priv_key)
+        # all_cas = get_cas(self.ca_url, pub_key, priv_key)
         # dta["issuer_pem"] = all_cas[0]
 
-        req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
+        req = requests.post(
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        )
         self.assertTrue(req.status_code == 200)
         old_ca = json.loads(req.text)["certificate"]
 
@@ -142,45 +150,43 @@ class TestRevoke(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
         data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
         data["name_dict"] = name_dict
         data["issuer_pem"] = old_ca
 
-        req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
+        req = requests.post(
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        )
         self.assertTrue(req.status_code == 200)
         curr_ca = json.loads(req.text)["certificate"]
 
         # Check revoked status
-        request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/is_revoked")
-        }
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/is_revoked")}
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/is_revoked", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/is_revoked", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]
         self.assertTrue(revoked is False)
 
         # Revoke CA
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/revoke")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/revoke")}
 
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/revoke", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
 
         # Check revoked status
-        request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/is_revoked")
-        }
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/is_revoked")}
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/is_revoked", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/is_revoked", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]

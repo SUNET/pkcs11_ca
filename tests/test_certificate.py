@@ -3,12 +3,16 @@ Test our certificates
 """
 import unittest
 import json
+import os
+
 import requests
+
 
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from src.pkcs11_ca_service.config import ROOT_URL
 from .lib import get_cas
 
 
@@ -16,6 +20,11 @@ class TestCertificate(unittest.TestCase):
     """
     Test our certificates.
     """
+
+    if "CA_URL" in os.environ:
+        ca_url = os.environ["CA_URL"]
+    else:
+        ca_url = ROOT_URL
 
     def test_certificate(self) -> None:
         """
@@ -45,23 +54,23 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 4afzNzZEQ9AI0J9WsJgFo26jNyOHUQ==
 -----END CERTIFICATE REQUEST-----"""
 
-        cas = get_cas(pub_key, priv_key)
+        cas = get_cas(self.ca_url, pub_key, priv_key)
 
         data = json.loads('{"pem": "' + csr_pem.replace("\n", "\\n") + '"' + "}")
         data["ca_pem"] = cas[0]
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/sign_csr")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
         req = requests.post(
-            "https://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
 
         # All certificates
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
         }
         req = requests.get(
-            "https://localhost:8005/search/certificate", headers=request_headers, timeout=5, verify=False
+            self.ca_url + "/search/certificate", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
@@ -69,11 +78,15 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 
         # Search for certificates
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
         }
         data = json.loads('{"pem": ' + '"' + certs[0].replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/search/certificate", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/search/certificate",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]

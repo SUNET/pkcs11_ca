@@ -3,12 +3,14 @@ Test our csr signing
 """
 import unittest
 import json
+import os
 
 import requests
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from src.pkcs11_ca_service.config import ROOT_URL
 from .lib import get_cas, verify_cert
 
 
@@ -16,6 +18,11 @@ class TestCsr(unittest.TestCase):
     """
     Test our csrs.
     """
+
+    if "CA_URL" in os.environ:
+        ca_url = os.environ["CA_URL"]
+    else:
+        ca_url = ROOT_URL
 
     def test_csr(self) -> None:
         """
@@ -27,10 +34,10 @@ class TestCsr(unittest.TestCase):
         with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
 
-        cas = get_cas(pub_key, priv_key)
+        cas = get_cas(self.ca_url, pub_key, priv_key)
 
         # Sign a csr
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/sign_csr")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
 
         test_csr = """-----BEGIN CERTIFICATE REQUEST-----
 MIICtjCCAZ4CAQAwcTELMAkGA1UEBhMCQVUxDDAKBgNVBAgMA3NkZjEMMAoGA1UE
@@ -63,7 +70,7 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
             + "}"
         )
         req = requests.post(
-            "https://localhost:8005/sign_csr", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
 
@@ -77,11 +84,15 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
 
         # Get cert from our csr
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
         }
         data = json.loads('{"pem": ' + '"' + cert_given.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/search/certificate", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/search/certificate",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]

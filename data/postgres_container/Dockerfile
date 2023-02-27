@@ -2,8 +2,6 @@ FROM debian:bullseye-20230208-slim@sha256:40febe8053827d8342f93978c541956ed0ac85
 
 MAINTAINER victor@sunet.se
 
-EXPOSE 8000/tcp
-
 # Metadata
 LABEL version="1.03"
 LABEL description="pkcs11_ca postgres"

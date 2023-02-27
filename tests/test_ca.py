@@ -14,7 +14,7 @@ from asn1crypto import crl as asn1_crl
 from python_x509_pkcs11.ocsp import certificate_ocsp_data
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
-from src.pkcs11_ca_service.config import KEY_TYPES
+from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
 from .lib import get_cas, create_i_ca, cdp_url, verify_cert
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
@@ -28,17 +28,20 @@ class TestCa(unittest.TestCase):
     Test our ca
     """
 
+    if "CA_URL" in os.environ:
+        ca_url = os.environ["CA_URL"]
+    else:
+        ca_url = ROOT_URL
+
     def get_single_ca(self, cas: List[str]) -> None:
         """Get single ca"""
 
         # Get a ca
-        request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/ca")
-        }
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/ca")}
 
         data = json.loads('{"pem": ' + '"' + cas[-1].replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            "https://localhost:8005/search/ca", headers=request_headers, json=data, timeout=5, verify=False
+            self.ca_url + "/search/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["cas"]) == 1)
@@ -58,20 +61,20 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        cas = get_cas(pub_key, priv_key)
+        cas = get_cas(self.ca_url, pub_key, priv_key)
 
-        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
 
-        cas2 = get_cas(pub_key, priv_key)
+        cas2 = get_cas(self.ca_url, pub_key, priv_key)
 
         # Ensure we now have more ca than before
         self.assertTrue(len(cas2) > len(cas) or len(cas2) >= 10)
 
-        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
@@ -97,12 +100,14 @@ class TestCa(unittest.TestCase):
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
 
         # Create a root ca
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
         data = json.loads('{"key_label": ' + '"' + new_key_label[:-2] + '"' + "}")
         data["name_dict"] = name_dict
 
-        req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
+        req = requests.post(
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        )
         self.assertTrue(req.status_code == 200)
 
         data = json.loads(req.text)["certificate"].encode("utf-8")
@@ -136,7 +141,7 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        new_ca = create_i_ca(pub_key, priv_key, name_dict)
+        new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
@@ -158,7 +163,7 @@ class TestCa(unittest.TestCase):
         self.assertTrue(found_ocsp)
 
         # Get AIA
-        req = requests.get(url_ca, timeout=5, verify=False)
+        req = requests.get(url_ca, timeout=10, verify="./tls_certificate.pem")
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -170,7 +175,7 @@ class TestCa(unittest.TestCase):
 
         # Get CDP
         url = cdp_url(new_ca)
-        req = requests.get(url, timeout=5, verify=False)
+        req = requests.get(url, timeout=10, verify="./tls_certificate.pem")
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -192,14 +197,16 @@ class TestCa(unittest.TestCase):
             "email_address": "soc@sunet.se",
         }
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data["name_dict"] = name_dict
-        data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
+        data["issuer_pem"] = get_cas(self.ca_url, pub_key, priv_key)[-1]
         data["key_type"] = "dummy_not_exist"
 
-        req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
+        req = requests.post(
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        )
         self.assertTrue(req.status_code != 200)
 
     def test_ca_key_types(self) -> None:
@@ -218,15 +225,15 @@ class TestCa(unittest.TestCase):
                 "email_address": "soc@sunet.se",
             }
 
-            request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+            request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
             data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
             data["name_dict"] = name_dict
-            data["issuer_pem"] = get_cas(pub_key, priv_key)[0]  # first ca for depth level 1
+            data["issuer_pem"] = get_cas(self.ca_url, pub_key, priv_key)[0]  # first ca for depth level 1
             data["key_type"] = key_type
 
             req = requests.post(
-                "https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False
+                self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
             )
             self.assertTrue(req.status_code == 200)
             new_ca: str = json.loads(req.text)["certificate"]

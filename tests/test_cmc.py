@@ -3,8 +3,11 @@ Test our cmc
 """
 import unittest
 import base64
+import os
 
 import requests
+
+from src.pkcs11_ca_service.config import ROOT_URL
 
 # from asn1crypto import x509 as asn1_x509
 # from asn1crypto import pem as asn1_pem
@@ -17,6 +20,11 @@ class TestCMC(unittest.TestCase):
     """
     Test our certificates.
     """
+
+    if "CA_URL" in os.environ:
+        ca_url = os.environ["CA_URL"]
+    else:
+        ca_url = ROOT_URL
 
     def test_cmc(self) -> None:
         """
@@ -48,11 +56,11 @@ class TestCMC(unittest.TestCase):
         )
         decoded = base64.b64decode(crmf_req.strip())
         req = requests.post(
-            "https://localhost:8005/cmc01",
+            self.ca_url + "/cmc01",
             data=decoded,
             headers={"Content-Type": "application/pkcs7-mime"},
-            timeout=5,
-            verify=False,
+            timeout=10,
+            verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
 
@@ -61,10 +69,10 @@ class TestCMC(unittest.TestCase):
         )
 
         req = requests.post(
-            "https://localhost:8005/cmc01",
+            self.ca_url + "/cmc01",
             data=decoded,
             headers={"Content-Type": "application/pkcs7-mime"},
-            timeout=5,
-            verify=False,
+            timeout=10,
+            verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)

@@ -1,13 +1,16 @@
 #!/bin/bash
 
-# Ensure ENV vars are set
+# For production replace the selfsigned TLS cert with your cert at ./data/tls_certificate.pem
 
-# PKCS11
-if [ -z "$PKCS11_TOKEN" ]
+# Ensure ENV vars are set
+if [ -z "$CA_URL" ]
 then
-    echo "Set ENV PKCS11_TOKEN"
+    echo "Set ENV CA_URL"
     echo """
 Try with default ENV vars
+
+export CA_URL="https://dev:8005"
+export CA_DNS_NAME="dev"
 
 export PKCS11_TOKEN=my_test_token_1
 export PKCS11_PIN=1234
@@ -20,6 +23,19 @@ export POSTGRES_PORT="5432"
 export POSTGRES_DATABASE="pkcs11_testdb1"
 export POSTGRES_TIMEOUT="5"
 """
+    exit 1
+fi
+
+if [ -z "$CA_DNS_NAME" ]
+then
+    echo "Set ENV CA_DNS_NAME"
+    exit 1
+fi
+
+# PKCS11
+if [ -z "$PKCS11_TOKEN" ]
+then
+    echo "Set ENV PKCS11_TOKEN"
     exit 1
 fi
 if [ -z "$PKCS11_PIN" ]
@@ -74,12 +90,10 @@ then
     exit 1
 fi
 
-mkdir -p data/trusted_keys
 # Generate trusted keys
+mkdir -p data/trusted_keys
 if [ ! -f data/trusted_keys/privkey1.key ]
 then
-    # FIXME add healthcheck keys here?
-
     openssl genrsa -out data/trusted_keys/privkey1.key 4096
     openssl rsa -in data/trusted_keys/privkey1.key -pubout -out data/trusted_keys/pubkey1.pem
 
@@ -114,7 +128,7 @@ then
 
     # Add the tls cert and key
     openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
-    openssl req -subj "/C=SE/CN=pkcs11-ca-test.localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+    openssl req -subj "/C=SE/CN=web" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
     chmod 644 data/tls_key*.key
 fi
 
@@ -125,6 +139,14 @@ then
     echo "docker not found, install with sudo apt-get install docker.io"
     echo "sudo usermod -a -G docker $USER"
     echo "logout and in now for docker group to work"
+    exit 1
+fi
+
+# Check python3
+which python3 > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "python3 not found, install with sudo apt-get install python3"
     exit 1
 fi
 
@@ -202,7 +224,23 @@ docker-compose -f docker-compose.yml up -d || exit 1
 # Allow container to startup
 sleep 5
 
+
+# Run test container instead
 echo "Running tests"
-python3 -m unittest || exit 1
+echo ""
+
+python3 -c '
+import sys
+from src.pkcs11_ca_service.config import ROOT_URL
+
+if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
+  sys.exit(1)
+'
+if [ $? -eq 0 ]
+then
+    docker run --env "CA_URL=${CA_URL}" --network pkcs11_ca_default pkcs11_ca_test1 | exit 1
+else
+    docker run --env "CA_URL=${CA_URL}" --network host pkcs11_ca_test1 | exit 1
+fi
 
 echo -e "\nService ONLINE at 0.0.0.0:8005"

@@ -12,25 +12,27 @@ from asn1crypto import pem as asn1_pem
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
-def get_cas(pub_key: bytes, priv_key: bytes) -> List[str]:
+def get_cas(root_url: str, pub_key: bytes, priv_key: bytes) -> List[str]:
     """Get all CAs"""
-    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/search/ca")}
-    req = requests.get("https://localhost:8005/search/ca", headers=request_headers, timeout=5, verify=False)
+    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, root_url + "/search/ca")}
+    req = requests.get(root_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem")
     if req.status_code != 200:
         raise ValueError("NOT OK status when fetching all CAs")
     cas: List[str] = json.loads(req.text)["cas"]
     return cas
 
 
-def create_i_ca(pub_key: bytes, priv_key: bytes, name_dict: Dict[str, str]) -> str:
+def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[str, str]) -> str:
     """Create a CA"""
-    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/ca")}
+    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, root_url + "/ca")}
 
     data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
     data["name_dict"] = name_dict
-    data["issuer_pem"] = get_cas(pub_key, priv_key)[-1]
+    data["issuer_pem"] = get_cas(root_url, pub_key, priv_key)[-1]
 
-    req = requests.post("https://localhost:8005/ca", headers=request_headers, json=data, timeout=5, verify=False)
+    req = requests.post(
+        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+    )
     if req.status_code != 200:
         raise ValueError("NOT OK posting a new CA")
     new_ca: str = json.loads(req.text)["certificate"]
@@ -87,7 +89,7 @@ def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
     if len(url_ca) < 3:
         return
 
-    resp = requests.get(url_ca, timeout=5, verify=False)
+    resp = requests.get(url_ca, timeout=10, verify="./tls_certificate.pem")
     if resp.status_code != 200:
         raise ValueError("Could not download ca from ca_issuers")
 

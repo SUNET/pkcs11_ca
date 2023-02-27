@@ -557,7 +557,9 @@ def create_jwt_header_str(pub_key: bytes, priv_key: bytes, url: str) -> str:
     str
     """
 
-    req = requests.head(url.split("/")[0] + "//" + url.split("/")[2] + "/new_nonce", timeout=5, verify=False)
+    req = requests.head(
+        url.split("/")[0] + "//" + url.split("/")[2] + "/new_nonce", timeout=5, verify="./tls_certificate.pem"
+    )
     nonce = req.headers["Replay-Nonce"]
     jwt_headers = {"nonce": nonce, "url": url}
     jwk_key_data = pem_key_to_jwk(pub_key.decode("utf-8"))
