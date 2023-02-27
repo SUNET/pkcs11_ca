@@ -1,12 +1,12 @@
-FROM debian:bullseye-20221114-slim@sha256:df172d92d287ec4d4a538e5db8026fcde5f91f5f90061423d69d6148ff05cc47
+FROM debian:bullseye-20230208-slim@sha256:40febe8053827d8342f93978c541956ed0ac858016953e704939d276f62c83a3
 
 MAINTAINER victor@sunet.se
 
 EXPOSE 8000/tcp
 
 # Metadata
-LABEL version="1.02"
-LABEL description="pkcs11_ca_service postgres"
+LABEL version="1.03"
+LABEL description="pkcs11_ca postgres"
 
 # Set work dir
 WORKDIR /var/lib/postgresql/data
@@ -37,6 +37,5 @@ USER postgres
 HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
     CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
-#ENTRYPOINT ["sleep", "300"]
+# ENTRYPOINT ["sleep", "300"]
 ENTRYPOINT["/usr/bin/pg_ctlcluster", "start"]
-# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--host", "0.0.0.0", "--workers", "1", "--header", "server:pkcs11_ca_service"]

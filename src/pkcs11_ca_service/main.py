@@ -29,6 +29,7 @@ from .asn1 import (
     aia_and_cdp_exts,
     cert_as_der,
     crl_as_der,
+    cert_pem_serial_number,
 )
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
@@ -40,7 +41,8 @@ loop = asyncio.get_running_loop()
 startup_task = loop.create_task(startup())
 
 # Create fastapi app
-app = FastAPI()
+# Disable swagger and docs endpoints for now
+app = FastAPI(docs_url=None, redoc_url=None)
 
 
 @app.get("/new_nonce")
@@ -517,6 +519,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
                 "authorized_by": auth_by,
                 "pkcs11_key": pkcs11_key_obj.serial,
                 "csr": csr_obj.serial,
+                "serial_number": str(cert_pem_serial_number(ca_pem)),
                 "issuer": issuer_obj.serial,
                 "path": hashlib.sha256(token_bytes(256)).hexdigest(),
             }
@@ -530,6 +533,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
                 "pkcs11_key": pkcs11_key_obj.serial,
                 "authorized_by": auth_by,
                 "csr": csr_obj.serial,
+                "serial_number": str(cert_pem_serial_number(ca_pem)),
             }
         )
         # Cant know issuer before we know serial which is only after we call save()
@@ -593,6 +597,7 @@ class RevokeInput(InputObject):
     """Class to represent revoke specification matching from HTTP post data"""
 
     pem: str
+    reason: Union[int, None]
     # pem: Union[str, None]
     # fingerprint: Union[str, None]
     # serial: Union[int, None]
@@ -656,7 +661,7 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     db_certificate_objs = await db_load_data_class(Certificate, CertificateInput(pem=revoke_input.pem))
     for obj in db_certificate_objs:
         if isinstance(obj, Certificate):
-            await obj.revoke(auth_by)
+            await obj.revoke(auth_by, revoke_input.reason)
             return JSONResponse(
                 status_code=200,
                 content={"revoked": revoke_input.pem},
@@ -664,7 +669,7 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     db_ca_objs = await db_load_data_class(Ca, CaInput(pem=revoke_input.pem))
     for obj in db_ca_objs:
         if isinstance(obj, Ca):
-            await obj.revoke(auth_by)
+            await obj.revoke(auth_by, revoke_input.reason)
             return JSONResponse(
                 status_code=200,
                 content={"revoked": revoke_input.pem},
@@ -689,12 +694,12 @@ async def post_cmc(request: Request) -> Response:
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
 
     data = await request.body()
-    # print("cmc req")
-    # print(data.hex())
+    print("cmc req")
+    print(data.hex())
     try:
         data_content = await cmc_handle_request(data)
         return Response(status_code=200, content=data_content, media_type="application/pkcs7-mime")
-    except ValueError:
+    except (ValueError, TypeError):
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
 
 

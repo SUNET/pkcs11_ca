@@ -5,8 +5,8 @@ MAINTAINER victor@sunet.se
 EXPOSE 8005/tcp
 
 # Metadata
-LABEL version="1.02"
-LABEL description="pkcs11_ca_service web"
+LABEL version="1.03"
+LABEL description="pkcs11_ca web"
 
 # Set work dir
 WORKDIR /app
@@ -21,11 +21,11 @@ RUN apt-get update \
     python3-dev \
     softhsm2 \
     python3 \
-    opensc \
     build-essential \
+    opensc \
     wget \
-    libz-dev \
     swig \
+    libz-dev \
     dnsutils \
     mercurial \
     && pip3 install -r requirements.txt \
@@ -41,8 +41,8 @@ RUN apt-get update \
 RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
 
 # Add user and add to softhsm group
-RUN useradd pkcs11_ca_service -u 1500 -s /usr/sbin/nologin
-RUN usermod -a -G softhsm pkcs11_ca_service
+RUN useradd pkcs11_ca -u 1500 -s /usr/sbin/nologin
+RUN usermod -a -G softhsm pkcs11_ca
 
 # Copy files
 COPY ./src /app/src
@@ -55,30 +55,30 @@ COPY ./data/tls_certificate.pem /app/tls_certificate.pem
 COPY ./data/tls_key.key /app/tls_key.key
 
 # HSM stuff
-WORKDIR /usr/src/luna-client
-COPY ./data/luna-client-7.4 /usr/src/luna-client
-RUN ./deb.sh
-WORKDIR /
-RUN rm -rf /usr/src/luna-client
-COPY ./data/web_container/entrypoint.sh /entrypoint.sh
-RUN chmod a+rx /entrypoint.sh
-COPY ./cert /usr/safenet/lunaclient/cert
-COPY ./50-ha-slot.conf /etc/Chrystoki.conf.d/50-ha-slot.conf
+# WORKDIR /usr/src/luna-client
+# COPY ./data/luna-client-7.4 /usr/src/luna-client
+# RUN ./deb.sh
+# WORKDIR /
+# RUN rm -rf /usr/src/luna-client
+# COPY ./data/web_container/entrypoint.sh /entrypoint.sh
+# RUN chmod a+rx /entrypoint.sh
+# COPY ./cert /usr/safenet/lunaclient/cert
+# COPY ./50-ha-slot.conf /etc/Chrystoki.conf.d/50-ha-slot.conf
 
-WORKDIR /app
+# WORKDIR /app
 
 # Run as user
-USER pkcs11_ca_service
+USER pkcs11_ca
 
 # Set env variables now during build
-ENV PKCS11_TOKEN="my_test_token_1"
-ENV PKCS11_PIN="1234"
-ENV PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
+# ENV PKCS11_TOKEN="my_test_token_1"
+# ENV PKCS11_PIN="1234"
+# ENV PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 
 # RUN softhsm2-util --init-token --slot 0 --label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN
 
 # Add healthcheck
-HEALTHCHECK --interval=60s --timeout=15s --retries=1 --start-period=30s \
+HEALTHCHECK --interval=120s --timeout=15s --retries=1 --start-period=30s \
     CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
 ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--ssl-keyfile", "tls_key.key", "--ssl-certfile", "tls_certificate.pem", "--ssl-version", "2", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]

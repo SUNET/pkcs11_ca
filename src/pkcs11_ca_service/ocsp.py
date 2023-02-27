@@ -185,7 +185,7 @@ async def ocsp_response(request: bytes, encoded: bool = False) -> bytes:
             raise ValueError
 
         try:
-            ocsp_request.native
+            _ = ocsp_request.native
         except ValueError:
             ocsp_request = await _fix_broken_ocsp_request(ocsp_request)
             request_was_broken = True

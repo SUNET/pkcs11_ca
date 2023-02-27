@@ -1,23 +1,14 @@
-"""CMC functions, lazy implementation"""
-from typing import Dict, Any
+"""CMC functions"""
+from typing import Dict, Union, List
 import datetime
 import hashlib
 from random import randint
 
-# from fastapi import HTTPException
+from fastapi import HTTPException
+
 from asn1crypto import csr as asn1_csr
 from asn1crypto import pem as asn1_pem
-from asn1crypto.core import (
-    Asn1Value,
-    Sequence,
-    Set,
-    ObjectIdentifier,
-    Integer,
-    OctetString,
-    ParsableOctetString,
-    UTCTime,
-    UTF8String,
-)
+from asn1crypto import core as asn1_core
 import asn1crypto.x509 as asn1_x509
 import asn1crypto.cms as asn1_cms
 import asn1crypto.algos as asn1_algos
@@ -25,218 +16,198 @@ import asn1crypto.algos as asn1_algos
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.csr import sign_csr
 
+from python_cmc import cmc as asn1_cmc
+
 from .route_functions import ca_request, pkcs11_key_request
-from .ca import CaInput
+from .ca import Ca, CaInput
 from .pkcs11_key import Pkcs11KeyInput
 from .public_key import PublicKey
-from .certificate import Certificate
+from .certificate import Certificate, CertificateInput
 from .csr import Csr
-from .asn1 import aia_and_cdp_exts, public_key_pem_from_csr, cert_is_ca, pem_cert_to_key_hash
+from .asn1 import (
+    aia_and_cdp_exts,
+    public_key_pem_from_csr,
+    cert_is_ca,
+    pem_cert_to_key_hash,
+    cert_pem_serial_number,
+    pem_cert_to_name_dict,
+)
+from .base import db_load_data_class
 from .config import (
     CMC_CERT_ISSUING_KEY_LABEL,
     CMC_CERT_ISSUING_NAME_DICT,
     CMC_SIGNING_KEY_LABEL,
 )
 
-# fixme
-# https://www.rfc-editor.org/rfc/rfc4211#page-16
-class CertificationRequestInfo2(Sequence):  # type: ignore
-    """Ugly hack to create CSR from a CMC CRMF request"""
 
-    _fields = [
-        ("version", asn1_csr.Version, {"implicit": 0, "default": "v1"}),
-        ("subject", asn1_x509.Name, {"explicit": 5}),
-        ("subject_pk_info", asn1_x509.PublicKeyInfo, {"implicit": 6}),
-        ("attributes", asn1_csr.CRIAttributes, {"implicit": 9, "optional": True}),
-    ]
+async def cmc_revoke(revoke_data: bytes) -> None:
+    """Revoke a certificate based on the CMC RevokeRequest"""
+    set_of_revoke_request = asn1_cmc.SetOfRevokeRequest.load(revoke_data)
+    revoked_certs = 0
 
+    for _, revoke_request in enumerate(set_of_revoke_request):
+        # Try certs
+        db_certificate_objs = await db_load_data_class(
+            Certificate, CertificateInput(serial_number=str(revoke_request["serial_number"].native))
+        )
+        for obj in db_certificate_objs:
+            if isinstance(obj, Certificate):
+                if pem_cert_to_name_dict(await obj.issuer_pem()) == revoke_request["issuerName"].native:
+                    await obj.revoke(1, int(revoke_request["reason"]))  # Change to cmc request signer
+                    revoked_certs += 1
+                    print("Revoked cert due to CMC request")
 
-class Set30(Set):  # type: ignore
-    """Subclass to PKI response"""
+        # Try Ca's
+        db_ca_objs = await db_load_data_class(Ca, CaInput(serial_number=str(revoke_request["serial_number"].native)))
+        for obj in db_ca_objs:
+            if isinstance(obj, Ca):
+                if pem_cert_to_name_dict(await obj.issuer_pem()) == revoke_request["issuerName"].native:
+                    await obj.revoke(1, int(revoke_request["reason"]))  # Change to cmc request signer
+                    revoked_certs += 1
+                    print("Revoked cert due to CMC request")
 
-    _fields = [
-        ("0", OctetString),
-    ]
-
-
-class Packet310(Sequence):  # type: ignore
-    """Subclass to PKI response"""
-
-    _fields = [
-        ("0", Integer),
-    ]
-
-
-class Packet31(Sequence):  # type: ignore
-    """Subclass to PKI response"""
-
-    _fields = [
-        ("0", Integer),
-        ("1", Packet310),
-        ("2", UTF8String, {"optional": True}),
-        ("3", Integer, {"optional": True}),
-    ]
+    if revoked_certs == 0:
+        print("Could not find the certificate to revoke from CMC RevokeRequest")
+        raise ValueError
 
 
-class Set31(Set):  # type: ignore
-    """Subclass to PKI response"""
+async def create_cert_from_csr(csr_data: asn1_csr.CertificationRequest) -> asn1_x509.Certificate:
+    """Create cert from a csr"""
+    issuer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=CMC_CERT_ISSUING_KEY_LABEL))
+    issuer = await ca_request(CaInput(pkcs11_key=issuer_pkcs11_key.serial))
 
-    _fields = [
-        ("0", Packet31),
-    ]
+    csr_pem: bytes = asn1_pem.armor("CERTIFICATE REQUEST", csr_data.dump())
 
+    extra_extensions = aia_and_cdp_exts(issuer.path)
 
-class Packet20(Sequence):  # type: ignore
-    """Subclass to PKI response"""
+    signed_cert = await sign_csr(
+        CMC_CERT_ISSUING_KEY_LABEL,
+        CMC_CERT_ISSUING_NAME_DICT,
+        csr_pem.decode("utf-8"),
+        extra_extensions=extra_extensions,
+        ignore_auth_exts=True,
+        key_type="secp256r1",
+    )
+    # print("signed_cert_in_cmc_response")
+    # print(signed_cert)
 
-    _fields = [
-        ("0", Integer),
-        ("1", ObjectIdentifier),
-        ("2", Set30),
-    ]
+    # Get public key from csr
+    public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_pem.decode("utf-8")), "authorized_by": 1})  # FIXME
+    await public_key_obj.save()
 
+    # Save csr
+    csr_internal_obj = Csr(
+        {"pem": csr_pem.decode("utf-8"), "authorized_by": 1, "public_key": public_key_obj.serial}
+    )  # FIXME
+    await csr_internal_obj.save()
 
-class Packet21(Sequence):  # type: ignore
-    """Subclass to PKI response"""
+    # Save cert
+    cert_obj = Certificate(
+        {
+            "pem": signed_cert,
+            "authorized_by": 1,  # FIXME
+            "csr": csr_internal_obj.serial,
+            "serial_number": str(cert_pem_serial_number(signed_cert)),
+            "public_key": public_key_obj.serial,
+            "issuer": issuer.serial,
+        }
+    )
+    await cert_obj.save()
+    if cert_is_ca(signed_cert):
+        print("Warning: Treating CA as a certificate since we dont have the private key")
 
-    _fields = [
-        ("0", Integer),
-        ("1", ObjectIdentifier),
-        ("2", Set31),
-    ]
-
-
-class Packet0(Sequence):  # type: ignore
-    """Subclass to PKI response"""
-
-    _fields = [
-        ("0", Packet20),
-        ("1", Packet21),
-        ("2", Packet20, {"optional": True}),
-    ]
-
-
-class Packet(Sequence):  # type: ignore
-    """PKI response"""
-
-    _fields = [
-        ("0", Packet0),
-        ("1", Sequence),
-        ("2", Sequence),
-    ]
-
-
-def _fix_constructed_classes_into_seqs(data: bytes) -> bytes:
-    if len(data) == 0:
-        return b""
-
-    # if data[0] < 128:
-    # return data[2:2+data[1]]
-    #    return data[2:2+data[1]] + _fix_constructed_classes_into_seqs(data[2:])
-
-    # if data[1] < 128:
-    #     length = data[1]
-    #     start = 2
-    # else:
-    #     if data[1] == 129:
-    #         length = data[2]
-    #         start = 3
-    #     elif data[1] == 130:
-    #         length = data[2] * 256 + data[3]
-    #         start = 4
-    #     else:
-    #         # print(data)
-    #         raise ValueError("FIXME, finish this")
-
-    if data[0] > 128:
-        return b"0" + data[1:]
-
-    return data
+    return asn1_x509.Certificate.load(asn1_pem.unarmor(signed_cert.encode("utf-8"))[2])
 
 
-def _fix_set_data(data: bytes) -> bytes:
-    if data[0] != 49:  # Code for ASN1 SET
-        raise ValueError("Failed")
+def _create_cmc_response_status_packet(
+    created_certs: Dict[int, asn1_x509.Certificate],
+    failed: bool,
+) -> asn1_cmc.TaggedAttribute:
+    body_part_references = asn1_cmc.BodyPartReferences()
 
-    length = 0
-    start = 2
+    for req_id in created_certs:
+        body_part_references.append(asn1_cmc.BodyPartReference({"bodyPartID": req_id}))
 
-    if data[1] < 128:
-        length = data[1]
+    status_v2 = asn1_cmc.CMCStatusInfoV2()
+    if len(body_part_references) == 0:
+        status_v2["bodyList"] = asn1_cmc.BodyPartReferences([])
     else:
-        if data[1] == 129:
-            length = data[2]
-            start = 3
-        elif data[1] == 130:
-            length = data[2] * 256 + data[3]
-            start = 4
-        else:
-            raise ValueError("FIXME, finish this")
+        status_v2["bodyList"] = body_part_references
 
-    return data[start : length + start]
+    if failed:
+        status_v2["cMCStatus"] = asn1_cmc.CMCStatus(2)
+        status_v2["statusString"] = "Failed processing CMC request"
+        status_v2["otherInfo"] = asn1_cmc.OtherStatusInfo({"failInfo": asn1_cmc.CMCFailInfo(11)})
+    else:
+        status_v2["cMCStatus"] = asn1_cmc.CMCStatus(0)
+        status_v2["statusString"] = "OK"
 
-
-def _create_cmc_failed_response_packet(request_data: Dict[str, Any]) -> Packet:
-    packet_20 = Packet20(
-        {
-            "0": randint(10000000, 99999999),
-            "1": ObjectIdentifier("1.3.6.1.5.5.7.7.7"),
-            "2": Set30({"0": request_data["id-cmc-senderNonce"]}),
-        }
-    )
-    packet_21 = Packet21(
-        {
-            "0": randint(10000000, 99999999),
-            "1": ObjectIdentifier("1.3.6.1.5.5.7.7.25"),
-            "2": Set31(
-                {
-                    "0": Packet31(
-                        {
-                            "0": 2,  # error code
-                            "1": Packet310({"0": request_data["req_integer"]}),
-                            "2": UTF8String("Error, fixme"),
-                            "3": Integer(11),  # internal CA error, fixme here
-                        }
-                    )
-                }
-            ),
-        }
-    )
-
-    packet_0 = Packet0({"0": packet_20, "1": packet_21})
-    packet = Packet({"0": packet_0, "1": Sequence.load(b"0\x00"), "2": Sequence.load(b"0\x00")})
-    return packet
+    status_v2_attr_values = asn1_cmc.SetOfCMCStatusInfoV2()
+    status_v2_attr_values.append(status_v2)
+    status_v2_attr = asn1_cmc.TaggedAttribute()
+    status_v2_attr["bodyPartID"] = randint(10000000, 4294967294)
+    status_v2_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.25")
+    status_v2_attr["attrValues"] = status_v2_attr_values
+    return status_v2_attr
 
 
-def _create_cmc_response_packet(request_data: Dict[str, Any]) -> Packet:
-    packet_20 = Packet20(
-        {
-            "0": randint(10000000, 99999999),
-            "1": ObjectIdentifier("1.3.6.1.5.5.7.7.7"),
-            "2": Set30({"0": request_data["id-cmc-senderNonce"]}),
-        }
-    )
-    packet_21 = Packet21(
-        {
-            "0": randint(10000000, 99999999),
-            "1": ObjectIdentifier("1.3.6.1.5.5.7.7.25"),
-            "2": Set31({"0": Packet31({"0": 0, "1": Packet310({"0": request_data["req_integer"]})})}),
-        }
-    )
-    packet_22 = Packet20(
-        {
-            "0": randint(10000000, 99999999),
-            "1": ObjectIdentifier("1.3.6.1.5.5.7.7.19"),
-            "2": Set30({"0": request_data["id-cmc-regInfo"]}),
-        }
-    )
+async def create_cmc_response_packet(
+    controls: asn1_cmc.Controls,
+    created_certs: Dict[int, asn1_x509.Certificate],
+    failed: bool,
+) -> asn1_cmc.PKIResponse:
+    """Create a CMC response package.
+    Revoke cert(s) if the request had a RevokeRequest(s).
+    """
 
-    packet_0 = Packet0({"0": packet_20, "1": packet_21, "2": packet_22})
-    packet = Packet({"0": packet_0, "1": Sequence.load(b"0\x00"), "2": Sequence.load(b"0\x00")})
-    return packet
+    response_controls = asn1_cmc.Controls()
+    nonce: Union[bytes, None] = None
+    reg_info: Union[bytes, None] = None
+
+    for _, control_value in enumerate(controls):
+        if control_value["attrType"].native == "id-cmc-senderNonce":
+            nonce = control_value["attrValues"].dump()
+
+    for _, control_value in enumerate(controls):
+        if control_value["attrType"].native == "id-cmc-regInfo":
+            reg_info = control_value["attrValues"].dump()
+
+    # If a revoke request
+    if not failed:
+        for _, control_value in enumerate(controls):
+            if control_value["attrType"].native == "id-cmc-revokeRequest":
+                revoke_request = control_value["attrValues"].dump()
+                await cmc_revoke(revoke_request)
+
+    if nonce is not None:
+        nonce_attr = asn1_cmc.TaggedAttribute()
+        nonce_attr["bodyPartID"] = randint(10000000, 4294967294)
+        nonce_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.7")
+        nonce_attr["attrValues"] = asn1_cms.SetOfOctetString.load(nonce)
+        response_controls.append(nonce_attr)
+
+    if reg_info is not None:
+        reg_info_attr = asn1_cmc.TaggedAttribute()
+        reg_info_attr["bodyPartID"] = randint(10000000, 4294967294)
+        reg_info_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.19")
+        reg_info_attr["attrValues"] = asn1_cms.SetOfOctetString.load(reg_info)
+        response_controls.append(reg_info_attr)
+
+    status_v2_attr = _create_cmc_response_status_packet(created_certs, failed)
+    response_controls.append(status_v2_attr)
+
+    pki_response = asn1_cmc.PKIResponse()
+    pki_response["controlSequence"] = response_controls
+    pki_response["cmsSequence"] = asn1_cmc.TaggedContentInfos([])
+    pki_response["otherMsgSequence"] = asn1_cmc.OtherMsgs([])
+    return pki_response
 
 
-async def create_cmc_response(request_data: Dict[str, Any], created_cert: bytes, failed: bool) -> bytes:
+async def create_cmc_response(  # pylint: disable-msg=too-many-locals
+    controls: asn1_cmc.Controls,
+    created_certs: Dict[int, asn1_x509.Certificate],
+    failed: bool,
+) -> bytes:
     """Create a CMS responce containing a CMC package"""
 
     # issuer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label="cmc_issuer_test3"))
@@ -244,21 +215,22 @@ async def create_cmc_response(request_data: Dict[str, Any], created_cert: bytes,
     signer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=CMC_SIGNING_KEY_LABEL))
     signer = await ca_request(CaInput(pkcs11_key=signer_pkcs11_key.serial))
 
-    # fixme make this into a recursive chain instead of assuming next is root
-
     # root_pem = await issuer.issuer_pem()
     # root = asn1_x509.Certificate.load(asn1_pem.unarmor(root_pem.encode("utf-8"))[2])
     # chain = [root, asn1_x509.Certificate.load(asn1_pem.unarmor(issuer.pem.encode("utf-8"))[2]), created_cert]
-    if not failed:
-        chain = [created_cert, asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2])]
-        packet = _create_cmc_response_packet(request_data)
-    else:
-        chain = [asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2])]
-        packet = _create_cmc_failed_response_packet(request_data)
+
+    # FIXME make this into a recursive chain instead of assuming next is root and
+    # dont assue all certs are issued by the same issuer
+    chain: List[asn1_x509.Certificate] = [asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2])]
+
+    for req_id in created_certs:
+        chain.append(created_certs[req_id])
+
+    packet = await create_cmc_response_packet(controls, created_certs, failed)
 
     eci = asn1_cms.EncapsulatedContentInfo()
     eci["content_type"] = asn1_cms.ContentType("1.3.6.1.5.5.7.12.3")
-    packet_data = ParsableOctetString()
+    packet_data = asn1_core.ParsableOctetString()
     packet_data.set(packet.dump())
     eci["content"] = packet_data
 
@@ -298,7 +270,7 @@ async def create_cmc_response(request_data: Dict[str, Any], created_cert: bytes,
         asn1_cms.CMSAttribute(
             {
                 "type": asn1_cms.CMSAttributeType("1.2.840.113549.1.9.5"),
-                "values": asn1_cms.SetOfTime([UTCTime(datetime.datetime.now(datetime.timezone.utc))]),
+                "values": asn1_cms.SetOfTime([asn1_core.UTCTime(datetime.datetime.now(datetime.timezone.utc))]),
             }
         )
     )
@@ -345,103 +317,30 @@ async def create_cmc_response(request_data: Dict[str, Any], created_cert: bytes,
     cmc_resp["content"] = signed_data
 
     ret: bytes = cmc_resp.dump()
-    # print("cmc response")
-    # print(ret.hex())
+    print("cmc response")
+    print(ret.hex())
     return ret
 
 
-async def create_cert_from_csr(csr_data: asn1_csr.CertificationRequest) -> asn1_x509.Certificate:
-    """Create cert from a csr"""
-    issuer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=CMC_CERT_ISSUING_KEY_LABEL))
-    issuer = await ca_request(CaInput(pkcs11_key=issuer_pkcs11_key.serial))
-
-    csr_pem: bytes = asn1_pem.armor("CERTIFICATE REQUEST", csr_data.dump())
-
-    extra_extensions = aia_and_cdp_exts(issuer.path)
-
-    signed_cert = await sign_csr(
-        CMC_CERT_ISSUING_KEY_LABEL,
-        CMC_CERT_ISSUING_NAME_DICT,
-        csr_pem.decode("utf-8"),
-        extra_extensions=extra_extensions,
-        ignore_auth_exts=True,
-        key_type="secp256r1",
-    )
-    # print("signed_cert_in_cmc_response")
-    # print(signed_cert)
-
-    # Get public key from csr
-    public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_pem.decode("utf-8")), "authorized_by": 1})  # FIXME
-    await public_key_obj.save()
-
-    # Save csr
-    csr_internal_obj = Csr(
-        {"pem": csr_pem.decode("utf-8"), "authorized_by": 1, "public_key": public_key_obj.serial}
-    )  # FIXME
-    await csr_internal_obj.save()
-
-    # Save cert
-    cert_obj = Certificate(
-        {
-            "pem": signed_cert,
-            "authorized_by": 1,  # FIXME
-            "csr": csr_internal_obj.serial,
-            "public_key": public_key_obj.serial,
-            "issuer": issuer.serial,
-        }
-    )
-    await cert_obj.save()
-    if cert_is_ca(signed_cert):
-        print("Warning: Treating CA as a certificate since we dont have the private key")
-
-    return asn1_x509.Certificate.load(asn1_pem.unarmor(signed_cert.encode("utf-8"))[2])
-
-
-async def cmc_handle_crmf_request(dummy_cert_req: CertificationRequestInfo2) -> asn1_csr.CertificationRequest:
+# This need to be improved to fully support crmf, not just basics
+def create_csr_from_crmf(cert_req: asn1_cmc.CertReqMsg) -> asn1_csr.CertificationRequest:
     """Manually handle the CRMF request into a CSR
     since we use CSR as data type in the database and currently all certs have a csr which the are created from"""
     attrs = asn1_csr.CRIAttributes()
 
     cert_req_info = asn1_csr.CertificationRequestInfo()
-    cert_req_info["version"] = dummy_cert_req["version"]
-    cert_req_info["subject"] = dummy_cert_req["subject"]
-    cert_req_info["subject_pk_info"] = dummy_cert_req["subject_pk_info"]
+    # cert_req_info["version"] = dummy_cert_req["version"]
+    cert_req_info["version"] = 0
+    cert_req_info["subject"] = cert_req["subject"]
+    cert_req_info["subject_pk_info"] = cert_req["publicKey"]
 
     set_of_exts = asn1_csr.SetOfExtensions()
-    exts = asn1_x509.Extensions()
 
-    for attr in range(len(dummy_cert_req["attributes"])):
-        ext = dummy_cert_req["attributes"][attr]
-        if isinstance(dummy_cert_req["attributes"][attr], asn1_csr.CRIAttribute):
-            ext_id = asn1_x509.ExtensionId(dummy_cert_req["attributes"][attr]["type"].native)
-            critical = False
-            if (
-                isinstance(dummy_cert_req["attributes"][attr]["values"].native, bool)
-                and dummy_cert_req["attributes"][attr]["values"].native is True
-            ):
-                critical = True
-
-            ext = asn1_x509.Extension()
-            ext["extn_id"] = ext_id
-            ext["critical"] = critical
-            # ext["extn_value": extn_value,
-
-            if critical:
-                extn_value = ext.spec("extn_value").load(dummy_cert_req["attributes"][attr].native["2"])
-            else:
-                try:
-                    extn_value = ext.spec("extn_value").load(dummy_cert_req["attributes"][attr]["values"].dump())
-                except ValueError:
-                    extn_value = ext.spec("extn_value").load(dummy_cert_req["attributes"][attr].native["values"])
-            ext["extn_value"] = extn_value
-            exts.append(ext)
-
-    if len(exts) > 0:
-        set_of_exts.append(exts)
-        cri_attr = asn1_csr.CRIAttribute(
-            {"type": asn1_csr.CSRAttributeType("1.2.840.113549.1.9.14"), "values": set_of_exts}
-        )
-        attrs.append(cri_attr)
+    set_of_exts.append(cert_req["extensions"])
+    cri_attr = asn1_csr.CRIAttribute(
+        {"type": asn1_csr.CSRAttributeType("1.2.840.113549.1.9.14"), "values": set_of_exts}
+    )
+    attrs.append(cri_attr)
 
     cert_req_info["attributes"] = attrs
 
@@ -454,60 +353,34 @@ async def cmc_handle_crmf_request(dummy_cert_req: CertificationRequestInfo2) -> 
     return cert_req
 
 
+# FIXME handle errors and store all CMC control attributes not only reginfo and nonce
 async def cmc_handle_request(data: bytes) -> bytes:
     """Handle and extract CMS CMC request"""
 
-    values: Dict[str, Any] = {}
-    values["subject_name_info"] = {}
+    created_certs: Dict[int, asn1_x509.Certificate] = {}
 
     content_info = asn1_cms.ContentInfo.load(data)
-    content_data = content_info["content"]["encap_content_info"]["content"].parsed
-
-    # for id_cmc_nonce
-    for attr in range(len(content_data[0])):
-        if content_data[0][attr][1].native == "1.3.6.1.5.5.7.7.6":
-            values["id-cmc-senderNonce"] = Asn1Value.load(_fix_set_data(content_data[0][attr][2].dump())).native
-            break
-    # for id-cmc-regInfo
-    for attr in range(len(content_data[0])):
-        if content_data[0][attr][1].native == "1.3.6.1.5.5.7.7.18":
-            values["id-cmc-regInfo"] = Asn1Value.load(_fix_set_data(content_data[0][attr][2].dump())).native
-            break
-
-    for attr in range(len(content_data[0])):
-        if content_data[0][attr][1].native == "1.3.6.1.5.5.7.7.11":
-            values["id-cmc-lraPOPWitness"] = Asn1Value.load(_fix_set_data(content_data[0][attr][2].dump())).native
-            break
-
-    try:  # CRMF
-        req_data0 = Asn1Value.load(_fix_constructed_classes_into_seqs(content_data[1][0].dump()))
-
-        req_data2 = Asn1Value.load(Asn1Value.load(_fix_constructed_classes_into_seqs(req_data0[0].dump()))[1].dump())
-
-        dummy_cert_req = CertificationRequestInfo2.load(req_data2.dump())
-        _ = dummy_cert_req.native
-        values["CRMF"] = True
-        content_data10_data = Asn1Value.load(_fix_constructed_classes_into_seqs(content_data[1][0].dump()))
-        values["req_integer"] = content_data10_data[0][0].native
-        cert_req = await cmc_handle_crmf_request(dummy_cert_req)
-    except ValueError:  # CSR
-        next_seq = content_data[1].dump()
-        if next_seq[1] == 130:
-            req_integer_data0 = Asn1Value.load(_fix_constructed_classes_into_seqs(next_seq[0:4] + b"0" + next_seq[5:]))
-        elif next_seq[1] == 129:
-            req_integer_data0 = Asn1Value.load(_fix_constructed_classes_into_seqs(next_seq[0:3] + b"0" + next_seq[4:]))
-        else:
-            req_integer_data0 = Asn1Value.load(_fix_constructed_classes_into_seqs(next_seq[0:2] + b"0" + next_seq[3:]))
-
-        req_integer_data1 = Asn1Value.load(_fix_constructed_classes_into_seqs(req_integer_data0[0].dump()))
-
-        values["req_integer"] = req_integer_data1[0].native
-        cert_req = asn1_csr.CertificationRequest.load(req_integer_data1[1].dump())
+    _ = content_info.native  # Ensure valid data
+    cmc_req = asn1_cmc.PKIData.load(content_info["content"]["encap_content_info"]["content"].parsed.dump())
+    _ = cmc_req.native  # Ensure valid data
 
     try:
-        created_cert = await create_cert_from_csr(cert_req)
-        ret = await create_cmc_response(values, created_cert, failed=False)
-    except:  # fixme
-        ret = await create_cmc_response(values, b"0", failed=True)
+        for _, value in enumerate(cmc_req["reqSequence"]):
+            if isinstance(value.chosen, asn1_cmc.CertReqMsg):  # CRMF
+                req_id = int(value.chosen["certReq"]["certReqId"].native)
+                crmf_csr = create_csr_from_crmf(value.chosen["certReq"]["certTemplate"])
+                created_certs[req_id] = await create_cert_from_csr(crmf_csr)
+
+            elif isinstance(value.chosen, asn1_cmc.TaggedCertificationRequest):  # CSR
+                req_id = int(value.chosen["bodyPartID"].native)
+                created_certs[req_id] = await create_cert_from_csr(value.chosen["certificationRequest"])
+
+            elif isinstance(value.chosen, asn1_cmc.ORM):  # ORM
+                print("ERROR: CMC request type is ORM, cannot handle this")
+                raise HTTPException(status_code=400, detail="Cannot process CMC type ORM")
+
+        ret = await create_cmc_response(cmc_req["controlSequence"], created_certs, failed=False)
+    except (ValueError, TypeError):
+        ret = await create_cmc_response(cmc_req["controlSequence"], created_certs, failed=True)
 
     return ret

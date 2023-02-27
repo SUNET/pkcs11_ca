@@ -14,6 +14,7 @@ asn1crypto==1.5.1 \
     --hash=sha256:13ae38502be632115abf8a24cbe5f4da52e3b5231990aff31123c805306ccb9c \
     --hash=sha256:db4e40728b728508912cbb3d44f19ce188f218e9eba635821bb4b68564f8fd67
     # via
+    #   python-cmc
     #   python-pkcs11
     #   python-x509-pkcs11
 asyncpg==0.27.0 \
@@ -350,9 +351,13 @@ pyjwt==2.6.0 \
     --hash=sha256:69285c7e31fc44f68a1feb309e948e0df53259d579295e6cfe2b1792329f05fd \
     --hash=sha256:d83c3d892a77bbb74d3e1a2cfa90afaadb60945205d1095d9221f04466f64c14
     # via -r requirements.in
-python-dotenv==0.21.1 \
-    --hash=sha256:1c93de8f636cde3ce377292818d0e440b6e45a82f215c3744979151fa8151c49 \
-    --hash=sha256:41e12e0318bebc859fcc4d97d4db8d20ad21721a6aa5047dd59f090391cb549a
+python-cmc==1.22 \
+    --hash=sha256:c1527318d34c6fb14c43ab107bdcd7aaa2060e3db35faf8879e6083dc3c6c56b \
+    --hash=sha256:e787371075b489e940e0de5957eb61df1560d49da5a418a4f524a91cfce90c90
+    # via -r requirements.in
+python-dotenv==1.0.0 \
+    --hash=sha256:a8df96034aae6d2d50a4ebe8216326c61c3eb64836776504fcca410e5937a3ba \
+    --hash=sha256:f5971a9226b701070a4bf2c38c89e5a3f0d64de8debda981d1db98583009122a
     # via uvicorn
 python-pkcs11==0.7.0 \
     --hash=sha256:9737e0c24cabb8bc9d48bf8c57c3df2a70f8cdd96b70c50290803286f9e46bf7

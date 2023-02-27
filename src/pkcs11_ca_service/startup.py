@@ -66,6 +66,34 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
     return await db_obj.startup(tables, fields, reference_fields, unique_fields)
 
 
+async def _pkcs11_check() -> bool:
+    # Ensure pkcs11 env variables
+    if "PKCS11_MODULE" not in os.environ or "PKCS11_TOKEN" not in os.environ or "PKCS11_PIN" not in os.environ:
+        print("PKCS11_MODULE, PKCS11_TOKEN or PKCS11_PIN env variables is not set")
+        sys.exit(1)
+
+    # If SOFTHSM then create token if not exists
+    if PKCS11_BACKEND == "SOFTHSM":
+        if not os.path.isdir("/var/lib/softhsm/tokens") or not os.listdir("/var/lib/softhsm/tokens"):
+            subprocess.check_call(
+                [
+                    "softhsm2-util",
+                    "--init-token",
+                    "--slot",
+                    "0",
+                    "--label",
+                    os.environ["PKCS11_TOKEN"],
+                    "--pin",
+                    os.environ["PKCS11_PIN"],
+                    "--so-pin",
+                    os.environ["PKCS11_PIN"],
+                ]
+            )
+
+    print("PKCS11 check OK", flush=True)
+    return True
+
+
 async def _pkcs11_startup(db_obj: DataBaseObject) -> bool:
     try:
         _, _ = await db_obj.pkcs11_session.public_key_data(ROOT_CA_KEY_LABEL, key_type=ROOT_CA_KEY_TYPE)
@@ -88,23 +116,14 @@ async def startup() -> None:
     db_obj = _load_db_module()
     db_data_classes = _load_db_data_classes()
 
-    # Ensure pkcs11 env variables
-    if "PKCS11_MODULE" not in os.environ or "PKCS11_TOKEN" not in os.environ or "PKCS11_PIN" not in os.environ:
-        print("PKCS11_MODULE, PKCS11_TOKEN or PKCS11_PIN env variables is not set")
-        sys.exit(0)
-
-    if PKCS11_BACKEND == "SOFTHSM":
-        subprocess.check_call(
-            "ls /var/lib/softhsm/tokens/* >/dev/null 2>&1 "
-            + "|| softhsm2-util --init-token --slot 0 "
-            + "--label $PKCS11_TOKEN --pin $PKCS11_PIN --so-pin $PKCS11_PIN",
-            shell=True,
-        )
+    # Check pkcs11
+    if not await _pkcs11_check():
+        sys.exit(1)
 
     # Check DB
     if not await _db_startup(db_obj, db_data_classes):
         sys.exit(1)
 
-    # Check pkcs11
+    # Check pkcs11 with database
     if not await _pkcs11_startup(db_obj):
         sys.exit(1)

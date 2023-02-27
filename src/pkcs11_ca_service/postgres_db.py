@@ -8,7 +8,8 @@ import datetime
 import hashlib
 from secrets import token_bytes
 import os
-from time import sleep
+import time
+import sys
 
 from asyncpg.exceptions import UndefinedTableError
 from asyncpg import create_pool
@@ -18,7 +19,7 @@ from python_x509_pkcs11.ca import create as create_ca
 from python_x509_pkcs11.crl import create as create_crl
 from pkcs11.exceptions import MultipleObjectsReturned
 
-from .asn1 import this_update_next_update_from_crl
+from .asn1 import this_update_next_update_from_crl, cert_pem_serial_number
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
@@ -303,29 +304,51 @@ class PostgresDB(DataBaseObject):
         unique_fields: List[List[str]],
     ) -> bool:
 
+        for env_var in [
+            "POSTGRES_HOST",
+            "POSTGRES_PORT",
+            "POSTGRES_DATABASE",
+            "POSTGRES_USER",
+            "POSTGRES_PASSWORD",
+            "POSTGRES_TIMEOUT",
+        ]:
+            if env_var not in os.environ:
+                print(f"ERROR: Missing ENV var {env_var}")
+                sys.exit(1)
+
         for _ in range(5):
             try:
-                sleep(1)
+                time.sleep(1)
                 cls.pool = await create_pool(
-                    dsn="postgres://" + DB_USER + ":" + DB_PASSWORD + "@" + DB_HOST + ":" + DB_PORT + "/" + DB_DATABASE,
-                    min_size=5,
+                    dsn="postgres://"
+                    + os.environ["POSTGRES_USER"]
+                    + ":"
+                    + os.environ["POSTGRES_PASSWORD"]
+                    + "@"
+                    + os.environ["POSTGRES_HOST"]
+                    + ":"
+                    + os.environ["POSTGRES_PORT"]
+                    + "/"
+                    + os.environ["POSTGRES_DATABASE"],
+                    min_size=3,
                     max_size=50,
-                    command_timeout=DB_TIMEOUT,
+                    command_timeout=os.environ["POSTGRES_TIMEOUT"],
                 )
+                print("DB connected OK", flush=True)
                 break
             except:  # pylint: disable=bare-except
                 print("Failed to connect to DB, please fix", flush=True)
                 print(
                     "postgres://"
-                    + DB_USER
+                    + os.environ["POSTGRES_USER"]
                     + ":"
                     + "password_redacted"
                     + "@"
-                    + DB_HOST
+                    + os.environ["POSTGRES_HOST"]
                     + ":"
-                    + DB_PORT
+                    + os.environ["POSTGRES_PORT"]
                     + "/"
-                    + DB_DATABASE,
+                    + os.environ["POSTGRES_DATABASE"],
                     flush=True,
                 )
         else:
@@ -552,6 +575,7 @@ class PostgresDB(DataBaseObject):
                     query,
                     root_ca_pem,
                     serial,
+                    str(cert_pem_serial_number(root_ca_pem)),
                     issuer_serial,
                     serial,
                     issuer_serial,

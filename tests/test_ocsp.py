@@ -125,6 +125,7 @@ class TestOCSP(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/revoke")}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
+        data["reason"] = 5
         req = requests.post(
             "https://localhost:8005/revoke", headers=request_headers, json=data, timeout=5, verify=False
         )
@@ -236,6 +237,7 @@ class TestOCSP(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, "https://localhost:8005/revoke")}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
+        data["reason"] = 5
         req = requests.post(
             "https://localhost:8005/revoke", headers=request_headers, json=data, timeout=5, verify=False
         )

@@ -13,7 +13,7 @@ from .public_key import PublicKey, PublicKeyInput
 from .ca import CaInput, Ca
 from .crl import Crl
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
-from .asn1 import crl_expired, pem_cert_to_name_dict, aia_and_cdp_exts, cert_is_ca
+from .asn1 import crl_expired, pem_cert_to_name_dict, aia_and_cdp_exts, cert_is_ca, cert_pem_serial_number
 from .base import db_load_data_class
 
 from .config import HEALTHCHECK_KEY_LABEL, HEALTHCHECK_KEY_TYPE
@@ -169,6 +169,7 @@ async def sign_csr(auth_by: int, issuer_obj: Ca, csr_obj: Csr, public_key_obj: P
             "pem": cert_pem,
             "authorized_by": auth_by,
             "csr": csr_obj.serial,
+            "serial_number": str(cert_pem_serial_number(cert_pem)),
             "public_key": public_key_obj.serial,
             "issuer": issuer_obj.serial,
         }

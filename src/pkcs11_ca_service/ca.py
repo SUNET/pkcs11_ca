@@ -24,6 +24,7 @@ class CaInput(InputObject):
     issuer_pem: Union[str, None]
     path: Union[str, None] = None
     pkcs11_key: Union[int, None] = None
+    serial_number: Union[str, None] = None
 
 
 class Ca(DataClassObject):
@@ -35,6 +36,7 @@ class Ca(DataClassObject):
     db_fields = {
         "pem": str,
         "csr": int,
+        "serial_number": str,
         "issuer": int,
         "pkcs11_key": int,
         "authorized_by": int,
@@ -68,7 +70,7 @@ class Ca(DataClassObject):
 
         self.path = hashlib.sha256(token_bytes(256)).hexdigest()
 
-    async def revoke(self, auth_by: int) -> None:
+    async def revoke(self, auth_by: int, reason: Union[int, None] = None) -> None:
         """Revoke the certificate authority
         https://github.com/wbond/asn1crypto/blob/b5f03e6f9797c691a3b812a5bb1acade3a1f4eeb/asn1crypto/crl.py#L97
 
@@ -78,6 +80,9 @@ class Ca(DataClassObject):
         Returns:
         str
         """
+
+        if reason is None:
+            reason = 0
 
         issuer = vars(self).get("issuer")
         if issuer is None or issuer < 1:
@@ -94,7 +99,7 @@ class Ca(DataClassObject):
             pem_cert_to_name_dict(ca_pem),
             old_crl_pem=curr_crl,
             serial_number=cert_pem_serial_number(self.pem),
-            reason=5,
+            reason=reason,
             key_type=key_type,
         )
         crl_obj = Crl(

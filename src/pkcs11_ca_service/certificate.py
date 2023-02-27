@@ -17,6 +17,7 @@ class CertificateInput(InputObject):
 
     pem: Union[str, None]
     fingerprint: Union[str, None]
+    serial_number: Union[str, None]
 
 
 class Certificate(DataClassObject):
@@ -29,6 +30,7 @@ class Certificate(DataClassObject):
         "public_key": int,
         "pem": str,
         "csr": int,
+        "serial_number": str,
         "issuer": int,
         "authorized_by": int,
         "fingerprint": str,
@@ -54,7 +56,7 @@ class Certificate(DataClassObject):
         self.fingerprint = pem_to_sha256_fingerprint(self.pem)
         self.not_before, self.not_after = not_before_not_after_from_cert(self.pem)
 
-    async def revoke(self, auth_by: int) -> None:
+    async def revoke(self, auth_by: int, reason: Union[int, None] = None) -> None:
         """Revoke the certificate.
         https://github.com/wbond/asn1crypto/blob/b5f03e6f9797c691a3b812a5bb1acade3a1f4eeb/asn1crypto/crl.py#L97
 
@@ -64,6 +66,9 @@ class Certificate(DataClassObject):
         Returns:
         str
         """
+
+        if reason is None:
+            reason = 0
 
         issuer = vars(self).get("issuer")
         if issuer is None or issuer < 1:
@@ -79,7 +84,7 @@ class Certificate(DataClassObject):
             key_label,
             pem_cert_to_name_dict(ca_pem),
             serial_number=cert_pem_serial_number(self.pem),
-            reason=5,
+            reason=reason,
             old_crl_pem=crl,
             key_type=key_type,
         )
@@ -92,6 +97,24 @@ class Certificate(DataClassObject):
         )
         await crl_obj.save()
         print("Revoked cert, serial " + str(self.serial))
+
+    async def issuer_pem(self) -> str:
+        """The Issuer for this CA in PEM form
+
+        Returns:
+        str
+        """
+
+        issuer = vars(self).get("issuer")
+        serial = vars(self).get("serial")
+        if issuer is None or issuer < 1:
+            raise HTTPException(status_code=400, detail="Cannot get issuer for a non existing ca.")
+
+        if serial is None or serial == issuer:
+            raise HTTPException(status_code=400, detail="Cannot get issuer for self signed ca.")
+
+        revoke_data = await self.db.revoke_data_for_ca(issuer)
+        return revoke_data["ca"]
 
     async def is_revoked(self) -> bool:
         """If certificate has been revoked

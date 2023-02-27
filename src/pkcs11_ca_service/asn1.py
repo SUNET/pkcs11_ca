@@ -292,8 +292,8 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
         ret["x"] = to_base64url(str(key["public_key"].to_coords()[0]).encode("utf-8"))
         ret["y"] = to_base64url(str(key["public_key"].to_coords()[1]).encode("utf-8"))
-
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
+
     elif key["algorithm"].native["algorithm"] in ["ed25519", "ed448"]:
         ret["kty"] = "OKP"
         ret["use"] = "sig"

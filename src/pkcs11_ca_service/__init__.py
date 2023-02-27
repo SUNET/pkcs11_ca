@@ -1,4 +1,4 @@
 """Python CA service
 """
 
-__version__ = "1.02"
+__version__ = "1.03"

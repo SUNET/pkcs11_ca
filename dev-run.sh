@@ -112,10 +112,10 @@ then
 
     chmod 644 data/trusted_keys/privkey*.key
 
-
     # Add the tls cert and key
     openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
     openssl req -subj "/C=SE/CN=pkcs11-ca-test.localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+    chmod 644 data/tls_key*.key
 fi
 
 # Check docker
@@ -205,4 +205,4 @@ sleep 5
 echo "Running tests"
 python3 -m unittest || exit 1
 
-echo -e "\nService ONLINE at 0.0.0.0:8000"
+echo -e "\nService ONLINE at 0.0.0.0:8005"
