@@ -30,7 +30,7 @@ async def pkcs11_sign(pkcs11_sign_input: Pkcs11SignInput) -> Dict[str, Union[str
         signature: bytes = await PKCS11Session.sign(
             key_label=pkcs11_sign_input.key_label,
             data=base64.b64decode(data),
-            verify_signature=True,  # FIXME Change to False after testing
+            verify_signature=False,
             key_type=pkcs11_sign_input.key_type)
 
         signed_data.append(base64.b64encode(signature).decode("utf-8"))
@@ -43,7 +43,9 @@ async def pkcs11_sign(pkcs11_sign_input: Pkcs11SignInput) -> Dict[str, Union[str
         result["algorithm"] = "sha256_ecdsa"
     elif pkcs11_sign_input.key_type == "secp384r1":
         result["algorithm"] = "sha384_ecdsa"
-    else:
+    elif pkcs11_sign_input.key_type == "secp521r1":
         result["algorithm"] = "sha512_ecdsa"
+    else:
+        result["algorithm"] = "ed25519"
 
     return result

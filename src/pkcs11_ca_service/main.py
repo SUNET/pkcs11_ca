@@ -693,7 +693,7 @@ async def post_pkcs11_sign(request: Request, pkcs11_sign_input: Pkcs11SignInput)
             content={"message": f"Missing Authentization token"},
         )
 
-    key_types = ["secp256r1", "secp384r1", "secp384r1"]
+    key_types = ["secp256r1", "secp384r1", "secp384r1", "ed25519"]
     if pkcs11_sign_input.key_type not in key_types:
         return JSONResponse(
             status_code=400,
