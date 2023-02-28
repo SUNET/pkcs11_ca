@@ -1,5 +1,5 @@
 """Main module, FastAPI runs from here"""
-
+import json
 from typing import Union, Dict
 import asyncio
 import hashlib
@@ -31,11 +31,12 @@ from .asn1 import (
     crl_as_der,
     cert_pem_serial_number,
 )
+from .pkcs11_sign import Pkcs11SignInput, pkcs11_sign
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
-from .config import KEY_TYPES
+from .config import KEY_TYPES, ACME_ROOT, ROOT_URL
 
 loop = asyncio.get_running_loop()
 startup_task = loop.create_task(startup())
@@ -681,6 +682,24 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
     )
 
 
+@app.post("/pkcs11_sign")
+async def post_ca(request: Request, pkcs11_sign_input: Pkcs11SignInput) -> JSONResponse:
+    """/pkcs11_sign, POST method."""
+
+    key_types = ["secp256r1", "secp384r1", "secp384r1"]
+    if pkcs11_sign_input.key_type not in key_types:
+        return JSONResponse(
+            status_code=400,
+            content={"message": f"key_type '{pkcs11_sign_input.key_type}' must be one of {key_types}"},
+        )
+
+    data = await pkcs11_sign(pkcs11_sign_input)
+    return JSONResponse(
+        status_code=200,
+        content=data,
+    )
+
+
 @app.post("/cmc01")
 async def post_cmc(request: Request) -> Response:
     """fixme"""
@@ -701,6 +720,18 @@ async def post_cmc(request: Request) -> Response:
         return Response(status_code=200, content=data_content, media_type="application/pkcs7-mime")
     except (ValueError, TypeError):
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+
+
+@app.get(ACME_ROOT)
+async def get_acme_directory() -> Response:
+    paths = ["new-nonce", "new-account", "new-order", "new-authz", "revoke-cert", "key-change"]
+    directory: Dict[str, str] = {}
+
+    for path in paths:
+        index = path.split("-")[0] + path.split("-")[1][0].upper() + path.split("-")[1][1:]
+        directory[index] = ROOT_URL + ACME_ROOT + "/" + path
+
+    return JSONResponse(status_code=200, content=json.dumps(directory))
 
 
 # WORK ON THIS

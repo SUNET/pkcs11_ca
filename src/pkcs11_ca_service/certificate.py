@@ -99,7 +99,7 @@ class Certificate(DataClassObject):
         print("Revoked cert, serial " + str(self.serial))
 
     async def issuer_pem(self) -> str:
-        """The Issuer for this CA in PEM form
+        """The issuer for this certificate in PEM form
 
         Returns:
         str
@@ -107,11 +107,8 @@ class Certificate(DataClassObject):
 
         issuer = vars(self).get("issuer")
         serial = vars(self).get("serial")
-        if issuer is None or issuer < 1:
-            raise HTTPException(status_code=400, detail="Cannot get issuer for a non existing ca.")
-
-        if serial is None or serial == issuer:
-            raise HTTPException(status_code=400, detail="Cannot get issuer for self signed ca.")
+        if issuer is None or issuer < 1 or serial is None or serial < 1:
+            raise HTTPException(status_code=400, detail="Cannot get issuer for a non existing cert.")
 
         revoke_data = await self.db.revoke_data_for_ca(issuer)
         return revoke_data["ca"]

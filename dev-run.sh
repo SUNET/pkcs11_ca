@@ -128,7 +128,20 @@ then
 
     # Add the tls cert and key
     openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
-    openssl req -subj "/C=SE/CN=web" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+    python3 -c '
+import sys
+from src.pkcs11_ca_service.config import ROOT_URL
+
+if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
+  sys.exit(1)
+'
+    if [ $? -eq 0 ]
+    then
+        openssl req -subj "/C=SE/CN=${CA_DNS_NAME}" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+    else
+        openssl req -subj "/C=SE/CN=${CA_DNS_NAME}" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -addext "subjectAltName = DNS:localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+    fi
+
     chmod 644 data/tls_key*.key
 fi
 
@@ -208,26 +221,23 @@ then
     pylint --max-line-length 120 tests/*.py
 fi
 
-mkdir -p data/hsm_tokens data/db_data
+echo "Using 'sudo' to set correct directory ownership"
+# Remove git create folder files
+sudo rm -f data/hsm_tokens/.empty
+sudo rm -f data/db_data/.empty
+sudo mkdir -p data/hsm_tokens data/db_data
 sudo chown -R $USER data/hsm_tokens data/db_data/
 docker-compose build || exit 1
 sudo chown -R 1500 data/hsm_tokens
 sudo chown -R 999 data/db_data
 
-# Remove git create folder files
-rm -f data/hsm_tokens/.empty
-rm -f data/db_data/.empty
-
 docker-compose -f docker-compose.yml up -d || exit 1
 
-
 # Allow container to startup
-sleep 5
-
-
-# Run test container instead
-echo "Running tests"
-echo ""
+sleep 3
+# Run test container
+echo -e "Running tests\n"
+sleep 2
 
 python3 -c '
 import sys
@@ -239,8 +249,13 @@ if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
 if [ $? -eq 0 ]
 then
     docker run --env "CA_URL=${CA_URL}" --network pkcs11_ca_default pkcs11_ca_test1 | exit 1
+    echo -e "\nService ONLINE at https://localhost:8005 and at ${CA_URL} inside the docker network pkcs11_ca_default"
+    echo -e "Note that the service listens on 0.0.0.0 so will be exposed to the public if its port is open"
 else
     docker run --env "CA_URL=${CA_URL}" --network host pkcs11_ca_test1 | exit 1
+    echo -e "\nService ONLINE at ${CA_URL}"
 fi
 
-echo -e "\nService ONLINE at 0.0.0.0:8005"
+# Show 'docker ps' output
+echo -e "\n"
+docker ps

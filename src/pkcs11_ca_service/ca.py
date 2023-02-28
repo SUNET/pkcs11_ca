@@ -114,7 +114,7 @@ class Ca(DataClassObject):
         print("Revoked CA, serial " + str(self.serial))
 
     async def issuer_pem(self) -> str:
-        """The Issuer for this CA in PEM form
+        """The issuer for this CA in PEM form
 
         Returns:
         str
@@ -122,7 +122,7 @@ class Ca(DataClassObject):
 
         issuer = vars(self).get("issuer")
         serial = vars(self).get("serial")
-        if issuer is None or issuer < 1:
+        if issuer is None or issuer < 1 or serial is None or serial < 1:
             raise HTTPException(status_code=400, detail="Cannot get issuer for a non existing ca.")
 
         if serial is None or serial == issuer:

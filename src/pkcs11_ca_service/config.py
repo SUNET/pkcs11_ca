@@ -9,17 +9,22 @@ if PKCS11_BACKEND == "LUNAHSM":
 else:
     KEY_TYPES = ["ed25519", "ed448", "secp256r1", "secp384r1", "secp521r1", "rsa_2048", "rsa_4096"]
 
+ACME_ROOT = "/acme"
+
 # Folder for the initial trusted pub_keys
 ROOT_ADMIN_KEYS_FOLDER = "trusted_keys"
 
-
-# ROOT_URL = "https://web:8005"
-# ROOT_URL = https://pkcs11-ca.sunet.se:8005"
-ROOT_URL = os.environ["CA_URL"]
-
 DB_MODULE = "postgres_db"
-# Table order is important: for example 'ca' dependes on 'public_key' so it comes after
-DB_TABLE_MODULES = ["public_key", "pkcs11_key", "csr", "ca", "certificate", "crl"]
+# Table order is important: for example 'ca' depends on 'public_key' so it comes after
+DB_TABLE_MODULES = [
+    "public_key",
+    "pkcs11_key",
+    "csr",
+    "ca",
+    "certificate",
+    "crl",
+    "acme_account",
+]
 
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
 JWT_ALGOS = ["EdDSA", "ES256", "ES384", "ES512", "PS256", "PS512"]
@@ -76,3 +81,5 @@ CMC_CERT_ISSUING_NAME_DICT = {
 }
 
 CSR_EXPIRE_DATE = 365 * 1
+
+ROOT_URL = os.environ["CA_URL"]
