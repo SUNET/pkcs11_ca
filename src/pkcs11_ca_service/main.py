@@ -683,7 +683,7 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
 
 
 @app.post("/pkcs11_sign")
-async def post_ca(request: Request, pkcs11_sign_input: Pkcs11SignInput) -> JSONResponse:
+async def post_pkcs11_sign(request: Request, pkcs11_sign_input: Pkcs11SignInput) -> JSONResponse:
     """/pkcs11_sign, POST method."""
 
     key_types = ["secp256r1", "secp384r1", "secp384r1"]

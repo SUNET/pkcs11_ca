@@ -1,11 +1,10 @@
 from typing import List, Union, Dict
-import json
 import base64
 
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .base import InputObject, db_load_data_class
+from .base import InputObject
 
 
 class Pkcs11SignInput(InputObject):
