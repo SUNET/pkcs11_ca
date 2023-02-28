@@ -11,7 +11,7 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install git python3-dev python3-pip docker.io docker-compose sudo mypy black pylint flit -y
+          apt-get install git python3-dev python3-pip docker.io docker-compose sudo flit -y
           useradd python_pkcs11_ca -m
           usermod -a -G sudo python_pkcs11_ca
           usermod -a -G docker python_pkcs11_ca
@@ -33,4 +33,5 @@ jobs:
           git clone https://github.com/SUNET/pkcs11_ca.git && \
           cd pkcs11_ca && \
           python3 -m pip install -r requirements.txt && \
+          python3 -m pip install mypy black pylint && \
           bash dev-run.sh'
