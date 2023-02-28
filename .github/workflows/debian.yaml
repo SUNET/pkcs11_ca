@@ -16,6 +16,17 @@ jobs:
           usermod -a -G sudo python_pkcs11_ca
           usermod -a -G docker python_pkcs11_ca
           sudo -u python_pkcs11_ca bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
+          export CA_URL=https://web:8005 && \
+          export CA_DNS_NAME=web && \
+          export PKCS11_TOKEN=my_test_token_1 && \
+          export PKCS11_PIN=1234 && \
+          export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so && \
+          export POSTGRES_HOST=postgres && \
+          export POSTGRES_USER=pkcs11_testuser1 && \
+          export POSTGRES_PASSWORD=DBUserPassword && \
+          export POSTGRES_PORT=5432 && \
+          export POSTGRES_DATABASE=pkcs11_testdb1 && \
+          export POSTGRES_TIMEOUT=5 && \
           id && \
           cd && \
           git clone https://github.com/SUNET/pkcs11_ca.git && \
