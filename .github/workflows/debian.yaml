@@ -1,4 +1,4 @@
-name: pkcs11_ca-debian
+name: python_pkcs11_ca-debian
 
 on: [push]
 
@@ -11,13 +11,13 @@ jobs:
       - name: Install dependencies
         run: |
           apt-get update
-          apt-get install git python3-dev python3-pip sudo mypy black pylint flit docker.io docker-compose -y
-          useradd pkcs11_ca -m
-          usermod -a -G sudo pkcs11_ca
-          usermod -a -G docker pkcs11_ca
-          sudo -u pkcs11_ca bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
+          apt-get install git python3-dev python3-pip docker.io docker-compose sudo mypy black pylint flit -y
+          useradd python_pkcs11_ca -m
+          usermod -a -G sudo python_pkcs11_ca
+          usermod -a -G docker python_pkcs11_ca
+          sudo -u python_pkcs11_ca bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
           id && \
           cd && \
           git clone https://github.com/SUNET/pkcs11_ca.git && \
           cd pkcs11_ca && \
-	  bash dev-run.sh'
+          bash dev-run.sh'
