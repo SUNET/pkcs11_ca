@@ -9,17 +9,18 @@ jobs:
     steps:
       - name: Install dependencies
         run: |
-          apt-get update
-          apt-get install git python3-dev python3-pip docker.io docker-compose sudo flit curl -y
-          curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-          add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu kinetic stable"
-          apt-get update
-          apt install docker-ce docker-ce-cli containerd.io -y
-          useradd python_pkcs11_ca -m
-          usermod -a -G sudo python_pkcs11_ca
-          usermod -a -G docker python_pkcs11_ca
-          systemctl restart docker
-          echo 'python_pkcs11_ca ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+          id
+          sudo apt-get update
+          sudo apt-get install git python3-dev python3-pip docker.io docker-compose sudo flit curl -y
+          sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+          sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu kinetic stable"
+          sudo apt-get update
+          sudo apt install docker-ce docker-ce-cli containerd.io -y
+          sudo useradd python_pkcs11_ca -m
+          sudo usermod -a -G sudo python_pkcs11_ca
+          sudo usermod -a -G docker python_pkcs11_ca
+          sudo systemctl restart docker
+          # sudo echo 'python_pkcs11_ca ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
           sudo -u python_pkcs11_ca bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
           export CA_URL=https://web:8005 && \
           export CA_DNS_NAME=web && \
