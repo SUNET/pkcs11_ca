@@ -6,7 +6,6 @@ jobs:
   container-test-job:
 
     runs-on: ubuntu-latest
-    # container: debian:latest
     steps:
       - name: Install dependencies
         run: |
@@ -14,7 +13,7 @@ jobs:
           apt-get install git python3-dev python3-pip docker.io docker-compose sudo flit curl -y
           curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
           add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu kinetic stable"
-	  apt-get update
+          apt-get update
           apt install docker-ce docker-ce-cli containerd.io -y
           useradd python_pkcs11_ca -m
           usermod -a -G sudo python_pkcs11_ca
