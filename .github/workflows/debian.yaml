@@ -15,6 +15,7 @@ jobs:
           useradd python_pkcs11_ca -m
           usermod -a -G sudo python_pkcs11_ca
           usermod -a -G docker python_pkcs11_ca
+          echo 'python_pkcs11_ca ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
           sudo -u python_pkcs11_ca bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
           export CA_URL=https://web:8005 && \
           export CA_DNS_NAME=web && \
@@ -31,4 +32,5 @@ jobs:
           cd && \
           git clone https://github.com/SUNET/pkcs11_ca.git && \
           cd pkcs11_ca && \
+          python3 -m pip install -r requirements.txt && \
           bash dev-run.sh'
