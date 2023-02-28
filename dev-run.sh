@@ -248,11 +248,11 @@ if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
 '
 if [ $? -eq 0 ]
 then
-    docker run --env "CA_URL=${CA_URL}" --network pkcs11_ca_default pkcs11_ca_test1 | exit 1
+    docker run --env "CA_URL=${CA_URL}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at https://localhost:8005 and at ${CA_URL} inside the docker network pkcs11_ca_default"
     echo -e "Note that the service listens on 0.0.0.0 so will be exposed to the public if its port is open"
 else
-    docker run --env "CA_URL=${CA_URL}" --network host pkcs11_ca_test1 | exit 1
+    docker run --env "CA_URL=${CA_URL}" --network host pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at ${CA_URL}"
 fi
 
