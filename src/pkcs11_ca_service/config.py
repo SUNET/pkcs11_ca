@@ -26,6 +26,8 @@ DB_TABLE_MODULES = [
     "acme_account",
 ]
 
+PKCS11_SIGN_TOKEN = 'xyz'
+
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
 JWT_ALGOS = ["EdDSA", "ES256", "ES384", "ES512", "PS256", "PS512"]
 

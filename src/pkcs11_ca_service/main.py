@@ -3,6 +3,7 @@ import json
 from typing import Union, Dict
 import asyncio
 import hashlib
+import base64
 from secrets import token_bytes
 
 from fastapi import FastAPI, Request, Response, HTTPException
@@ -36,7 +37,7 @@ from .cmc import cmc_handle_request
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
-from .config import KEY_TYPES, ACME_ROOT, ROOT_URL
+from .config import KEY_TYPES, ACME_ROOT, ROOT_URL, PKCS11_SIGN_TOKEN
 
 loop = asyncio.get_running_loop()
 startup_task = loop.create_task(startup())
@@ -685,6 +686,12 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
 @app.post("/pkcs11_sign")
 async def post_pkcs11_sign(request: Request, pkcs11_sign_input: Pkcs11SignInput) -> JSONResponse:
     """/pkcs11_sign, POST method."""
+
+    if "Authorization" not in request.headers or base64.b64decode(request.headers["Authorization"].split("Bearer ")[1]) != PKCS11_SIGN_TOKEN.encode("utf-8"):
+        return JSONResponse(
+            status_code=401,
+            content={"message": f"Missing Authentization token"},
+        )
 
     key_types = ["secp256r1", "secp384r1", "secp384r1"]
     if pkcs11_sign_input.key_type not in key_types:
