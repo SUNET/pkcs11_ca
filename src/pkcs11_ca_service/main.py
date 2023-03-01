@@ -690,7 +690,7 @@ async def post_pkcs11_sign(request: Request, pkcs11_sign_input: Pkcs11SignInput)
     if "Authorization" not in request.headers or base64.b64decode(request.headers["Authorization"].split("Bearer ")[1]) != PKCS11_SIGN_TOKEN.encode("utf-8"):
         return JSONResponse(
             status_code=401,
-            content={"message": f"Missing Authentization token"},
+            content={"message": f"Missing Authorization token"},
         )
 
     key_types = ["secp256r1", "secp384r1", "secp384r1", "ed25519"]
