@@ -23,7 +23,7 @@ requires = [
     "asn1crypto>=1.5.1",
     "pyjwt>=2.5.1",
     "uvicorn[standard]",
-    "python_cmc>",
+    "python_cmc",
     "fastapi",
     "asyncpg",
     "cryptography",

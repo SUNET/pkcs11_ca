@@ -8,7 +8,7 @@ from .config import ROOT_URL, ACME_ROOT
 
 
 class AcmeAccount(DataClassObject):
-    """Class to represent an ACME account"""
+    """Class to represent an ACME order"""
 
     db: DataBaseObject
 

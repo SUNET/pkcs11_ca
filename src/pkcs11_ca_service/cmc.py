@@ -6,12 +6,21 @@ from random import randint
 
 from fastapi import HTTPException
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric import padding
+
+from cryptography.hazmat.primitives import hashes
+from cryptography.exceptions import InvalidSignature
+
 from asn1crypto import csr as asn1_csr
 from asn1crypto import pem as asn1_pem
 from asn1crypto import core as asn1_core
-import asn1crypto.x509 as asn1_x509
-import asn1crypto.cms as asn1_cms
-import asn1crypto.algos as asn1_algos
+from asn1crypto import x509 as asn1_x509
+from asn1crypto import cms as asn1_cms
+from asn1crypto import algos as asn1_algos
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from python_x509_pkcs11.csr import sign_csr
@@ -37,6 +46,7 @@ from .config import (
     CMC_CERT_ISSUING_KEY_LABEL,
     CMC_CERT_ISSUING_NAME_DICT,
     CMC_SIGNING_KEY_LABEL,
+    CMC_REQUEST_CERTS,
 )
 
 
@@ -220,7 +230,7 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     # chain = [root, asn1_x509.Certificate.load(asn1_pem.unarmor(issuer.pem.encode("utf-8"))[2]), created_cert]
 
     # FIXME make this into a recursive chain instead of assuming next is root and
-    # dont assue all certs are issued by the same issuer
+    # dont issue all certs are issued by the same issuer
     chain: List[asn1_x509.Certificate] = [asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2])]
 
     for req_id in created_certs:
@@ -353,6 +363,45 @@ def create_csr_from_crmf(cert_req: asn1_cmc.CertReqMsg) -> asn1_csr.Certificatio
     return cert_req
 
 
+def _do_check_signature(pub_key_data: bytes, signature: bytes, data: bytes) -> bool:
+    loaded_public_key = serialization.load_pem_public_key(pub_key_data)
+
+    try:
+        if isinstance(loaded_public_key, EllipticCurvePublicKey):
+            loaded_public_key.verify(signature, data, ECDSA(hashes.SHA256()))
+        elif isinstance(loaded_public_key, RSAPublicKey):
+            loaded_public_key.verify(signature, data, padding.PKCS1v15(), hashes.SHA256())  # hash
+        elif isinstance(loaded_public_key, Ed25519PublicKey):
+            loaded_public_key.verify(signature, data)
+        return True
+    except InvalidSignature:
+        print("Failed to validate CMC request signature")
+    return False
+
+
+# FIXME check for different ec curves, rsa and ed25519
+def _check_request_signature(request_signers: asn1_cms.CertificateSet, signer_infos: asn1_cms.SignerInfos) -> None:
+    was_valid = False
+
+    for _, request_signer in enumerate(request_signers):
+        for valid_cert in CMC_REQUEST_CERTS:
+            _, _, valid_cert_pem = asn1_pem.unarmor(valid_cert.encode("UTF-8"))
+            if request_signer.chosen.native == asn1_x509.Certificate.load(valid_cert_pem).native:
+                for _, signer_info in enumerate(signer_infos):
+                    pub_key_data = asn1_pem.armor(
+                        "PUBLIC KEY", request_signer.chosen["tbs_certificate"]["subject_public_key_info"].dump()
+                    )
+                    if _do_check_signature(
+                        pub_key_data,
+                        signer_info["signature"].contents,
+                        signer_info["signed_attrs"].retag(17).dump(),
+                    ):
+                        was_valid = True
+
+    if not was_valid:
+        raise HTTPException(status_code=401, detail="Wrong or missing CMS signer")
+
+
 # FIXME handle errors and store all CMC control attributes not only reginfo and nonce
 async def cmc_handle_request(data: bytes) -> bytes:
     """Handle and extract CMS CMC request"""
@@ -361,6 +410,15 @@ async def cmc_handle_request(data: bytes) -> bytes:
 
     content_info = asn1_cms.ContentInfo.load(data)
     _ = content_info.native  # Ensure valid data
+
+    # Ensure valid signature for the request
+    if len(content_info["content"]["signer_infos"]) == 0 or len(content_info["content"]["certificates"]) == 0:
+        raise HTTPException(status_code=401, detail="Invalid signature or certificate for the signature")
+    _check_request_signature(
+        content_info["content"]["certificates"],
+        content_info["content"]["signer_infos"],
+    )
+
     cmc_req = asn1_cmc.PKIData.load(content_info["content"]["encap_content_info"]["content"].parsed.dump())
     _ = cmc_req.native  # Ensure valid data
 

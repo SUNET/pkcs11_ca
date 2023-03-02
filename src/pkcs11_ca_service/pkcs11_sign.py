@@ -1,12 +1,13 @@
-from typing import List, Dict, Any
+"""Module to handle /pkcs11_sign endpoint"""
 import base64
+from typing import List, Dict, Any
 
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 import jsonschema
-from openapi_schema_validator import validate as openapi_validate
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
+from openapi_schema_validator import validate as openapi_validate
 
 request_schema = {
     "$id": "https://localhost/request.schema.json",
@@ -68,6 +69,15 @@ response_schema = {
 
 
 def validate_input(request: dict[str, Any]) -> None:
+    """Validate the json input with our schema, raises HTTP error 400 if invalid
+
+    Parameters:
+    request (Dict[str, Any]): The input.
+
+    Returns:
+    None
+    """
+
     try:
         openapi_validate(request, request_schema)  # type: ignore
     except jsonschema.exceptions.ValidationError as exc:
@@ -81,6 +91,16 @@ def validate_input(request: dict[str, Any]) -> None:
 
 
 async def pkcs11_sign(request: Dict[str, Any]) -> JSONResponse:
+    """Sign input data in the request schema format using a key in a pkcs11 device.
+    Raises HTTP error if operation or data formats failed/invalid.
+
+    Parameters:
+    request (Dict[str, Any]): The input data.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     result: Dict[str, Any] = {}
     signed_data: List[Dict[str, str]] = []
 

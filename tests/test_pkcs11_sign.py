@@ -7,11 +7,11 @@ import json
 import base64
 import requests
 
-from src.pkcs11_ca_service.config import ROOT_URL, PKCS11_SIGN_API_TOKEN
-
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.hashes import SHA256
+
+from src.pkcs11_ca_service.config import ROOT_URL, PKCS11_SIGN_API_TOKEN
 
 
 class TestPKCS11Sign(unittest.TestCase):
@@ -36,7 +36,7 @@ class TestPKCS11Sign(unittest.TestCase):
             {"id": "doc2", "data": "913271fd1510ceb9827d3982bd83200722f434f50ada2578e57c19ef07c08367"},
             {
                 "id": "doc3",
-                "data": "MEQCIAJ2fcp/sSODCXbkr0HWCkdLYBgYtCzTdqC65bAOLj1PAiAqPv5kNZdtkdATrRYjZ8TETV0dsPUOz6zQutCEk7Uq/g==",
+                "data": "MEQCIAJ2fcp/sSODCXbkr0HWCkdLYBgYtCzTdqC65bAOLj1PAiAqPv5kNZdtkdATrRYjZ8TETV0dsPUOz6zQutCEk7Uq/g==",  # pylint: disable=line-too-long
             },  # pylint: disable=line-too-long
         ],
     }
@@ -71,6 +71,6 @@ class TestPKCS11Sign(unittest.TestCase):
         for index, _ in enumerate(response_data["signature_values"]):
             signer_public_key.verify(
                 base64.b64decode(response_data["signature_values"][index]["signature"].encode("utf-8")),
-                base64.b64decode(self.request_data["documents"][index]["data"].encode("utf-8")),
+                base64.b64decode(self.request_data["documents"][index]["data"].encode("utf-8")),  # type: ignore
                 ECDSA(SHA256()),
             )

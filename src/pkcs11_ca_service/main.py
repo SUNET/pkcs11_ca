@@ -726,11 +726,16 @@ async def post_cmc(request: Request) -> Response:
 
 @app.get(ACME_ROOT)
 async def get_acme_directory() -> Response:
+    """fixme"""
     paths = ["new-nonce", "new-account", "new-order", "new-authz", "revoke-cert", "key-change"]
     directory: Dict[str, str] = {}
 
     for path in paths:
-        index = path.split("-")[0] + path.split("-")[1][0].upper() + path.split("-")[1][1:]
+        index = (
+            path.split("-", maxsplit=1)[0]
+            + path.split("-", maxsplit=1)[1][0].upper()
+            + path.split("-", maxsplit=1)[1][1:]
+        )
         directory[index] = ROOT_URL + ACME_ROOT + "/" + path
 
     return JSONResponse(status_code=200, content=json.dumps(directory))
