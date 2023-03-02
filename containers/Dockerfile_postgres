@@ -25,8 +25,8 @@ RUN apt-get update \
 # Remove setuid and setgid
 RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
 
-# COPY ./data/healthcheck.sh /healthcheck.sh
-# COPY ./data/healthcheck.py /healthcheck.py
+# COPY ./containers/healthcheck.sh /healthcheck.sh
+# COPY ./containers/healthcheck.py /healthcheck.py
 
 # Run as user
 USER postgres

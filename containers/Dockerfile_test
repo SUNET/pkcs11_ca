@@ -33,8 +33,8 @@ RUN useradd pkcs11_ca_test1 -u 1501 -s /usr/sbin/nologin
 COPY ./src /app/src
 COPY ./tests /app/tests
 COPY ./data/trusted_keys /app/data/trusted_keys
-COPY ./data/healthcheck.sh /app/healthcheck.sh
-COPY ./data/healthcheck.py /app/healthcheck.py
+COPY ./containers/healthcheck.sh /app/healthcheck.sh
+COPY ./containers/healthcheck.py /app/healthcheck.py
 COPY ./data/tls_certificate.pem /app/tls_certificate.pem
 
 RUN chown -R pkcs11_ca_test1 /app

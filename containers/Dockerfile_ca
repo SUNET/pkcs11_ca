@@ -48,9 +48,9 @@ RUN usermod -a -G softhsm pkcs11_ca
 COPY ./src /app/src
 COPY ./tests /app/tests
 COPY ./data/trusted_keys /app/trusted_keys
-COPY ./data/healthcheck.sh /app/healthcheck.sh
-COPY ./data/healthcheck.py /app/healthcheck.py
-COPY ./data/logging.json /app/logging.json
+COPY ./containers/healthcheck.sh /app/healthcheck.sh
+COPY ./containers/healthcheck.py /app/healthcheck.py
+COPY ./containers/logging.json /app/logging.json
 COPY ./data/tls_certificate.pem /app/tls_certificate.pem
 COPY ./data/tls_key.key /app/tls_key.key
 

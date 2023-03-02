@@ -1,6 +1,8 @@
 dist
 venv
 data/trusted_keys
+data/tls_certificate.pem
+data/tls_key.key
 .idea
 *.mypy_cache
 *__pycache__
