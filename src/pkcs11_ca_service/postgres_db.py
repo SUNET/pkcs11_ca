@@ -69,7 +69,6 @@ class PostgresDB(DataBaseObject):
         fields: Dict[str, Union[str, int]],
         unique_fields: List[str],
     ) -> None:
-
         if not fields:
             raise WrongDataType("Cant update DB row, 'fields' dict was empty")
 
@@ -94,7 +93,6 @@ class PostgresDB(DataBaseObject):
         serial: int
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 query = "SELECT serial from " + table_name + " WHERE " + unique_fields[0] + " = $1"
                 rows = await conn.fetch(query, fields[unique_fields[0]])
                 if rows:
@@ -120,7 +118,6 @@ class PostgresDB(DataBaseObject):
 
     @classmethod
     def _rows_to_class_objects(cls, rows: List[Tuple[str, int]], fields: List[str]) -> List[Dict[str, Union[str, int]]]:
-
         ret: List[Dict[str, Union[str, int]]] = []
         for row in rows:
             value_dict: Dict[str, Union[str, int]] = {}
@@ -137,7 +134,6 @@ class PostgresDB(DataBaseObject):
         fields: List[str],
         unique_fields: List[str],
     ) -> List[Dict[str, Union[str, int]]]:
-
         search: Dict[str, Union[str, int]] = {}
         for key in input_search:
             if key in unique_fields:
@@ -148,7 +144,6 @@ class PostgresDB(DataBaseObject):
 
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 fields_list: List[Dict[str, Union[str, int]]] = []
 
                 # If search argument exists
@@ -191,7 +186,6 @@ class PostgresDB(DataBaseObject):
     ) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 query = (
                     "CREATE TABLE IF NOT EXISTS " + table + " (serial BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,"
                 )
@@ -235,7 +229,6 @@ class PostgresDB(DataBaseObject):
 
             async with cls.pool.acquire() as conn:
                 async with conn.transaction():
-
                     with open(ROOT_ADMIN_KEYS_FOLDER + "/" + key_file, encoding="utf-8") as file_data:
                         key_pem = file_data.read()
                     key_pem = key_pem.strip() + "\n"  # Fix whitespaces for pem key
@@ -265,7 +258,6 @@ class PostgresDB(DataBaseObject):
     async def revoke_data_for_ca(cls, ca_serial: int) -> Dict[str, str]:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-
                 query = (
                     "SELECT crl.pem, ca.pem, ca.issuer, ca.serial FROM crl INNER JOIN ca ON crl.issuer = ca.serial "
                     + "WHERE ca.serial = $1 ORDER BY crl.serial DESC LIMIT 1"
@@ -303,7 +295,6 @@ class PostgresDB(DataBaseObject):
         reference_fields: List[Dict[str, str]],
         unique_fields: List[List[str]],
     ) -> bool:
-
         for env_var in [
             "POSTGRES_HOST",
             "POSTGRES_PORT",
@@ -517,7 +508,6 @@ class PostgresDB(DataBaseObject):
         issuer_path: Union[str, None],
         path: str,
     ) -> None:
-
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
                 not_before = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(minutes=2)

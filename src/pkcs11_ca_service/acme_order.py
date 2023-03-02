@@ -36,5 +36,3 @@ class AcmeAccount(DataClassObject):
         # if not isinstance(pem, str):
         #     raise WrongDataType("'pem', must be a 'str'")
         # self.pem = pem
-
-

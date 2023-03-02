@@ -26,8 +26,6 @@ DB_TABLE_MODULES = [
     "acme_account",
 ]
 
-PKCS11_SIGN_TOKEN = 'xyz'
-
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
 JWT_ALGOS = ["EdDSA", "ES256", "ES384", "ES512", "PS256", "PS512"]
 
@@ -85,3 +83,4 @@ CMC_CERT_ISSUING_NAME_DICT = {
 CSR_EXPIRE_DATE = 365 * 1
 
 ROOT_URL = os.environ["CA_URL"]
+PKCS11_SIGN_API_TOKEN = os.environ["PKCS11_SIGN_API_TOKEN"]

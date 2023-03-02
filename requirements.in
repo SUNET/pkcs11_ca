@@ -6,3 +6,4 @@ fastapi
 asyncpg
 cryptography>=39.0.1
 requests
+openapi_schema_validator

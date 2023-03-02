@@ -237,7 +237,6 @@ async def db_load_data_class(db_data_class: Type[DataClassObject], input_object:
 
     ret: List[DataClassObject] = []
     for value_dict in value_dict_list:
-
         class_obj = db_data_class(value_dict)
         for name, value in value_dict.items():
             setattr(class_obj, name, value)

@@ -465,7 +465,6 @@ def cert_revoked_time(serial_number: int, pem: str) -> Tuple[datetime.datetime, 
     if len(crl["tbs_cert_list"]["revoked_certificates"]) != 0:
         for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
             if serial_number == revoked["user_certificate"].native:
-
                 for _, ext in enumerate(revoked["crl_entry_extensions"]):
                     if ext["extn_id"].dotted == "2.5.29.21":
                         return revoked["revocation_date"].native, asn1_crl.CRLReason(ext["extn_value"].native)
@@ -519,7 +518,7 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     access_description_ocsp = asn1_x509.AccessDescription(
         {
             "access_method": "ocsp",
-            "access_location": asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/ocsp/")),
+            "access_location": asn1_x509.GeneralName(name="uniform_resource_identifier", value=ROOT_URL + "/ocsp/"),
         }
     )
     aia = asn1_x509.AuthorityInfoAccessSyntax([access_description_ca, access_description_ocsp])
@@ -528,7 +527,7 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     aia_ext["extn_value"] = aia
 
     # CDP
-    g_n = asn1_x509.GeneralName(name="uniform_resource_identifier", value=(ROOT_URL + "/crl/" + issuer_path))
+    g_n = asn1_x509.GeneralName(name="uniform_resource_identifier", value=ROOT_URL + "/crl/" + issuer_path)
     g_ns = asn1_x509.GeneralNames()
     g_ns.append(g_n)
     dist_point = asn1_x509.DistributionPoint()

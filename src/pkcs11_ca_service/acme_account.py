@@ -18,7 +18,7 @@ class AcmeAccount(DataClassObject):
         "contact": str,
         "termsOfServiceAgreed": str,
         "externalAccountBinding": str,
-        "orders": str
+        "orders": str,
     }
     db_reference_fields: Dict[str, str] = {}
     db_unique_fields = ["orders"]
@@ -29,5 +29,3 @@ class AcmeAccount(DataClassObject):
         # if not isinstance(pem, str):
         #     raise WrongDataType("'pem', must be a 'str'")
         # self.pem = pem
-
-

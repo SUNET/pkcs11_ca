@@ -32,12 +32,12 @@ from .asn1 import (
     crl_as_der,
     cert_pem_serial_number,
 )
-from .pkcs11_sign import Pkcs11SignInput, pkcs11_sign
+from .pkcs11_sign import pkcs11_sign
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
 from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
-from .config import KEY_TYPES, ACME_ROOT, ROOT_URL, PKCS11_SIGN_TOKEN
+from .config import KEY_TYPES, ACME_ROOT, ROOT_URL, PKCS11_SIGN_API_TOKEN
 
 loop = asyncio.get_running_loop()
 startup_task = loop.create_task(startup())
@@ -684,27 +684,22 @@ async def post_revoke(request: Request, revoke_input: RevokeInput) -> JSONRespon
 
 
 @app.post("/pkcs11_sign")
-async def post_pkcs11_sign(request: Request, pkcs11_sign_input: Pkcs11SignInput) -> JSONResponse:
+async def post_pkcs11_sign(request: Request) -> JSONResponse:
     """/pkcs11_sign, POST method."""
 
-    if "Authorization" not in request.headers or base64.b64decode(request.headers["Authorization"].split("Bearer ")[1]) != PKCS11_SIGN_TOKEN.encode("utf-8"):
+    if (
+        "Authorization" not in request.headers
+        or "Bearer " not in request.headers["Authorization"]
+        or base64.b64decode(request.headers["Authorization"].split("Bearer ", maxsplit=1)[1])
+        != PKCS11_SIGN_API_TOKEN.encode("utf-8")
+    ):
         return JSONResponse(
             status_code=401,
-            content={"message": f"Missing Authorization token"},
+            content={"message": "Missing valid authorization token"},
         )
 
-    key_types = ["secp256r1", "secp384r1", "secp384r1", "ed25519"]
-    if pkcs11_sign_input.key_type not in key_types:
-        return JSONResponse(
-            status_code=400,
-            content={"message": f"key_type '{pkcs11_sign_input.key_type}' must be one of {key_types}"},
-        )
-
-    data = await pkcs11_sign(pkcs11_sign_input)
-    return JSONResponse(
-        status_code=200,
-        content=data,
-    )
+    data = await request.json()
+    return await pkcs11_sign(data)
 
 
 @app.post("/cmc01")
@@ -720,7 +715,7 @@ async def post_cmc(request: Request) -> Response:
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
 
     data = await request.body()
-    print("cmc req")
+    print("cmc req for debugging")
     print(data.hex())
     try:
         data_content = await cmc_handle_request(data)

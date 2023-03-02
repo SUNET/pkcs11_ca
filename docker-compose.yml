@@ -25,6 +25,7 @@ services:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
       - CA_URL=${CA_URL}
+      - PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}
       - PKCS11_TOKEN=${PKCS11_TOKEN}
       - PKCS11_PIN=${PKCS11_PIN}
       - PKCS11_MODULE=${PKCS11_MODULE}
@@ -75,4 +76,5 @@ services:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
       - CA_URL=${CA_URL}
+      - PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}
     entrypoint: ['true']

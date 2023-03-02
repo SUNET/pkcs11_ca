@@ -12,6 +12,8 @@ Try with default ENV vars
 export CA_URL="https://web:8005"
 export CA_DNS_NAME="web"
 
+export PKCS11_SIGN_API_TOKEN="xyz"
+
 export PKCS11_TOKEN=my_test_token_1
 export PKCS11_PIN=1234
 export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
@@ -26,6 +28,11 @@ export POSTGRES_TIMEOUT="5"
     exit 1
 fi
 
+if [ -z "$PKCS11_SIGN_API_TOKEN" ]
+then
+    echo "Set ENV PKCS11_SIGN_API_TOKEN"
+    exit 1
+fi
 if [ -z "$CA_DNS_NAME" ]
 then
     echo "Set ENV CA_DNS_NAME"
@@ -248,11 +255,11 @@ if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
 '
 if [ $? -eq 0 ]
 then
-    docker run --env "CA_URL=${CA_URL}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
+    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at https://localhost:8005 and at ${CA_URL} inside the docker network pkcs11_ca_default"
     echo -e "Note that the service listens on 0.0.0.0 so will be exposed to the public if its port is open"
 else
-    docker run --env "CA_URL=${CA_URL}" --network host pkcs11_ca_test1 || exit 1
+    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --network host pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at ${CA_URL}"
 fi
 
