@@ -9,8 +9,8 @@ then
     echo """
 Try with default ENV vars
 
-export CA_URL="https://web:8005"
-export CA_DNS_NAME="web"
+export CA_URL="https://ca:8005"
+export CA_DNS_NAME="ca"
 
 export PKCS11_SIGN_API_TOKEN="xyz"
 
@@ -139,7 +139,7 @@ then
 import sys
 from src.pkcs11_ca_service.config import ROOT_URL
 
-if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
+if ROOT_URL not in ["https://ca:8005", "https://ca:443", "https://ca"]:
   sys.exit(1)
 '
     if [ $? -eq 0 ]
@@ -250,7 +250,7 @@ python3 -c '
 import sys
 from src.pkcs11_ca_service.config import ROOT_URL
 
-if ROOT_URL not in ["https://web:8005", "https://web:443", "https://web"]:
+if ROOT_URL not in ["https://ca:8005", "https://ca:443", "https://ca"]:
   sys.exit(1)
 '
 if [ $? -eq 0 ]
