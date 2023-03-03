@@ -14,6 +14,7 @@ jobs:
           bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
           export CA_URL=https://ca:8005 && \
           export CA_DNS_NAME=ca && \
+          export ACME_ROOT=/acme && \
           export PKCS11_SIGN_API_TOKEN=xyz && \
           export PKCS11_TOKEN=my_test_token_1 && \
           export PKCS11_PIN=1234 && \

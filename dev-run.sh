@@ -12,6 +12,8 @@ Try with default ENV vars
 export CA_URL="https://ca:8005"
 export CA_DNS_NAME="ca"
 
+export ACME_ROOT="/acme"
+
 export PKCS11_SIGN_API_TOKEN="xyz"
 
 export PKCS11_TOKEN=my_test_token_1
@@ -36,6 +38,12 @@ fi
 if [ -z "$CA_DNS_NAME" ]
 then
     echo "Set ENV CA_DNS_NAME"
+    exit 1
+fi
+
+if [ -z "$ACME_ROOT" ]
+then
+    echo "Set ENV ACME_ROOT"
     exit 1
 fi
 
@@ -255,11 +263,11 @@ if ROOT_URL not in ["https://ca:8005", "https://ca:443", "https://ca"]:
 '
 if [ $? -eq 0 ]
 then
-    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
+    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --env "ACME_ROOT=${ACME_ROOT}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at https://localhost:8005 and at ${CA_URL} inside the docker network pkcs11_ca_default"
     echo -e "Note that the service listens on 0.0.0.0 so will be exposed to the public if its port is open"
 else
-    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --network host pkcs11_ca_test1 || exit 1
+    docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --env "ACME_ROOT=${ACME_ROOT}" --network host pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at ${CA_URL}"
 fi
 

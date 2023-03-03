@@ -7,27 +7,19 @@ from .config import ROOT_URL, ACME_ROOT
 # FIXME use enum instead of str when appropriate
 
 
-class AcmeOrder(DataClassObject):
-    """Class to represent an ACME order"""
+class AcmeIdentifier(DataClassObject):
+    """Class to represent an ACME identifier"""
 
     db: DataBaseObject
 
-    db_table_name = "acme_order"
+    db_table_name = "acme_identifier"
     db_fields = {
-        "account": int,
-        "status": str,
-        "expires": str,
-        "identifiers": str,  # stored as base64url split by ","in DB
-        "not_before": str,
-        "not_after": str,
-        # "error": str # Implement this
-        "authorizations": str,  # stored as base64url split by ","in DB
-        "finalize": str,
-        "certificate": str,
-        "path": str,
+        "order": int,
+        "type": str,
+        "value": str,
     }
     db_reference_fields: Dict[str, str] = {
-        "account": "acme_account(serial)",
+        "order": "acme_order(serial)",
     }
     db_unique_fields = ["path"]
 

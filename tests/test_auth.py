@@ -78,7 +78,7 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # No url in token
-        req = requests.head(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce}
@@ -91,7 +91,7 @@ class TestAuth(unittest.TestCase):
         self.assertTrue(req.status_code == 401)
 
         # Wrong url in token
-        req = requests.head(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca_wrong_url"}
@@ -116,7 +116,7 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # Sign with key2 but send key1 as public key
-        req = requests.head(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
         jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
@@ -128,7 +128,7 @@ class TestAuth(unittest.TestCase):
         self.assertTrue(req.status_code == 401)
 
         # Correct auth, HEAD nonce
-        req = requests.head(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
@@ -141,7 +141,7 @@ class TestAuth(unittest.TestCase):
         self.assertTrue(req.status_code == 200)
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
@@ -185,7 +185,7 @@ class TestAuth(unittest.TestCase):
             pub_key4 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -212,7 +212,7 @@ class TestAuth(unittest.TestCase):
             pub_key5 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -239,7 +239,7 @@ class TestAuth(unittest.TestCase):
             pub_key6 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -271,7 +271,7 @@ class TestAuth(unittest.TestCase):
             pub_key7 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -283,7 +283,7 @@ class TestAuth(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
 
@@ -312,7 +312,7 @@ class TestAuth(unittest.TestCase):
             pub_key8 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -324,7 +324,7 @@ class TestAuth(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get(self.ca_url + "/new_nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}

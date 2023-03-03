@@ -9,8 +9,6 @@ if PKCS11_BACKEND == "LUNAHSM":
 else:
     KEY_TYPES = ["ed25519", "ed448", "secp256r1", "secp384r1", "secp521r1", "rsa_2048", "rsa_4096"]
 
-ACME_ROOT = "/acme"
-
 # Folder for the initial trusted pub_keys
 ROOT_ADMIN_KEYS_FOLDER = "trusted_keys"
 
@@ -96,3 +94,4 @@ CSR_EXPIRE_DATE = 365 * 1
 
 ROOT_URL = os.environ["CA_URL"]
 PKCS11_SIGN_API_TOKEN = os.environ["PKCS11_SIGN_API_TOKEN"]
+ACME_ROOT = os.environ["ACME_ROOT"]

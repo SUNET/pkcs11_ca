@@ -14,7 +14,7 @@ from .asn1 import to_base64url, from_base64url
 nonces: List[str] = []
 
 
-def generate_nonce() -> str:
+def _generate_nonce() -> str:
     """Generate a nonce, will be base64url encoded.
 
     Returns:
@@ -55,17 +55,23 @@ async def verify_nonce(nonce: str) -> bool:
     return False
 
 
-def nonce_response() -> Response:
-    """Create HTTP reponse containing a new nonce.
+def generate_nonce() -> str:
+    new_nonce = _generate_nonce()
+    nonces.append(hash_nonce(new_nonce))
+    return new_nonce
+
+
+def nonce_response(status_code: int = 200) -> Response:
+    """Create HTTP response containing a new nonce.
 
     Returns:
     fastapi.Response
     """
 
     new_nonce = generate_nonce()
-    nonces.append(hash_nonce(new_nonce))
 
     response = Response()
     response.headers["Cache-Control"] = "no-store"
     response.headers["Replay-Nonce"] = new_nonce
+    response.status_code = status_code
     return response

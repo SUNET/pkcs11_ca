@@ -32,6 +32,7 @@ from .asn1 import (
     crl_as_der,
     cert_pem_serial_number,
 )
+from .acme_http_routes import acme_new_account
 from .pkcs11_sign import pkcs11_sign
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
@@ -47,7 +48,7 @@ startup_task = loop.create_task(startup())
 app = FastAPI(docs_url=None, redoc_url=None)
 
 
-@app.get("/new_nonce")
+@app.get("/new-nonce")
 async def get_new_nonce() -> Response:
     """Get new nonce, GET method.
 
@@ -58,7 +59,7 @@ async def get_new_nonce() -> Response:
     return nonce_response()
 
 
-@app.head("/new_nonce")
+@app.head("/new-nonce")
 async def head_new_nonce() -> Response:
     """Get new nonce, HEAD method.
 
@@ -737,8 +738,31 @@ async def get_acme_directory() -> Response:
             + path.split("-", maxsplit=1)[1][1:]
         )
         directory[index] = ROOT_URL + ACME_ROOT + "/" + path
-
     return JSONResponse(status_code=200, content=json.dumps(directory))
+
+
+@app.get(ACME_ROOT + "/new-nonce")
+async def get_acme_new_nonce() -> Response:
+    """fixme"""
+    return nonce_response(204)
+
+
+@app.head(ACME_ROOT + "/new-nonce")
+async def head_acme_new_nonce() -> Response:
+    """fixme"""
+    return nonce_response(200)
+
+
+@app.post(ACME_ROOT + "/new-account")
+async def post_acme_new_account(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    return await acme_new_account(request)
 
 
 # WORK ON THIS
