@@ -197,6 +197,16 @@ class DataClassObject(ABC):
             await self.db.update(self.db_table_name, self.db_data(), self.db_unique_fields)
         return serial
 
+    async def update(self) -> None:
+        """Update data object from its database.
+
+        Returns:
+        None
+        """
+
+        await self.db.update(self.db_table_name, self.db_data(), self.db_unique_fields)
+        print("Updated " + self.db_table_name)
+
     async def delete(self) -> None:
         """Delete data object from its database.
 
@@ -206,9 +216,7 @@ class DataClassObject(ABC):
 
         unique_field = self.db_unique_fields[0]
         await self.db.delete(self.db_table_name, unique_field, self.db_data()[unique_field])
-        print(
-            "Deleted from " + self.db_table_name + ", WHERE " + unique_field + " = " + str(self.db_data()[unique_field])
-        )
+        print("Deleted from " + self.db_table_name)
 
 
 async def db_load_data_class(db_data_class: Type[DataClassObject], input_object: InputObject) -> List[DataClassObject]:

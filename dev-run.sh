@@ -238,7 +238,7 @@ fi
 
 echo "Using 'sudo' to set correct directory ownership"
 # Remove git create folder files
-sudo rm -f data/hsm_tokens/.empty
+sudo rm -f data/hsm_tokens/.empty || exit 1 # if sudo is not installed ot failed
 sudo rm -f data/db_data/.empty
 sudo mkdir -p data/hsm_tokens data/db_data
 sudo chown -R $USER data/hsm_tokens data/db_data/

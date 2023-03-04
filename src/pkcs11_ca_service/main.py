@@ -32,7 +32,7 @@ from .asn1 import (
     crl_as_der,
     cert_pem_serial_number,
 )
-from .acme_http_routes import acme_new_account
+from .acme_http_routes import acme_new_account, acme_update_account, acme_key_change
 from .pkcs11_sign import pkcs11_sign
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
@@ -471,7 +471,7 @@ async def post_ca(request: Request, ca_input: CaInput) -> JSONResponse:  # pylin
         issuer_key_type = issuer_pkcs11_key_obj.key_type
         issuer_pem = pem_cert_to_name_dict(issuer_obj.pem)
 
-        # This will be an intermidiate CA so get the AIA and CDP extensions for it
+        # This will be an intermediate CA so get the AIA and CDP extensions for it
         extra_extensions = aia_and_cdp_exts(issuer_obj.path)
 
     try:
@@ -763,6 +763,30 @@ async def post_acme_new_account(request: Request) -> JSONResponse:
         )
 
     return await acme_new_account(request)
+
+
+@app.post(ACME_ROOT + "/acct/{account_id}")
+async def post_acme_update_account(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    return await acme_update_account(request)
+
+
+@app.post(ACME_ROOT + "/key-change")
+async def post_acme_key_change(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    return await acme_key_change(request)
 
 
 # WORK ON THIS
