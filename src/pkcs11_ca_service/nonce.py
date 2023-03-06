@@ -11,6 +11,8 @@ from .asn1 import to_base64url, from_base64url
 # https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.1
 
 
+# FIXME store in DB and clear DB nonces on application startup
+
 nonces: List[str] = []
 
 

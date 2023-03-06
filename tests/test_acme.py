@@ -1,11 +1,13 @@
 """
 Test our acme
 """
-from typing import Dict, Any
+from typing import Dict, Any, Union
 import unittest
 import os
 import json
-import time
+import hashlib
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
 
@@ -19,9 +21,98 @@ from src.pkcs11_ca_service.asn1 import pem_key_to_jwk, from_base64url, to_base64
 from src.pkcs11_ca_service.config import ROOT_URL, ACME_ROOT
 
 
+class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
+    ACME_CHALLENGE: str
+
+    def do_GET(self) -> None:
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(self.ACME_CHALLENGE.encode("utf-8"))))
+        self.end_headers()
+        self.wfile.write(self.ACME_CHALLENGE.encode("utf-8"))
+        self.server.shutdown()
+        self.server.server_close()
+
+    # Disable logging in unittest
+    def log_request(self, code: Union[int, str] = "-", size: Union[int, str] = "-") -> None:
+        pass
+
+
+def run_http_server(key_authorization: str) -> None:
+    server_address = ("", 80)
+    AcmeChallengeHTTPRequestHandler.ACME_CHALLENGE = key_authorization
+
+    httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
+    httpd.timeout = 3
+    httpd.handle_request()
+
+
 def acme_nonce() -> str:
     req = requests.head(f"{ROOT_URL}{ACME_ROOT}/new-nonce", timeout=10, verify="./tls_certificate.pem")
     return req.headers["Replay-Nonce"]
+
+
+def get_orders_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    payload: Dict[str, str] = {}
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    acme_req = {
+        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "signature": signature,
+    }
+
+    return acme_req
+
+
+def get_authz_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    payload: Dict[str, str] = {}
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    acme_req = {
+        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "signature": signature,
+    }
+
+    return acme_req
+
+
+def new_order_jws(kid: str, priv_key2: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-order"}
+    payload = {
+        "identifiers": [
+            {"type": "dns", "value": os.environ["HOSTNAME"]},
+            {"type": "dns", "value": "www.test1"},
+        ],
+        "notBefore": "2023-01-01T00:04:00+04:00",
+        "notAfter": "2025-01-01T00:04:00+04:00",
+    }
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    acme_req = {
+        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "signature": signature,
+    }
+
+    return acme_req
 
 
 def create_key_change_jws(
@@ -142,8 +233,8 @@ class TestAcme(unittest.TestCase):
         self.assertTrue(req.status_code == 201)
         response_data = json.loads(req.text)
         kid = req.headers["Location"]
+        orders = response_data["orders"]
 
-        time.sleep(1)
         jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
         acme_req = create_new_account_jws(jwk, priv_key)
 
@@ -182,10 +273,8 @@ class TestAcme(unittest.TestCase):
             timeout=10,
             verify="./tls_certificate.pem",
         )
-        print(req.text)
         self.assertTrue(req.status_code == 200)
 
-        time.sleep(1)
         # Try with old key Update the account
         acme_req = create_update_account_jws(kid, priv_key)
         req = requests.post(
@@ -201,6 +290,74 @@ class TestAcme(unittest.TestCase):
         acme_req = create_update_account_jws(kid, priv_key2)
         req = requests.post(
             f"{kid}",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Create new order
+        acme_req = new_order_jws(kid, priv_key2)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-order",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        authz = response_data["authorizations"][0]
+
+        # List orders
+        acme_req = get_orders_jws(kid, priv_key2, orders)
+        req = requests.post(
+            orders,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        order = response_data["orders"][0]
+
+        # Get order
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Get authz
+        acme_req = get_authz_jws(kid, priv_key2, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        challenge = response_data["challenges"][0]
+
+        # Handle acme challenge in background http server
+        hash_module = hashlib.sha256()
+        hash_module.update(kid.encode("utf-8"))
+        key_authorization = f"{challenge['token']}.{to_base64url(hash_module.digest())}"
+        t = threading.Thread(target=run_http_server, args=(key_authorization,), daemon=True)
+        t.start()
+
+        # Trigger challenge
+        acme_req = get_authz_jws(kid, priv_key2, challenge["url"])
+        req = requests.post(
+            challenge["url"],
             headers=request_headers,
             json=acme_req,
             timeout=10,

@@ -8,6 +8,7 @@ import datetime
 from pydantic import BaseModel
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 from .validate import validate_input_string
+from .error import WrongDataType
 
 
 class DataBaseObject(ABC):
@@ -158,6 +159,9 @@ class DataClassObject(ABC):
         self.created = str(datetime.datetime.utcnow())
 
         for key, value in kwargs.items():
+            if key in self.db_fields:
+                if not isinstance(value, self.db_fields[key]):
+                    raise WrongDataType(f"'{key}', must be a '{self.db_fields[key]}'")
             setattr(self, key, value)
 
     def db_data(self) -> Dict[str, Union[str, int]]:

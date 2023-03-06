@@ -244,6 +244,7 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
         pki["algorithm"] = pka
         pki["public_key"] = from_base64url(data["x"])
 
+    _ = pki.native  # Ensure valid data
     return public_key_info_to_pem(pki)
 
 
@@ -264,6 +265,7 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         _, _, data = asn1_pem.unarmor(data)
 
     key = PublicKeyInfo().load(data)
+    _ = key.native  # Ensure valid data
 
     # Work on https://www.rfc-editor.org/rfc/rfc7517#section-4
     if key["algorithm"].native["algorithm"] == "rsa":

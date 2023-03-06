@@ -6,6 +6,7 @@ import hashlib
 import base64
 from secrets import token_bytes
 
+from cryptography.exceptions import InvalidSignature
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
 
@@ -32,7 +33,17 @@ from .asn1 import (
     crl_as_der,
     cert_pem_serial_number,
 )
-from .acme_http_routes import acme_new_account, acme_update_account, acme_key_change
+from .acme_http_routes import (
+    acme_new_account,
+    acme_update_account,
+    acme_order,
+    acme_key_change,
+    acme_new_order,
+    acme_orders,
+    acme_authz,
+    acme_chall,
+)
+from .acme_lib import NoSuchKID
 from .pkcs11_sign import pkcs11_sign
 from .cmc import cmc_handle_request
 from .nonce import nonce_response
@@ -762,7 +773,12 @@ async def post_acme_new_account(request: Request) -> JSONResponse:
             status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
         )
 
-    return await acme_new_account(request)
+    try:
+        return await acme_new_account(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
 
 
 @app.post(ACME_ROOT + "/acct/{account_id}")
@@ -774,7 +790,29 @@ async def post_acme_update_account(request: Request) -> JSONResponse:
             status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
         )
 
-    return await acme_update_account(request)
+    try:
+        return await acme_update_account(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/orders/{order_id}")
+async def post_acme_orders(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_orders(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
 
 
 @app.post(ACME_ROOT + "/key-change")
@@ -786,7 +824,80 @@ async def post_acme_key_change(request: Request) -> JSONResponse:
             status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
         )
 
-    return await acme_key_change(request)
+    try:
+        return await acme_key_change(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/new-order")
+async def post_acme_new_order(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_new_order(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/order/{order_id}")
+async def post_acme_order(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_order(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/authz/{authz_id}")
+async def post_acme_authz(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_authz(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/chall/{chall_id}")
+async def post_acme_chall(request: Request) -> JSONResponse:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_chall(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
 
 
 # WORK ON THIS

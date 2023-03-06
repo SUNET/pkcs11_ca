@@ -258,13 +258,14 @@ python3 -c '
 import sys
 from src.pkcs11_ca_service.config import ROOT_URL
 
-if ROOT_URL not in ["https://ca:8005", "https://ca:443", "https://ca"]:
-  sys.exit(1)
+if ROOT_URL in ["https://ca:8005", "https://ca:443", "https://ca"]:
+  sys.exit(0)
+sys.exit(1)
 '
 if [ $? -eq 0 ]
 then
     docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --env "ACME_ROOT=${ACME_ROOT}" --network pkcs11_ca_default pkcs11_ca_test1 || exit 1
-    echo -e "\nService ONLINE at https://localhost:8005 and at ${CA_URL} inside the docker network pkcs11_ca_default"
+    echo -e "\nService ONLINE at ${CA_URL} inside the docker network pkcs11_ca_default"
     echo -e "Note that the service listens on 0.0.0.0 so will be exposed to the public if its port is open"
 else
     docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --env "ACME_ROOT=${ACME_ROOT}" --network host pkcs11_ca_test1 || exit 1

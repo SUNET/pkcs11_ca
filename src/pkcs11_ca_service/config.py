@@ -22,6 +22,8 @@ DB_TABLE_MODULES = [
     "certificate",
     "crl",
     "acme_account",
+    "acme_order",
+    "acme_authorization",
 ]
 
 # https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/blob/dev/src/Microsoft.IdentityModel.Tokens/JsonWebKeyECTypes.cs#L40
@@ -95,3 +97,4 @@ CSR_EXPIRE_DATE = 365 * 1
 ROOT_URL = os.environ["CA_URL"]
 PKCS11_SIGN_API_TOKEN = os.environ["PKCS11_SIGN_API_TOKEN"]
 ACME_ROOT = os.environ["ACME_ROOT"]
+ACME_IDENTIFIER_TYPES = ["dns"]  # FIXME http
