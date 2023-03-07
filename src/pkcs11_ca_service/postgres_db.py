@@ -40,6 +40,10 @@ from .config import (
     CMC_CERT_ISSUING_NAME_DICT,
     CMC_SIGNING_NAME_DICT,
     CMC_EXPIRE,
+    ACME_SIGNER_KEY_LABEL,
+    ACME_SIGNER_NAME_DICT,
+    ACME_SIGNER_KEY_TYPE,
+    ACME_SIGNER_EXPIRE,
 )
 from .error import WrongDataType
 from .asn1 import (
@@ -420,6 +424,21 @@ class PostgresDB(DataBaseObject):
                 cmc_root_path,
                 hashlib.sha256(token_bytes(256)).hexdigest(),
             )
+            await cls._insert_init_ca(
+                classes_info,
+                ACME_SIGNER_KEY_LABEL,
+                ACME_SIGNER_NAME_DICT,
+                "ACME_signer_ca",
+                ACME_SIGNER_KEY_TYPE,
+                ACME_SIGNER_EXPIRE,
+                5,
+                5,
+                None,
+                None,
+                None,
+                None,
+                hashlib.sha256(token_bytes(256)).hexdigest(),
+            )
 
             await cls._insert_healthcheck_key(classes_info)
 
@@ -483,10 +502,10 @@ class PostgresDB(DataBaseObject):
                 query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
                 await conn.execute(
                     query,
-                    5,
+                    6,
                     HEALTHCHECK_KEY_LABEL,
                     HEALTHCHECK_KEY_TYPE,
-                    5,
+                    6,
                     str(datetime.datetime.utcnow()),
                 )
                 print("Created healthcheck PKCS11 key", flush=True)

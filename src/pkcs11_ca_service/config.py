@@ -96,5 +96,18 @@ CSR_EXPIRE_DATE = 365 * 1
 
 ROOT_URL = os.environ["CA_URL"]
 PKCS11_SIGN_API_TOKEN = os.environ["PKCS11_SIGN_API_TOKEN"]
+
 ACME_ROOT = os.environ["ACME_ROOT"]
 ACME_IDENTIFIER_TYPES = ["dns"]  # FIXME http
+ACME_SIGNER_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "acme_signer.sunet.se",
+    "email_address": "soc@sunet.se",
+}
+ACME_SIGNER_KEY_LABEL = "acme_root_test3"
+ACME_SIGNER_KEY_TYPE = "secp256r1"
+ACME_SIGNER_EXPIRE = 365 * 15

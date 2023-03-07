@@ -33,6 +33,7 @@ class AcmeOrder(DataClassObject):
     authorizations: str
     finalize: str
     certificate: str
+    issued_certificate: str
 
     db_table_name = "acme_order"
     db_fields = {
@@ -47,6 +48,7 @@ class AcmeOrder(DataClassObject):
         "authorizations": str,  # stored as base64url split by ","in DB
         "finalize": str,
         "certificate": str,
+        "issued_certificate": str,
     }
     db_reference_fields: Dict[str, str] = {"account": "acme_account(serial)"}
     db_unique_fields = ["id"]
@@ -86,6 +88,9 @@ def identifiers_from_order(payload: Dict[str, Any]) -> str:
             raise HTTPException(status_code=400, detail="Invalid type in identifier")
 
         identifier_entries.append({"type": entry_type, "value": entry_value})
+
+    if len(identifier_entries) == 0:
+        raise HTTPException(status_code=400, detail="Must have atleast one identifier")
 
     return to_base64url(json.dumps(identifier_entries).encode("utf-8"))
 

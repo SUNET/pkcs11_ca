@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 import json
 
-from fastapi import Request
+from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
 
@@ -10,6 +10,8 @@ from .acme_lib import (
     validate_jws,
     pem_from_jws,
     account_exists,
+    cert_response,
+    finalize_order_response,
     chall_response,
     authz_response,
     order_response,
@@ -22,6 +24,48 @@ from .acme_lib import (
     account_id_from_kid,
 )
 from .asn1 import from_base64url
+
+
+async def acme_cert(request: Request) -> Response:
+    input_data = await request.json()
+
+    if not isinstance(input_data, dict):
+        raise HTTPException(status_code=400, detail="Non valid jws")
+
+    # Ensure valid jwt
+    await validate_jws(input_data, str(request.url))
+    protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
+    account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
+
+    if account is None:
+        return JSONResponse(
+            status_code=401,
+            content="Unauthorized",  # fixme
+            media_type="application/json",
+        )
+
+    return await cert_response(account, input_data)
+
+
+async def acme_finalize_order(request: Request) -> JSONResponse:
+    input_data = await request.json()
+
+    if not isinstance(input_data, dict):
+        raise HTTPException(status_code=400, detail="Non valid jws")
+
+    # Ensure valid jwt
+    await validate_jws(input_data, str(request.url))
+    protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
+    account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
+
+    if account is None:
+        return JSONResponse(
+            status_code=401,
+            content="Unauthorized",  # fixme
+            media_type="application/json",
+        )
+
+    return await finalize_order_response(account, input_data)
 
 
 async def acme_chall(request: Request) -> JSONResponse:

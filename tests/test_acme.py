@@ -11,6 +11,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import requests
 
+import subprocess
+
+from asn1crypto import csr as asn1_csr
+from asn1crypto import x509 as asn1_x509
+from asn1crypto import pem as asn1_pem
+
+
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
@@ -70,6 +77,46 @@ def get_orders_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Di
     return acme_req
 
 
+def send_csr_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+
+    cmd = [
+        "bash",
+        "-c",
+        'openssl req -new -subj "/C=SE/CN='
+        + os.environ["HOSTNAME"]
+        + '" -addext "subjectAltName = DNS:'
+        + os.environ["HOSTNAME"]
+        + '" -newkey rsa:2048 -nodes -keyout key.pem -out req.pem 2> /dev/null',
+    ]
+    subprocess.call(cmd)
+    with open("req.pem", "rb") as f_data:
+        csr = f_data.read()
+
+    cmd = ["bash", "-c", "rm -rf key.pem req.pem"]
+    subprocess.call(cmd)
+
+    if asn1_pem.detect(csr):
+        _, _, csr = asn1_pem.unarmor(csr)
+    csr_asn1 = asn1_csr.CertificationRequest().load(csr)
+
+    payload: Dict[str, str] = {"csr": to_base64url(csr_asn1.dump())}
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    acme_req = {
+        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "signature": signature,
+    }
+
+    return acme_req
+
+
 def get_authz_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
@@ -95,7 +142,7 @@ def new_order_jws(kid: str, priv_key2: EllipticCurvePrivateKey) -> Dict[str, Any
     payload = {
         "identifiers": [
             {"type": "dns", "value": os.environ["HOSTNAME"]},
-            {"type": "dns", "value": "www.test1"},
+            # {"type": "dns", "value": "www.test1"},
         ],
         "notBefore": "2023-01-01T00:04:00+04:00",
         "notAfter": "2025-01-01T00:04:00+04:00",
@@ -333,6 +380,8 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "pending")
 
         # Get authz
         acme_req = get_authz_jws(kid, priv_key2, authz)
@@ -364,3 +413,78 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
+
+        # Get authz after challenge
+        acme_req = get_authz_jws(kid, priv_key2, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "valid")
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "ready")
+        finalize_url = response_data["finalize"]
+
+        # Send csr
+        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
+        req = requests.post(
+            finalize_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "valid")
+        cert_url = response_data["certificate"]
+
+        # get cert
+        acme_req = get_authz_jws(kid, priv_key2, cert_url)
+        req = requests.post(
+            cert_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        certs = req.text.split("-----BEGIN CERTIFICATE-----")
+        for issued_cert in certs:
+            if len(issued_cert) < 3:
+                continue
+
+            data = ("-----BEGIN CERTIFICATE-----" + issued_cert).encode("utf-8")
+            if asn1_pem.detect(data):
+                _, _, data = asn1_pem.unarmor(data)
+
+            cert_asn1 = asn1_x509.Certificate().load(data)
+            _ = cert_asn1.native

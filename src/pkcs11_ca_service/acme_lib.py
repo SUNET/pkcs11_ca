@@ -3,14 +3,20 @@ from secrets import token_bytes
 import datetime
 import json
 import hashlib
+import time
+
+from asn1crypto import csr as asn1_csr
+from asn1crypto import pem as asn1_pem
 
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.hashes import SHA256
 
+from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
+
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException
+from fastapi import HTTPException, Response
 import requests
 
 from .base import db_load_data_class
@@ -18,8 +24,28 @@ from .acme_authorization import AcmeAuthorization, AcmeAuthorizationInput, chall
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
 from .acme_order import AcmeOrder, AcmeOrderInput, identifiers_from_order, authorizations_from_list
 from .nonce import generate_nonce, verify_nonce
-from .asn1 import to_base64url, from_base64url, jwk_key_to_pem
-from .config import ACME_ROOT, ROOT_URL, ACME_IDENTIFIER_TYPES
+from .public_key import PublicKey
+from .pkcs11_key import Pkcs11KeyInput, Pkcs11Key
+from .ca import CaInput
+from .csr import Csr
+from .certificate import Certificate
+from .route_functions import ca_request
+from .asn1 import (
+    to_base64url,
+    from_base64url,
+    jwk_key_to_pem,
+    public_key_pem_from_csr,
+    cert_pem_serial_number,
+    aia_and_cdp_exts,
+)
+from .config import (
+    ACME_ROOT,
+    ROOT_URL,
+    ACME_IDENTIFIER_TYPES,
+    ACME_SIGNER_KEY_TYPE,
+    ACME_SIGNER_NAME_DICT,
+    ACME_SIGNER_KEY_LABEL,
+)
 
 
 class NoSuchKID(Exception):
@@ -62,22 +88,217 @@ async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAcco
     return None
 
 
-async def execute_challenge(kid: str, authz: AcmeAuthorization, challenge: Dict[str, str]) -> bool:
+async def execute_challenge(kid: str, order: AcmeOrder, authz: AcmeAuthorization, challenge: Dict[str, str]) -> None:
     identifier = json.loads(from_base64url(authz.identifier))
     hash_module = hashlib.sha256()
     hash_module.update(f"{ROOT_URL}{ACME_ROOT}/acct/{kid}".encode("utf-8"))
     key_authorization = f"{challenge['token']}.{to_base64url(hash_module.digest())}"
+    challenges = authz.challenges_as_list()
+
+    authz.status = "processing"
+    await authz.update()
+
+    chall_success = False
 
     if challenge["type"] == "http-01":
         req = requests.get(
             f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
         )
 
-        if req.status_code == 200 and len(req.text) < 500 and key_authorization in req.text:
-            print("chall OKKK")
-            return True
+        if req.status_code == 200 and key_authorization in req.text:
+            chall_success = True
+        else:
+            time.sleep(5)
+            req = requests.get(
+                f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
+            )
 
-    return False
+            if req.status_code == 200 and key_authorization in req.text:
+                chall_success = True
+
+        if chall_success:
+            for chall in challenges:
+                if chall["token"] == challenge["token"]:
+                    chall["status"] = "valid"
+                    chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+            authz.challenges = challenges_from_list(challenges)
+            authz.status = "valid"
+            await authz.update()
+
+            for order_auth_data in order.authorizations_as_list():
+                order_auth = await authz_exists(
+                    AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
+                )
+                if not isinstance(order_auth, AcmeAuthorization) or order_auth.status != "valid":
+                    break
+            else:
+                order.status = "ready"
+                await order.update()
+
+
+async def sign_cert(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
+    csr_pem = asn1_pem.armor("CERTIFICATE REQUEST", csr.dump()).decode("utf-8")
+
+    pkcs11_key = (await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(key_label=ACME_SIGNER_KEY_LABEL)))[0]
+    if not isinstance(pkcs11_key, Pkcs11Key):
+        raise HTTPException(status_code=400, detail="Non valid acme signer ca")
+
+    issuer = await ca_request(CaInput(pkcs11_key=pkcs11_key.serial))
+    extra_extensions = aia_and_cdp_exts(issuer.path)
+
+    # Get public key from csr
+    public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_pem), "authorized_by": 1})
+    await public_key_obj.save()
+
+    # Save csr
+    csr_obj = Csr({"pem": csr_pem, "authorized_by": 1, "public_key": public_key_obj.serial})
+    await csr_obj.save()
+
+    cert_pem = await pkcs11_sign_csr(
+        ACME_SIGNER_KEY_LABEL,
+        ACME_SIGNER_NAME_DICT,
+        csr_pem,
+        key_type=ACME_SIGNER_KEY_TYPE,
+        extra_extensions=extra_extensions,
+    )
+
+    # Save cert
+    cert_obj = Certificate(
+        {
+            "pem": cert_pem,
+            "authorized_by": 1,
+            "csr": csr_obj.serial,
+            "serial_number": str(cert_pem_serial_number(cert_pem)),
+            "public_key": public_key_obj.serial,
+            "issuer": issuer.serial,
+        }
+    )
+    await cert_obj.save()
+
+    order.certificate = f"{ROOT_URL}{ACME_ROOT}/cert/{random_string()}"
+    order.issued_certificate = cert_pem
+    order.status = "valid"
+    await order.update()
+
+
+def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
+    subject = csr["certification_request_info"]["subject"].native
+
+    sans: List[str] = []
+    csr_exts = csr["certification_request_info"]["attributes"].native
+    for csr_ext in csr_exts:
+        if csr_ext["type"] == "extension_request":
+            for exts in csr_ext["values"]:
+                for ext in exts:
+                    if ext["extn_id"] == "subject_alt_name":
+                        for san in ext["extn_value"]:
+                            sans.append(san)
+
+    if "common_name" not in subject or len(sans) == 0:
+        raise HTTPException(status_code=400, detail="Non valid csr")
+
+    identifiers: List[str] = []
+    for ident in order.identifiers_as_list():
+        if ident["type"] == "dns":
+            identifiers.append(ident["value"])
+
+    # Check all identifiers
+    for identifier in identifiers:
+        if identifier not in sans and identifier != subject["common_name"]:
+            raise HTTPException(status_code=400, detail="csr not matching identifier")
+
+    # Check all subject alternative names
+    for san in sans:
+        if san not in identifiers and san != subject["common_name"]:
+            raise HTTPException(status_code=400, detail="csr not matching identifier")
+
+
+async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
+    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
+    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+
+    cert_id: str = protected["url"]
+
+    order: AcmeOrder
+    db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
+    for obj in db_acme_order_objs:
+        if not isinstance(obj, AcmeOrder):
+            raise HTTPException(status_code=401, detail="Non valid order1")
+
+        if obj.certificate == cert_id:
+            order = obj
+            break
+    else:
+        raise HTTPException(status_code=401, detail="Non valid order2")
+
+    pkcs11_key = (await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(key_label=ACME_SIGNER_KEY_LABEL)))[0]
+    if not isinstance(pkcs11_key, Pkcs11Key):
+        raise HTTPException(status_code=400, detail="Non valid acme signer ca")
+
+    issuer = await ca_request(CaInput(pkcs11_key=pkcs11_key.serial))
+
+    return Response(content=f"{order.issued_certificate}{issuer.pem}", media_type="application/pem-certificate-chain")
+
+
+async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
+    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+
+    order_id: str = protected["url"]
+    order_id = order_id.replace(f"{ROOT_URL}{ACME_ROOT}/order/", "").replace("/finalize", "")
+
+    order: AcmeOrder
+    db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(id=order_id))
+    for obj in db_acme_order_objs:
+        if not isinstance(obj, AcmeOrder):
+            raise HTTPException(status_code=401, detail="Non valid order")
+
+        if obj.id == order_id:
+            order = obj
+            break
+    else:
+        raise HTTPException(status_code=401, detail="Non valid order")
+
+    if order.status != "ready":
+        raise HTTPException(status_code=403, detail="orderNotReady")  # Fixme handle error better see rfc
+
+    if "csr" not in payload:
+        raise HTTPException(status_code=400, detail="Non valid csr")
+
+    csr = payload["csr"]
+    if not isinstance(csr, str):
+        raise HTTPException(status_code=400, detail="Non valid csr")
+
+    csr_req = asn1_csr.CertificationRequest().load(from_base64url(csr))
+    _ = csr_req.native  # Ensure valid csr format
+
+    validate_csr(csr_req, order)
+
+    # Set status as processing since csr was valid
+    order.status = "prccessing"
+    await order.update()
+
+    await sign_cert(csr_req, order)
+
+    response_data = {
+        "status": order.status,
+        "expires": order.expires,
+        "notBefore": order.not_before,
+        "notAfter": order.not_after,
+        "identifiers": order.identifiers_as_list(),
+        "authorizations": order.authorizations_as_list(),
+        "finalize": order.finalize,
+    }
+    if order.status == "valid":
+        response_data["certificate"] = order.certificate
+
+    return JSONResponse(
+        status_code=200,
+        headers={"Replay-Nonce": generate_nonce()},
+        content=response_data,
+        media_type="application/json",
+    )
 
 
 async def chall_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
@@ -103,13 +324,13 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
             )
             for authz_obj in db_acme_authz_objs:
                 if not isinstance(authz_obj, AcmeAuthorization):
-                    raise HTTPException(status_code=401, detail="Non valid challenge")
+                    raise HTTPException(status_code=400, detail="Non valid challenge")
 
                 for challenge in authz_obj.challenges_as_list():
                     if challenge["url"] == challenge_url:
                         if execute:
-                            print("executing chall")
-                            await execute_challenge(account.id, authz_obj, challenge)
+                            print("executing chall")  # fixme run in background thread
+                            await execute_challenge(account.id, order, authz_obj, challenge)
                         return JSONResponse(
                             status_code=200,
                             headers={"Replay-Nonce": generate_nonce()},
@@ -138,9 +359,14 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
         "challenges": authz.challenges_as_list(),
     }
 
+    if authz.status == "pending":
+        headers = {"Replay-Nonce": generate_nonce(), "Retry-After": "10"}
+    else:
+        headers = {"Replay-Nonce": generate_nonce()}
+
     return JSONResponse(
         status_code=200,
-        headers={"Replay-Nonce": generate_nonce()},
+        headers=headers,
         content=response_data,
         media_type="application/json",
     )
@@ -170,6 +396,8 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
             "authorizations": order.authorizations_as_list(),
             "finalize": order.finalize,
         }
+        if order.status == "valid":
+            response_data["certificate"] = order.certificate
 
         return JSONResponse(
             status_code=200,
@@ -237,6 +465,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "authorizations": "",
             "finalize": "",
             "certificate": "",
+            "issued_certificate": "",
         }
     )
     new_order_serial = await new_order.save()
