@@ -155,7 +155,7 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
             pub_key.verify(signature, signed_data, ECDSA(SHA256()))  # Assume sha256
         elif pub_key.curve.name == "secp384r1":
             pub_key.verify(signature, signed_data, ECDSA(SHA384()))  # Assume sha384
-        elif pub_key.curve.name == "secp512r1":
+        elif pub_key.curve.name == "secp521r1":
             pub_key.verify(signature, signed_data, ECDSA(SHA512()))  # Assume sha512
         else:
             raise ValueError("Unsupported EC curve")
