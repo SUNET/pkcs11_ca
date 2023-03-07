@@ -18,8 +18,11 @@ from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.hashes import SHA256
 
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePrivateKey, generate_private_key, SECP256R1
 from cryptography.hazmat.primitives.hashes import SHA256
@@ -62,6 +65,27 @@ def get_orders_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Di
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, str] = {}
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    acme_req = {
+        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "signature": signature,
+    }
+
+    return acme_req
+
+
+def revoke_cert_jws(
+    kid: str, priv_key2: EllipticCurvePrivateKey, url: str, cert: asn1_x509.Certificate
+) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    payload: Dict[str, Union[str, int]] = {"certificate": to_base64url(cert.dump()), "reason": 4}
 
     signed_data = (
         to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
@@ -468,6 +492,7 @@ class TestAcme(unittest.TestCase):
         cert_url = response_data["certificate"]
 
         # get cert
+        issued_cert_asn1 = asn1_x509.Certificate()
         acme_req = get_authz_jws(kid, priv_key2, cert_url)
         req = requests.post(
             cert_url,
@@ -478,13 +503,27 @@ class TestAcme(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
-        for issued_cert in certs:
-            if len(issued_cert) < 3:
+        for index in range(len(certs)):
+            if len(certs[index]) < 3:
                 continue
 
-            data = ("-----BEGIN CERTIFICATE-----" + issued_cert).encode("utf-8")
+            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
             if asn1_pem.detect(data):
                 _, _, data = asn1_pem.unarmor(data)
 
             cert_asn1 = asn1_x509.Certificate().load(data)
             _ = cert_asn1.native
+
+            if index == 1:  # First cert in chain - the leaf
+                issued_cert_asn1 = asn1_x509.Certificate().load(data)
+
+        # Revoke cert
+        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)

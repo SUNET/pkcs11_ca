@@ -17,6 +17,7 @@ class AcmeOrderInput(InputObject):
 
     id: Union[str, None]
     account: Union[int, None]
+    issued_certificate: Union[str, None]
 
 
 class AcmeOrder(DataClassObject):
@@ -51,7 +52,7 @@ class AcmeOrder(DataClassObject):
         "issued_certificate": str,
     }
     db_reference_fields: Dict[str, str] = {"account": "acme_account(serial)"}
-    db_unique_fields = ["id"]
+    db_unique_fields = ["id", "issued_certificate"]
 
     def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
         super().__init__(kwargs)

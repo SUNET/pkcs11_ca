@@ -44,6 +44,7 @@ from .acme_http_routes import (
     acme_chall,
     acme_finalize_order,
     acme_cert,
+    acme_revoke_cert,
 )
 from .acme_lib import NoSuchKID
 from .pkcs11_sign import pkcs11_sign
@@ -930,6 +931,23 @@ async def post_acme_cert(request: Request) -> Response:
 
     try:
         return await acme_cert(request)
+    except (InvalidSignature, NoSuchKID) as exc:
+        raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
+    except (ValueError, IndexError, KeyError) as exc:
+        raise HTTPException(status_code=400, detail="Non valid jws") from exc
+
+
+@app.post(ACME_ROOT + "/revoke-cert")
+async def post_acme_revoke_cert(request: Request) -> Response:
+    """fixme"""
+    content_type = request.headers.get("Content-Type")
+    if content_type is None or content_type != "application/jose+json":
+        return JSONResponse(
+            status_code=415, content={"message": "Invalid Content-Type header"}, media_type="application/jose+json"
+        )
+
+    try:
+        return await acme_revoke_cert(request)
     except (InvalidSignature, NoSuchKID) as exc:
         raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
     except (ValueError, IndexError, KeyError) as exc:

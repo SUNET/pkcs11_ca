@@ -10,6 +10,7 @@ from .acme_lib import (
     validate_jws,
     pem_from_jws,
     account_exists,
+    revoke_cert_response,
     cert_response,
     finalize_order_response,
     chall_response,
@@ -24,6 +25,15 @@ from .acme_lib import (
     account_id_from_kid,
 )
 from .asn1 import from_base64url
+
+
+async def acme_revoke_cert(request: Request) -> Response:
+    input_data = await request.json()
+
+    if not isinstance(input_data, dict):
+        raise HTTPException(status_code=400, detail="Non valid jws")
+
+    return await revoke_cert_response(input_data, str(request.url))
 
 
 async def acme_cert(request: Request) -> Response:

@@ -6,6 +6,16 @@ import hashlib
 import datetime
 import urllib.parse
 
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_der_public_key
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey as cryptoRSAPublicKey
+
+from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
+
 import jwt
 import requests
 from asn1crypto import pem as asn1_pem
@@ -103,7 +113,7 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     """Get the subject name dict from pem data as a dict.
 
     Parameters:
-    pem (bytes): PEM input data.
+    pem (str): PEM input data.
 
     Returns:
     Dict[str, str]
@@ -118,11 +128,52 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     return ret
 
 
+def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) -> None:
+    """Verify signature dome by the certificates private key
+    raises cryptography.exceptions.InvalidSignature if invalid signature or ValueError if the public key is not supported.
+
+    Potentially fails if the signature is made using nonstandard hasing of the data
+
+    Parameters:
+    pem (str): PEM input data.
+
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+
+    cert = asn1_x509.Certificate().load(data)
+
+    pub_key = load_der_public_key(cert["tbs_certificate"]["subject_public_key_info"].dump())
+
+    if isinstance(pub_key, cryptoRSAPublicKey):
+        pub_key.verify(signature, signed_data, PKCS1v15(), SHA256())  # Assume pkcs1v15 and sha256
+
+    elif isinstance(pub_key, EllipticCurvePublicKey):
+        if pub_key.curve.name == "secp256r1":
+            pub_key.verify(signature, signed_data, ECDSA(SHA256()))  # Assume sha256
+        elif pub_key.curve.name == "secp384r1":
+            pub_key.verify(signature, signed_data, ECDSA(SHA384()))  # Assume sha384
+        elif pub_key.curve.name == "secp512r1":
+            pub_key.verify(signature, signed_data, ECDSA(SHA512()))  # Assume sha512
+        else:
+            raise ValueError("Unsupported EC curve")
+
+    elif isinstance(pub_key, Ed25519PublicKey):
+        pub_key.verify(signature, signed_data)
+
+    elif isinstance(pub_key, Ed448PublicKey):
+        pub_key.verify(signature, signed_data)
+    else:
+        raise ValueError("Non supported public key in certificate")
+
+
 def pem_cert_to_key_hash(pem: str) -> bytes:
     """Get the key hash from pem data as a dict.
 
     Parameters:
-    pem (bytes): PEM input data.
+    pem (str): PEM input data.
 
     Returns:
     bytes

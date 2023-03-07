@@ -6,6 +6,7 @@ import hashlib
 import time
 
 from asn1crypto import csr as asn1_csr
+from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 from cryptography.hazmat.primitives import serialization
@@ -28,7 +29,7 @@ from .public_key import PublicKey
 from .pkcs11_key import Pkcs11KeyInput, Pkcs11Key
 from .ca import CaInput
 from .csr import Csr
-from .certificate import Certificate
+from .certificate import Certificate, CertificateInput
 from .route_functions import ca_request
 from .asn1 import (
     to_base64url,
@@ -37,6 +38,7 @@ from .asn1 import (
     public_key_pem_from_csr,
     cert_pem_serial_number,
     aia_and_cdp_exts,
+    pem_cert_verify_signature,
 )
 from .config import (
     ACME_ROOT,
@@ -71,7 +73,7 @@ def account_id_from_kid(kid: str) -> str:
 
 
 async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAuthorization, None]:
-    """If exists the return the authorization"""
+    """If exists then return the authorization"""
     db_acme_authz_objs = await db_load_data_class(AcmeAuthorization, acme_authz_input)
     for obj in db_acme_authz_objs:
         if isinstance(obj, AcmeAuthorization):
@@ -80,7 +82,7 @@ async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAu
 
 
 async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAccount, None]:
-    """If exists the return the account"""
+    """If exists then return the account"""
     db_acme_account_objs = await db_load_data_class(AcmeAccount, acme_account_input)
     for obj in db_acme_account_objs:
         if isinstance(obj, AcmeAccount):
@@ -214,6 +216,72 @@ def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
             raise HTTPException(status_code=400, detail="csr not matching identifier")
 
 
+async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Response:
+    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
+    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    reason: Union[int, None] = None
+
+    if "signature" not in jws:
+        raise HTTPException(status_code=400, detail="invalid request")
+    signature = jws["signature"]
+    if not isinstance(signature, str) or not isinstance(protected, dict) or not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="invalid request")
+
+    signed_data = (
+        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+    )
+
+    if "certificate" not in payload:
+        raise HTTPException(status_code=400, detail="Certificate missing")
+    certificate: str = payload["certificate"]
+    if not isinstance(certificate, str):
+        raise HTTPException(status_code=400, detail="Certificate missing")
+
+    asn1_certificate = asn1_x509.Certificate().load(from_base64url(certificate))
+    cert_pem: str = asn1_pem.armor("CERTIFICATE", asn1_certificate.dump()).decode("utf-8")
+
+    if "reason" in payload:
+        reason = payload["reason"]
+    if not isinstance(reason, int) or reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:
+        raise HTTPException(status_code=400, detail="Invalid reason")
+
+    # Verify signature
+    if "kid" in protected:
+        # Ensure valid jwt
+        await validate_jws(jws, request_url)
+        account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
+        if account is None:
+            raise HTTPException(status_code=401, detail="No such account")
+
+        order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
+        if not isinstance(order, AcmeOrder):
+            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+        if order.issued_certificate != cert_pem or order.account != account.serial:
+            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+    elif "jwk" in protected:
+        pem_cert_verify_signature(cert_pem, from_base64url(signature), signed_data.encode("utf-8"))
+        order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
+        if not isinstance(order, AcmeOrder):
+            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+        if order.issued_certificate != cert_pem:
+            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+    else:
+        raise HTTPException(status_code=401, detail="No such account")
+
+    cert = (await db_load_data_class(Certificate, CertificateInput(pem=cert_pem)))[0]
+    if not isinstance(cert, Certificate):
+        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+    # Revoke cert
+    await cert.revoke(1, reason)
+    print("Revoked cert from acme revoke request")
+
+    return Response(headers={"Replay-Nonce": generate_nonce()})
+
+
 async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
@@ -224,13 +292,13 @@ async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
     db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
     for obj in db_acme_order_objs:
         if not isinstance(obj, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid order1")
+            raise HTTPException(status_code=401, detail="Non valid order")
 
         if obj.certificate == cert_id:
             order = obj
             break
     else:
-        raise HTTPException(status_code=401, detail="Non valid order2")
+        raise HTTPException(status_code=401, detail="Non valid order")
 
     pkcs11_key = (await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(key_label=ACME_SIGNER_KEY_LABEL)))[0]
     if not isinstance(pkcs11_key, Pkcs11Key):
@@ -741,9 +809,8 @@ def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str
 
 
 async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
-    # Fixme error handling
-    # if "protected" not in input_data or "payload" not in input_data or "signature" not in input_data:
-    #     raise HTTPException(status_code=400, detail="Non valid jws0")
+    if "protected" not in input_data or "payload" not in input_data or "signature" not in input_data:
+        raise HTTPException(status_code=400, detail="Non valid jws")
 
     protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(input_data["payload"]).decode("utf-8"))
@@ -765,7 +832,7 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
     url = protected["url"]
 
     if not isinstance(alg, str) or not isinstance(nonce, str) or not isinstance(url, str):
-        raise HTTPException(status_code=400, detail="Non valid jws2")
+        raise HTTPException(status_code=400, detail="Non valid jws")
 
     # Verify url
     # print(url)

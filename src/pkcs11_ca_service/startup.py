@@ -39,7 +39,10 @@ def _load_db_module() -> DataBaseObject:
     class_name = DB_MODULE[0].upper() + DB_MODULE[1:].replace("_db", "DB")
 
     # Instance the DB class to ensure abstract methods are implemented
-    db_obj: DataBaseObject = object.__new__(getattr(module, class_name))
+    db_obj = object.__new__(getattr(module, class_name))
+    if not isinstance(db_obj, DataBaseObject):
+        print(f"Error loading {class_name}")
+        sys.exit(1)
 
     # Set pkcs11 session
     db_obj.pkcs11_session = PKCS11Session()
@@ -56,7 +59,6 @@ async def _db_startup(db_obj: DataBaseObject, db_data_classes: List[DataClassObj
     unique_fields: List[List[str]] = []
 
     # Allow DB to startup
-
     for db_data_class in db_data_classes:
         tables.append(db_data_class.db_table_name)
         fields.append(db_data_class.db_fields)
