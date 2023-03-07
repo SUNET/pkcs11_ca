@@ -4,6 +4,7 @@ import json
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException
+from fastapi.background import BackgroundTasks
 
 from .acme_account import AcmeAccount, AcmeAccountInput
 from .acme_lib import (
@@ -78,7 +79,7 @@ async def acme_finalize_order(request: Request) -> JSONResponse:
     return await finalize_order_response(account, input_data)
 
 
-async def acme_chall(request: Request) -> JSONResponse:
+async def acme_chall(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
     input_data = await request.json()
 
     if not isinstance(input_data, dict):
@@ -96,7 +97,7 @@ async def acme_chall(request: Request) -> JSONResponse:
             media_type="application/json",
         )
 
-    return await chall_response(account, input_data)
+    return await chall_response(account, input_data, background_tasks)
 
 
 async def acme_authz(request: Request) -> JSONResponse:

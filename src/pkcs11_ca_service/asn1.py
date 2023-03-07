@@ -13,8 +13,10 @@ from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePub
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey as cryptoRSAPublicKey
-
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
+
+from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 import jwt
 import requests
@@ -29,6 +31,7 @@ from asn1crypto.keys import (
     PublicKeyAlgorithmId,
     NamedCurve,
     ECDomainParameters,
+    ECPointBitString,
 )
 
 from .config import ROOT_URL
@@ -132,7 +135,7 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
     """Verify signature dome by the certificates private key
     raises cryptography.exceptions.InvalidSignature if invalid signature or ValueError if the public key is not supported.
 
-    Potentially fails if the signature is made using nonstandard hasing of the data
+    Potentially fails if the signature is made using nonstandard hasing of the data.
 
     Parameters:
     pem (str): PEM input data.
@@ -148,15 +151,33 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
     pub_key = load_der_public_key(cert["tbs_certificate"]["subject_public_key_info"].dump())
 
     if isinstance(pub_key, cryptoRSAPublicKey):
-        pub_key.verify(signature, signed_data, PKCS1v15(), SHA256())  # Assume pkcs1v15 and sha256
+        try:
+            pub_key.verify(signature, signed_data, PKCS1v15(), SHA256())
+        except InvalidSignature:
+            try:
+                pub_key.verify(signature, signed_data, PKCS1v15(), SHA384())
+            except InvalidSignature:
+                pub_key.verify(signature, signed_data, PKCS1v15(), SHA512())
 
     elif isinstance(pub_key, EllipticCurvePublicKey):
         if pub_key.curve.name == "secp256r1":
-            pub_key.verify(signature, signed_data, ECDSA(SHA256()))  # Assume sha256
+            try:
+                pub_key.verify(signature, signed_data, ECDSA(SHA256()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(signature, "secp256r1")
+                pub_key.verify(converted_signature, signed_data, ECDSA(SHA256()))
         elif pub_key.curve.name == "secp384r1":
-            pub_key.verify(signature, signed_data, ECDSA(SHA384()))  # Assume sha384
+            try:
+                pub_key.verify(signature, signed_data, ECDSA(SHA384()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(signature, "secp384r1")
+                pub_key.verify(converted_signature, signed_data, ECDSA(SHA384()))
         elif pub_key.curve.name == "secp521r1":
-            pub_key.verify(signature, signed_data, ECDSA(SHA512()))  # Assume sha512
+            try:
+                pub_key.verify(signature, signed_data, ECDSA(SHA512()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(signature, "secp521r1")
+                pub_key.verify(converted_signature, signed_data, ECDSA(SHA512()))
         else:
             raise ValueError("Unsupported EC curve")
 
@@ -241,8 +262,8 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
 
     if data["kty"] == "RSA":
         rsa = RSAPublicKey()
-        rsa["modulus"] = int(from_base64url(data["modulus"]).decode("utf-8"))
-        rsa["public_exponent"] = int(from_base64url(data["public_exponent"]).decode("utf-8"))
+        rsa["modulus"] = int.from_bytes(from_base64url(data["n"]), "big")
+        rsa["public_exponent"] = int.from_bytes(from_base64url(data["e"]), "big")
 
         pka["algorithm"] = PublicKeyAlgorithmId("rsa")
         pki["algorithm"] = pka
@@ -250,39 +271,20 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
 
     elif data["kty"] == "EC":
         pka["algorithm"] = PublicKeyAlgorithmId("ec")
-
         pki["algorithm"] = pka
-
         if data["crv"] == "P-256":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp256r1")})
-            pki["public_key"] = (
-                b"\x04"
-                + int(from_base64url(data["x"])).to_bytes(32, "big")
-                + int(from_base64url(data["y"])).to_bytes(32, "big")
-            )
-
         elif data["crv"] == "P-384":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp384r1")})
-            pki["public_key"] = (
-                b"\x04"
-                + int(from_base64url(data["x"])).to_bytes(48, "big")
-                + int(from_base64url(data["y"])).to_bytes(48, "big")
-            )
-
         elif data["crv"] == "P-521":
             pka["parameters"] = ECDomainParameters({"named": NamedCurve("secp521r1")})
-            pki["public_key"] = (
-                b"\x04"
-                + int(from_base64url(data["x"])).to_bytes(66, "big")
-                + int(from_base64url(data["y"])).to_bytes(66, "big")
-            )
-
         else:
             raise UnsupportedJWTAlgorithm
 
-        # pki["public_key"] = ECPointBitString().from_coords(
-        #     int(from_base64url(data["x"])), int(from_base64url(data["y"]))
-        # )
+        key_string = ECPointBitString.from_coords(
+            int.from_bytes(from_base64url(data["x"]), "big"), int.from_bytes(from_base64url(data["y"]), "big")
+        )
+        pki["public_key"] = key_string
 
     elif data["kty"] == "OKP":
         if data["crv"] == "Ed25519":
@@ -322,9 +324,9 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
     if key["algorithm"].native["algorithm"] == "rsa":
         ret["kty"] = "RSA"
         ret["use"] = "sig"
-        # ret["alg"] = # Work on this
-        ret["modulus"] = to_base64url(str(key["public_key"].native["modulus"]).encode("utf-8"))
-        ret["public_exponent"] = to_base64url(str(key["public_key"].native["public_exponent"]).encode("utf-8"))
+        ret["alg"] = "RS256"
+        ret["n"] = to_base64url(key["public_key"].native["modulus"].to_bytes(key.byte_size, "big"))
+        ret["e"] = to_base64url(key["public_key"].native["public_exponent"].to_bytes(3, "big"))
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
 
     elif key["algorithm"].native["algorithm"] == "ec":
@@ -334,17 +336,21 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
         if key["algorithm"].native["parameters"] == "secp256r1":
             ret["crv"] = "P-256"
             ret["alg"] = "ES256"
+            ret["x"] = to_base64url(key["public_key"].to_coords()[0].to_bytes(32, "big"))
+            ret["y"] = to_base64url(key["public_key"].to_coords()[1].to_bytes(32, "big"))
         elif key["algorithm"].native["parameters"] == "secp384r1":
             ret["crv"] = "P-384"
             ret["alg"] = "ES384"
+            ret["x"] = to_base64url(key["public_key"].to_coords()[0].to_bytes(48, "big"))
+            ret["y"] = to_base64url(key["public_key"].to_coords()[1].to_bytes(48, "big"))
         elif key["algorithm"].native["parameters"] == "secp521r1":
             ret["crv"] = "P-521"
             ret["alg"] = "ES512"
+            ret["x"] = to_base64url(key["public_key"].to_coords()[0].to_bytes(66, "big"))
+            ret["y"] = to_base64url(key["public_key"].to_coords()[1].to_bytes(66, "big"))
         else:
             raise UnsupportedJWTAlgorithm
 
-        ret["x"] = to_base64url(str(key["public_key"].to_coords()[0]).encode("utf-8"))
-        ret["y"] = to_base64url(str(key["public_key"].to_coords()[1]).encode("utf-8"))
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
 
     elif key["algorithm"].native["algorithm"] in ["ed25519", "ed448"]:

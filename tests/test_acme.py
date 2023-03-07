@@ -19,10 +19,6 @@ from asn1crypto import pem as asn1_pem
 
 
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.hazmat.primitives.hashes import SHA256
 
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePrivateKey, generate_private_key, SECP256R1
 from cryptography.hazmat.primitives.hashes import SHA256
@@ -52,7 +48,7 @@ def run_http_server(key_authorization: str) -> None:
     AcmeChallengeHTTPRequestHandler.ACME_CHALLENGE = key_authorization
 
     httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
-    httpd.timeout = 3
+    httpd.timeout = 5
     httpd.handle_request()
 
 
@@ -67,13 +63,15 @@ def get_orders_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Di
     payload: Dict[str, str] = {}
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -88,13 +86,15 @@ def revoke_cert_jws(
     payload: Dict[str, Union[str, int]] = {"certificate": to_base64url(cert.dump()), "reason": 4}
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -128,13 +128,15 @@ def send_csr_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict
     payload: Dict[str, str] = {"csr": to_base64url(csr_asn1.dump())}
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -147,13 +149,15 @@ def get_authz_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dic
     payload: Dict[str, str] = {}
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -173,13 +177,15 @@ def new_order_jws(kid: str, priv_key2: EllipticCurvePrivateKey) -> Dict[str, Any
     }
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -198,28 +204,30 @@ def create_key_change_jws(
     inner_payload = {"account": kid, "oldKey": old_jwk}
 
     inner_signed_data = (
-        to_base64url(json.dumps(inner_protected).encode("utf-8"))
+        to_base64url(json.dumps(inner_protected, separators=(",", ":")).encode("utf-8"))
         + "."
-        + to_base64url(json.dumps(inner_payload).encode("utf-8"))
+        + to_base64url(json.dumps(inner_payload, separators=(",", ":")).encode("utf-8"))
     )
 
     inner_signature = to_base64url(priv_key2.sign(inner_signed_data.encode("utf-8"), ECDSA(SHA256())))
 
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/key-change"}
     payload = {
-        "protected": to_base64url(json.dumps(inner_protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(inner_payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(inner_protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(inner_payload, separators=(",", ":")).encode("utf-8")),
         "signature": inner_signature,
     }
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -235,13 +243,15 @@ def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Di
     }
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 
@@ -257,13 +267,15 @@ def create_new_account_jws(jwk: Dict[str, Any], priv_key: EllipticCurvePrivateKe
     }
 
     signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
+        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
     signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
-        "protected": to_base64url(json.dumps(protected).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload).encode("utf-8")),
+        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
+        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
 

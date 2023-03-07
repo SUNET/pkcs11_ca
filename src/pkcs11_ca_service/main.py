@@ -9,6 +9,7 @@ from secrets import token_bytes
 from cryptography.exceptions import InvalidSignature
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import JSONResponse
+from fastapi.background import BackgroundTasks
 
 from asn1crypto import x509 as asn1_x509
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
@@ -739,7 +740,7 @@ async def post_cmc(request: Request) -> Response:
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
 
 
-@app.get(ACME_ROOT)
+@app.get(ACME_ROOT + "/directory")
 async def get_acme_directory() -> Response:
     """fixme"""
     paths = ["new-nonce", "new-account", "new-order", "new-authz", "revoke-cert", "key-change"]
@@ -752,7 +753,7 @@ async def get_acme_directory() -> Response:
             + path.split("-", maxsplit=1)[1][1:]
         )
         directory[index] = ROOT_URL + ACME_ROOT + "/" + path
-    return JSONResponse(status_code=200, content=json.dumps(directory))
+    return JSONResponse(status_code=200, content=directory)
 
 
 @app.get(ACME_ROOT + "/new-nonce")
@@ -887,7 +888,7 @@ async def post_acme_authz(request: Request) -> JSONResponse:
 
 
 @app.post(ACME_ROOT + "/chall/{chall_id}")
-async def post_acme_chall(request: Request) -> JSONResponse:
+async def post_acme_chall(request: Request, background_tasks: BackgroundTasks) -> JSONResponse:
     """fixme"""
     content_type = request.headers.get("Content-Type")
     if content_type is None or content_type != "application/jose+json":
@@ -896,7 +897,7 @@ async def post_acme_chall(request: Request) -> JSONResponse:
         )
 
     try:
-        return await acme_chall(request)
+        return await acme_chall(request, background_tasks)
     except (InvalidSignature, NoSuchKID) as exc:
         raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
     except (ValueError, IndexError, KeyError) as exc:

@@ -10,14 +10,22 @@ from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
 from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
+from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
+from cryptography.exceptions import InvalidSignature
+
 
 from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
+from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException, Response
+from fastapi.background import BackgroundTasks
+
 import requests
 
 from .base import db_load_data_class
@@ -100,6 +108,9 @@ async def execute_challenge(kid: str, order: AcmeOrder, authz: AcmeAuthorization
     authz.status = "processing"
     await authz.update()
 
+    print("sleeping 2 seconds before executing challenge")
+    time.sleep(2)  # Ensure challenge responder has started
+
     chall_success = False
 
     if challenge["type"] == "http-01":
@@ -110,6 +121,7 @@ async def execute_challenge(kid: str, order: AcmeOrder, authz: AcmeAuthorization
         if req.status_code == 200 and key_authorization in req.text:
             chall_success = True
         else:
+            print("Retrying after 5 seconds")
             time.sleep(5)
             req = requests.get(
                 f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
@@ -227,9 +239,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
     if not isinstance(signature, str) or not isinstance(protected, dict) or not isinstance(payload, dict):
         raise HTTPException(status_code=400, detail="invalid request")
 
-    signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
-    )
+    signed_data = jws["protected"] + "." + jws["payload"]
 
     if "certificate" not in payload:
         raise HTTPException(status_code=400, detail="Certificate missing")
@@ -242,7 +252,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
     if "reason" in payload:
         reason = payload["reason"]
-    if not isinstance(reason, int) or reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:
+    if isinstance(reason, int) and reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:
         raise HTTPException(status_code=400, detail="Invalid reason")
 
     # Verify signature
@@ -284,7 +294,10 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
 async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    if jws["payload"] == "":
+        payload = {"just_info": "just_info"}
+    else:
+        payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     cert_id: str = protected["url"]
 
@@ -369,9 +382,12 @@ async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
     )
 
 
-async def chall_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_tasks: BackgroundTasks) -> JSONResponse:
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    if jws["payload"] == "":
+        payload = {"just_info": "just_info"}
+    else:
+        payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     if isinstance(payload, dict) and payload == {}:
         execute = True
@@ -397,8 +413,8 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
                 for challenge in authz_obj.challenges_as_list():
                     if challenge["url"] == challenge_url:
                         if execute:
-                            print("executing chall")  # fixme run in background thread
-                            await execute_challenge(account.id, order, authz_obj, challenge)
+                            background_tasks.add_task(execute_challenge, account.id, order, authz_obj, challenge)
+
                         return JSONResponse(
                             status_code=200,
                             headers={"Replay-Nonce": generate_nonce()},
@@ -442,7 +458,10 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
 
 async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    # payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    if jws["payload"] == "":
+        payload = {}
+    else:
+        payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     # Ensure correct account access the orders list
     order_id: str = protected["url"].replace(f"{ROOT_URL}{ACME_ROOT}/order/", "")
@@ -533,7 +552,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "authorizations": "",
             "finalize": "",
             "certificate": "",
-            "issued_certificate": "",
+            "issued_certificate": random_string(),
         }
     )
     new_order_serial = await new_order.save()
@@ -608,11 +627,7 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
     ):
         raise HTTPException(status_code=400, detail="Non valid inner jws")
 
-    inner_signed_data = (
-        to_base64url(json.dumps(inner_protected).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(inner_payload).encode("utf-8"))
-    )
+    inner_signed_data = payload["protected"] + "." + payload["payload"]
 
     if "jwk" not in inner_protected or "url" not in inner_protected or "alg" not in inner_protected:
         raise HTTPException(status_code=400, detail="Non valid inner jws")
@@ -772,18 +787,51 @@ def pem_from_jws(jws: Dict[str, Any]) -> str:
 def validate_signature(signer_public_key_data: str, data: str, signature: str) -> None:
     # Load the signers public key
     signer_public_key = serialization.load_pem_public_key(signer_public_key_data.encode("utf-8"))
-    if not isinstance(signer_public_key, EllipticCurvePublicKey) and not isinstance(
-        signer_public_key, Ed25519PublicKey
+    if (
+        not isinstance(signer_public_key, EllipticCurvePublicKey)
+        and not isinstance(signer_public_key, Ed25519PublicKey)
+        and not isinstance(signer_public_key, RSAPublicKey)
     ):
         raise HTTPException(status_code=400, detail="Non valid key in jwk")
 
-    if isinstance(signer_public_key, EllipticCurvePublicKey):
-        if signer_public_key.curve.name != "secp256r1":
+    if isinstance(signer_public_key, RSAPublicKey):
+        try:
+            signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA256())
+        except InvalidSignature:
+            try:
+                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA384())
+            except InvalidSignature:
+                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA512())
+
+    elif isinstance(signer_public_key, EllipticCurvePublicKey):
+        if signer_public_key.curve.name == "secp256r1":
+            try:
+                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA256()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp256r1")
+                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA256()))
+        elif signer_public_key.curve.name == "secp384r1":
+            try:
+                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA384()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp384r1")
+                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA384()))
+        elif signer_public_key.curve.name == "secp521r1":
+            try:
+                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA512()))
+            except InvalidSignature:
+                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp521r1")
+                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA512()))
+        else:
             raise HTTPException(status_code=400, detail="Non valid key in jwk")
 
-        signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA256()))
-    else:
+    elif isinstance(signer_public_key, Ed25519PublicKey):  # EdDSA
         signer_public_key.verify(from_base64url(signature), data.encode("utf-8"))
+    elif isinstance(signer_public_key, Ed448PublicKey):  # EdDSA
+        signer_public_key.verify(from_base64url(signature), data.encode("utf-8"))
+
+    else:
+        raise HTTPException(status_code=400, detail="Non valid key in jwk")
 
 
 async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
@@ -795,14 +843,8 @@ async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
 
 
 def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str) -> None:
-    if jwk["alg"] not in ["ES256", "EdDSA"]:
+    if alg not in ["RS256", "ES256", "ES384", "ES512", "EdDSA"]:
         raise HTTPException(status_code=400, detail="Non valid alg in jwk")
-
-    jwk_alg = jwk["alg"]
-
-    # Verify alg
-    if not isinstance(jwk_alg, str) or alg != jwk_alg:
-        raise HTTPException(status_code=400, detail="Non valid jwk in jws")
 
     signer_public_key_data = jwk_key_to_pem(jwk)
     validate_signature(signer_public_key_data, signed_data, signature)
@@ -813,19 +855,16 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
         raise HTTPException(status_code=400, detail="Non valid jws")
 
     protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
-    payload = json.loads(from_base64url(input_data["payload"]).decode("utf-8"))
+    if input_data["payload"] == "":
+        payload = {}
+    else:
+        payload = json.loads(from_base64url(input_data["payload"]).decode("utf-8"))
     signature = input_data["signature"]
 
     if not isinstance(protected, dict) or not isinstance(payload, dict) or not isinstance(signature, str):
-        raise HTTPException(status_code=400, detail="Non valid jws222")
+        raise HTTPException(status_code=400, detail="Non valid jws")
 
-    signed_data = (
-        to_base64url(json.dumps(protected).encode("utf-8")) + "." + to_base64url(json.dumps(payload).encode("utf-8"))
-    )
-    # print("protected")
-    # print(protected)
-    # print("payload")
-    # print(payload)
+    signed_data = input_data["protected"] + "." + input_data["payload"]
 
     alg = protected["alg"]
     nonce = protected["nonce"]
@@ -834,9 +873,6 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
     if not isinstance(alg, str) or not isinstance(nonce, str) or not isinstance(url, str):
         raise HTTPException(status_code=400, detail="Non valid jws")
 
-    # Verify url
-    # print(url)
-    # print(request_url)
     if url != request_url:
         raise HTTPException(status_code=400, detail="Client request url did not match jws url")
 
@@ -845,7 +881,7 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
         raise HTTPException(status_code=400, detail="No such nonce in jws")
 
     if "jwk" in protected and "kid" in protected:
-        raise HTTPException(status_code=400, detail="Non valid jws3")
+        raise HTTPException(status_code=400, detail="Non valid jws")
 
     if url == f"{ROOT_URL}{ACME_ROOT}/new-account":
         if "jwk" not in protected:
