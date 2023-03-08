@@ -97,11 +97,19 @@ then
 fi
 
 
-# Check docker
+# Check openssl
 which openssl > /dev/null
 if [ $? -ne 0 ]
 then
     echo "openssl not found, install with sudo apt-get install openssl"
+    exit 1
+fi
+
+# Check python3
+which python3 > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "python3 not found, install with sudo apt-get install python3"
     exit 1
 fi
 
@@ -144,17 +152,15 @@ then
     # Add the tls cert and key
     openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
     python3 -c '
-import sys
-from src.pkcs11_ca_service.config import ROOT_URL
-
-if ROOT_URL not in ["https://ca:8005", "https://ca:443", "https://ca"]:
+import os, sys
+if os.environ["CA_URL"] not in ["https://ca:8005", "https://ca:443", "https://ca"]:
   sys.exit(1)
 '
     if [ $? -eq 0 ]
     then
         openssl req -subj "/C=SE/CN=${CA_DNS_NAME}" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
     else
-        openssl req -subj "/C=SE/CN=${CA_DNS_NAME}" -addext "subjectAltName = DNS:${CA_DNS_NAME}" -addext "subjectAltName = DNS:localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
+        openssl req -subj "/C=SE/CN=${CA_DNS_NAME}" -addext "subjectAltName = DNS:${CA_DNS_NAME}, DNS:localhost" -new -x509 -key data/tls_key.key -out data/tls_certificate.pem -days 1026
     fi
 
     chmod 644 data/tls_key*.key
@@ -167,14 +173,6 @@ then
     echo "docker not found, install with sudo apt-get install docker.io"
     echo "sudo usermod -a -G docker $USER"
     echo "logout and in now for docker group to work"
-    exit 1
-fi
-
-# Check python3
-which python3 > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "python3 not found, install with sudo apt-get install python3"
     exit 1
 fi
 
@@ -255,10 +253,8 @@ echo -e "Running tests\n"
 sleep 2
 
 python3 -c '
-import sys
-from src.pkcs11_ca_service.config import ROOT_URL
-
-if ROOT_URL in ["https://ca:8005", "https://ca:443", "https://ca"]:
+import os, sys
+if os.environ["CA_URL"] in ["https://ca:8005", "https://ca:443", "https://ca"]:
   sys.exit(0)
 sys.exit(1)
 '
@@ -271,6 +267,9 @@ else
     docker run --env "CA_URL=${CA_URL}" --env "PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}" --env "ACME_ROOT=${ACME_ROOT}" --network host pkcs11_ca_test1 || exit 1
     echo -e "\nService ONLINE at ${CA_URL}"
 fi
+
+echo ""
+echo "Get ca log with 'docker logs pkcs11_ca_ca_1'"
 
 # Show 'docker ps' output
 echo -e "\n"
