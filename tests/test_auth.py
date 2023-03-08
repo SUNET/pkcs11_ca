@@ -224,36 +224,35 @@ class TestAuth(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-    # def test_auth_secp521r1(self) -> None:
-    #     """
-    #     Send requests with valid and invalid jwt tokens
-    #     """
-    #
-    #     if "secp521r1" not in KEY_TYPES:
-    #         print("Skipping secp521r1 test")
-    #         return
-    #
-    #     with open("data/trusted_keys/privkey6.key", "rb") as f_data:
-    #         priv_key6 = f_data.read()
-    #     with open("data/trusted_keys/pubkey6.pem", "rb") as f_data:
-    #         pub_key6 = f_data.read()
-    #
-    #     # Correct auth, GET nonce
-    #     req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
-    #     nonce = req.headers["Replay-Nonce"]
-    #     self.assertTrue(req.status_code == 200)
-    #     jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
-    #     jwk_key_data = pem_key_to_jwk(pub_key6.decode("utf-8"))
-    #     encoded = jwt.encode(jwk_key_data, priv_key6.decode("utf-8"), algorithm="ES512", headers=jwt_headers)
-    #
-    #     # decoded_jwt = jwt.decode(encoded, algorithms=["ES384, ES512"], options={"verify_signature": False})
-    #
-    #     request_headers = {"Authorization": "Bearer " + encoded}
-    #     req = requests.get(
-    #         self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
-    #     )
-    #
-    #     self.assertTrue(req.status_code == 200)
+    def test_auth_secp521r1(self) -> None:
+        """
+        Send requests with valid and invalid jwt tokens
+        """
+        if "secp521r1" not in KEY_TYPES:
+            print("Skipping secp521r1 test")
+            return
+
+        with open("data/trusted_keys/privkey6.key", "rb") as f_data:
+            priv_key6 = f_data.read()
+        with open("data/trusted_keys/pubkey6.pem", "rb") as f_data:
+            pub_key6 = f_data.read()
+
+        # Correct auth, GET nonce
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        nonce = req.headers["Replay-Nonce"]
+        self.assertTrue(req.status_code == 200)
+        jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
+        jwk_key_data = pem_key_to_jwk(pub_key6.decode("utf-8"))
+        encoded = jwt.encode(jwk_key_data, priv_key6.decode("utf-8"), algorithm="ES512", headers=jwt_headers)
+
+        # decoded_jwt = jwt.decode(encoded, algorithms=["ES384, ES512"], options={"verify_signature": False})
+
+        request_headers = {"Authorization": "Bearer " + encoded}
+        req = requests.get(
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+        )
+
+        self.assertTrue(req.status_code == 200)
 
     def test_auth_ed25519(self) -> None:
         """

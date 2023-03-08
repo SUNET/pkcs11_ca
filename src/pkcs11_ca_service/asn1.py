@@ -6,8 +6,7 @@ import hashlib
 import datetime
 import urllib.parse
 
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat, load_der_public_key
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.serialization import load_der_public_key
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
@@ -181,11 +180,9 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
         else:
             raise ValueError("Unsupported EC curve")
 
-    elif isinstance(pub_key, Ed25519PublicKey):
+    elif isinstance(pub_key, (Ed25519PublicKey, Ed448PublicKey)):
         pub_key.verify(signature, signed_data)
 
-    elif isinstance(pub_key, Ed448PublicKey):
-        pub_key.verify(signature, signed_data)
     else:
         raise ValueError("Non supported public key in certificate")
 
@@ -281,9 +278,13 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
         else:
             raise UnsupportedJWTAlgorithm
 
-        key_string = ECPointBitString.from_coords(
-            int.from_bytes(from_base64url(data["x"]), "big"), int.from_bytes(from_base64url(data["y"]), "big")
-        )
+        if data["crv"] == "p-521":
+            key_string = b"\x04" + from_base64url(data["x"]) + from_base64url(data["y"])
+        else:
+            key_string = ECPointBitString.from_coords(
+                int.from_bytes(from_base64url(data["x"]), "big"), int.from_bytes(from_base64url(data["y"]), "big")
+            )
+
         pki["public_key"] = key_string
 
     elif data["kty"] == "OKP":
