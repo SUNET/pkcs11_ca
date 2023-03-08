@@ -278,13 +278,12 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
         else:
             raise UnsupportedJWTAlgorithm
 
-        if data["crv"] == "p-521":
-            key_string = b"\x04" + from_base64url(data["x"]) + from_base64url(data["y"])
+        if data["crv"] == "P-521":
+            key_string = b'\x04' + from_base64url(data["x"]) + from_base64url(data["y"])
         else:
             key_string = ECPointBitString.from_coords(
                 int.from_bytes(from_base64url(data["x"]), "big"), int.from_bytes(from_base64url(data["y"]), "big")
             )
-
         pki["public_key"] = key_string
 
     elif data["kty"] == "OKP":
