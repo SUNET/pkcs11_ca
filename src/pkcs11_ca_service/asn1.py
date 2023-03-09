@@ -1,5 +1,5 @@
 """ASN1 module, mostly using asn1crypto"""
-
+import json
 from typing import Tuple, Dict, Union
 from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
 import hashlib
@@ -134,7 +134,7 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
     """Verify signature dome by the certificates private key
     raises cryptography.exceptions.InvalidSignature if invalid signature or ValueError if the public key is not supported.
 
-    Potentially fails if the signature is made using nonstandard hasing of the data.
+    Potentially fails if the signature is made using nonstandard hashing of the data.
 
     Parameters:
     pem (str): PEM input data.
@@ -279,7 +279,7 @@ def jwk_key_to_pem(data: Dict[str, str]) -> str:
             raise UnsupportedJWTAlgorithm
 
         if data["crv"] == "P-521":
-            key_string = b'\x04' + from_base64url(data["x"]) + from_base64url(data["y"])
+            key_string = b"\x04" + from_base64url(data["x"]) + from_base64url(data["y"])
         else:
             key_string = ECPointBitString.from_coords(
                 int.from_bytes(from_base64url(data["x"]), "big"), int.from_bytes(from_base64url(data["y"]), "big")
@@ -370,6 +370,29 @@ def pem_key_to_jwk(pem: str) -> Dict[str, str]:
 
         ret["kid"] = to_base64url(key.sha1.hex().encode("utf-8"))
     return ret
+
+
+def jwk_thumbprint(jwk: Dict[str, str]) -> bytes:
+    """Get JWK thumbprint from JWK.
+    https://www.rfc-editor.org/rfc/rfc7638
+
+    Parameters:
+    jwk (str): The JWK.
+
+    Returns:
+    Dict[str, str]
+    """
+
+    keep = ["crv", "e", "k", "kty", "n", "x", "y"]  # In alphabetical order
+    thumbprint: Dict[str, str] = {}
+
+    for key in keep:
+        if key in jwk:
+            thumbprint[key] = jwk[key]
+
+    hash_module = hashlib.sha256()
+    hash_module.update(json.dumps(thumbprint, separators=(",", ":")).encode("utf-8"))
+    return hash_module.digest()
 
 
 def public_key_pem_from_csr(pem: str) -> str:
@@ -509,7 +532,7 @@ def cert_revoked_time(serial_number: int, pem: str) -> Tuple[datetime.datetime, 
     """Check if CRL has expired from its next_update field compared to current time.
 
     Parameters:
-    serial_number (int): Serial number for the revoked ceritficate.
+    serial_number (int): Serial number for the revoked certificate.
     pem (str): PEM CRL input data.
 
     Returns:

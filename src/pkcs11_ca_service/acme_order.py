@@ -1,11 +1,10 @@
+"""ACME order module"""
 import json
 from typing import Dict, Union, Any, List
-import datetime
 
 from fastapi import HTTPException
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
-from .error import WrongDataType
-from .config import ROOT_URL, ACME_ROOT, ACME_IDENTIFIER_TYPES
+from .base import DataClassObject, DataBaseObject, InputObject
+from .config import ACME_IDENTIFIER_TYPES
 from .asn1 import to_base64url, from_base64url
 
 
@@ -54,19 +53,39 @@ class AcmeOrder(DataClassObject):
     db_reference_fields: Dict[str, str] = {"account": "acme_account(serial)"}
     db_unique_fields = ["id", "issued_certificate"]
 
-    def __init__(self, kwargs: Dict[str, Union[str, int]]) -> None:
-        super().__init__(kwargs)
-
     def identifiers_as_list(self) -> List[Dict[str, str]]:
+        """Get the orders identifiers as list.
+        They are stored in base64url.
+
+        Returns:
+        List[Dict[str, str]]
+        """
+
         ret: List[Dict[str, str]] = json.loads(from_base64url(self.identifiers))
         return ret
 
     def authorizations_as_list(self) -> List[str]:
+        """Get the orders authorizations as list
+        They are stored in base64url
+
+        Returns:
+        List[str]
+        """
+
         ret: List[str] = json.loads(from_base64url(self.authorizations))
         return ret
 
 
 def identifiers_from_order(payload: Dict[str, Any]) -> str:
+    """Encode the acme order identifiers to base64url
+
+    Parameters:
+    payload (Dict[str, Any): The payload part pf the acme JWS.
+
+    Returns:
+    str
+    """
+
     identifier_entries: List[Dict[str, str]] = []
 
     if "identifiers" not in payload:
@@ -91,10 +110,19 @@ def identifiers_from_order(payload: Dict[str, Any]) -> str:
         identifier_entries.append({"type": entry_type, "value": entry_value})
 
     if len(identifier_entries) == 0:
-        raise HTTPException(status_code=400, detail="Must have atleast one identifier")
+        raise HTTPException(status_code=400, detail="Must have least one identifier")
 
     return to_base64url(json.dumps(identifier_entries).encode("utf-8"))
 
 
 def authorizations_from_list(auths: List[str]) -> str:
+    """Base64url encode the acme authorizations.
+
+    Parameters:
+    auths (List[str]): List of auths.
+
+    Returns:
+    str
+    """
+
     return to_base64url(json.dumps(auths).encode("utf-8"))

@@ -5,36 +5,40 @@ from typing import Dict, Any, Union
 import unittest
 import os
 import json
-import hashlib
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
+import subprocess
 
 import requests
-
-import subprocess
 
 from asn1crypto import csr as asn1_csr
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
-
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePrivateKey, generate_private_key, SECP256R1
 from cryptography.hazmat.primitives.hashes import SHA256
 
-from src.pkcs11_ca_service.asn1 import pem_key_to_jwk, from_base64url, to_base64url
+from src.pkcs11_ca_service.asn1 import pem_key_to_jwk, to_base64url, jwk_thumbprint
 from src.pkcs11_ca_service.config import ROOT_URL, ACME_ROOT
 
 
 class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
-    ACME_CHALLENGE: str
+    token: str
+    key_authorization: str
 
     def do_GET(self) -> None:
-        self.send_response(200)
-        self.send_header("Content-Length", str(len(self.ACME_CHALLENGE.encode("utf-8"))))
-        self.end_headers()
-        self.wfile.write(self.ACME_CHALLENGE.encode("utf-8"))
+        if self.path == f"/.well-known/acme-challenge/{self.token}":
+            self.send_response(200)
+            self.send_header("Content-Length", str(len(self.key_authorization.encode("utf-8"))))
+            self.end_headers()
+            self.wfile.write(self.key_authorization.encode("utf-8"))
+        else:
+            self.send_response(401)
+            self.send_header("Content-Length", str(len(b"error")))
+            self.end_headers()
+            self.wfile.write(b"error")
+
         self.server.shutdown()
         self.server.server_close()
 
@@ -43,9 +47,10 @@ class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
         pass
 
 
-def run_http_server(key_authorization: str) -> None:
+def run_http_server(token: str, key_authorization: str) -> None:
     server_address = ("", 80)
-    AcmeChallengeHTTPRequestHandler.ACME_CHALLENGE = key_authorization
+    AcmeChallengeHTTPRequestHandler.token = token
+    AcmeChallengeHTTPRequestHandler.key_authorization = key_authorization
 
     httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
     httpd.timeout = 5
@@ -57,51 +62,41 @@ def acme_nonce() -> str:
     return req.headers["Replay-Nonce"]
 
 
-def get_orders_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
-    payload: Dict[str, str] = {}
-
+def create_payload(
+    protected: Dict[str, Any], payload: Dict[str, Any], priv_key: EllipticCurvePrivateKey
+) -> Dict[str, Any]:
     signed_data = (
         to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
         + "."
         + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
     )
 
-    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
+    signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
     acme_req = {
         "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
         "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
         "signature": signature,
     }
-
     return acme_req
 
 
+def get_orders_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    payload: Dict[str, str] = {}
+    return create_payload(protected, payload, priv_key)
+
+
 def revoke_cert_jws(
-    kid: str, priv_key2: EllipticCurvePrivateKey, url: str, cert: asn1_x509.Certificate
+    kid: str, priv_key: EllipticCurvePrivateKey, url: str, cert: asn1_x509.Certificate
 ) -> Dict[str, Any]:
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, Union[str, int]] = {"certificate": to_base64url(cert.dump()), "reason": 4}
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
-def send_csr_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
 
@@ -126,45 +121,17 @@ def send_csr_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict
     csr_asn1 = asn1_csr.CertificationRequest().load(csr)
 
     payload: Dict[str, str] = {"csr": to_base64url(csr_asn1.dump())}
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
-def get_authz_jws(kid: str, priv_key2: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+def get_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, str] = {}
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
-def new_order_jws(kid: str, priv_key2: EllipticCurvePrivateKey) -> Dict[str, Any]:
+def new_order_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-order"}
     payload = {
@@ -175,21 +142,7 @@ def new_order_jws(kid: str, priv_key2: EllipticCurvePrivateKey) -> Dict[str, Any
         "notBefore": "2023-01-01T00:04:00+04:00",
         "notAfter": "2025-01-01T00:04:00+04:00",
     }
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key2.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
 def create_key_change_jws(
@@ -217,21 +170,7 @@ def create_key_change_jws(
         "payload": to_base64url(json.dumps(inner_payload, separators=(",", ":")).encode("utf-8")),
         "signature": inner_signature,
     }
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
 def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
@@ -241,21 +180,7 @@ def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Di
         "termsOfServiceAgreed": True,
         "contact": ["mailto:updated@example.org", "mailto:updated2@example.org"],
     }
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
 def create_new_account_jws(jwk: Dict[str, Any], priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
@@ -265,21 +190,7 @@ def create_new_account_jws(jwk: Dict[str, Any], priv_key: EllipticCurvePrivateKe
         "termsOfServiceAgreed": True,
         "contact": ["mailto:cert-admin@example.org", "mailto:cert-admin2@example.org"],
     }
-
-    signed_data = (
-        to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
-        + "."
-        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
-    )
-
-    signature = to_base64url(priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256())))
-    acme_req = {
-        "protected": to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8")),
-        "payload": to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8")),
-        "signature": signature,
-    }
-
-    return acme_req
+    return create_payload(protected, payload, priv_key)
 
 
 class TestAcme(unittest.TestCase):
@@ -292,6 +203,143 @@ class TestAcme(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    def test_acme_directory(self) -> None:
+        acme_urls = ["newNonce", "newAccount", "newOrder", "revokeCert", "keyChange"]
+
+        req = requests.get(
+            f"{ROOT_URL}{ACME_ROOT}/directory",
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+
+        for acme_url in acme_urls:
+            self.assertTrue(acme_url in response_data)
+
+            req = requests.post(
+                response_data[acme_url],
+                timeout=10,
+                verify="./tls_certificate.pem",
+            )
+            self.assertTrue(req.status_code not in (200, 404))
+
+    # Works but cant bind to port 80 due to test_acme() also binds to port 80
+    #     def test_acme_dehydrated(self) -> None:
+    #         acme_test_script = """from typing import Union
+    # import threading
+    # from http.server import BaseHTTPRequestHandler, HTTPServer
+    # import time
+    # import subprocess
+    # import sys
+    # import os
+    #
+    # class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
+    #     def do_GET(self) -> None:
+    #
+    #         tokens = os.listdir("http_server")
+    #         if len(tokens) != 1:
+    #             print("ERROR: must have only one token in ./http_server")
+    #             sys.exit(1)
+    #
+    #
+    #         with open(f"http_server/{tokens[0]}", "rb") as f_data:
+    #             key_auth = f_data.read()
+    #
+    #         self.send_response(200)
+    #         self.send_header("Content-Length", str(len(key_auth)))
+    #         self.end_headers()
+    #
+    #         self.wfile.write(key_auth)
+    #         self.server.shutdown()
+    #         self.server.server_close()
+    #
+    #
+    # def run_http_server() -> None:
+    #     server_address = ("", 80)
+    #     httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
+    #     httpd.timeout = 10
+    #     httpd.handle_request()
+    #
+    #
+    #
+    # t = threading.Thread(target=run_http_server, daemon=True)
+    # t.start()
+    #
+    # time.sleep(2)
+    #
+    # subprocess.call(["bash", "-c", "echo $HOSTNAME > domains.txt"])
+    # subprocess.call(["bash", "-c", 'openssl req -subj "/C=SE/CN=my-web-server" -addext "subjectAltName = DNS:${HOSTNAME}" -new -newkey rsa:2048 -nodes -keyout csr_rsa.key -out csr_rsa.pem'])
+    #
+    # subprocess.call(["bash", "-c", "rm -rf http_server/ accounts/ && mkdir -p http_server/ && bash dehydrated --register --accept-terms && sleep 1 && bash dehydrated --signcsr csr_rsa.pem | grep -v '# CERT #' > chain.pem && sleep 1 && bash dehydrated --revoke chain.pem"])
+    # """
+    #
+    #         dehydrated_patch = """diff --git a/dehydrated b/dehydrated
+    # index a2bff40..fe8a3f4 100755
+    # --- a/dehydrated
+    # +++ b/dehydrated
+    # @@ -350,6 +350,7 @@ load_config() {
+    #    fi
+    #
+    #    # Preset
+    # +  CA_PKCS11CA="https://ca:8005/acme/directory"
+    #    CA_ZEROSSL="https://acme.zerossl.com/v2/DV90"
+    #    CA_LETSENCRYPT="https://acme-v02.api.letsencrypt.org/directory"
+    #    CA_LETSENCRYPT_TEST="https://acme-staging-v02.api.letsencrypt.org/directory"
+    # @@ -357,16 +358,18 @@ load_config() {
+    #    CA_BUYPASS_TEST="https://api.test4.buypass.no/acme/directory"
+    #
+    #    # Default values
+    # -  CA="letsencrypt"
+    # +  # CA="letsencrypt"
+    # +  CA="pkcs11ca"
+    #    OLDCA=
+    #    CERTDIR=
+    #    ALPNCERTDIR=
+    #    ACCOUNTDIR=
+    #    ACCOUNT_KEYSIZE="4096"
+    # -  ACCOUNT_KEY_ALGO=rsa
+    # +  # ACCOUNT_KEY_ALGO=rsa
+    # +  ACCOUNT_KEY_ALGO=secp384r1
+    #    CHALLENGETYPE="http-01"
+    #    CONFIG_D=
+    # -  CURL_OPTS=
+    # +  CURL_OPTS=" -k "
+    #    DOMAINS_D=
+    #    DOMAINS_TXT=
+    #    HOOK=
+    # @@ -471,7 +474,9 @@ load_config() {
+    #    fi
+    #
+    #    # Preset CAs
+    # -  if [ "${CA}" = "letsencrypt" ]; then
+    # +  if [ "${CA}" = "pkcs11ca" ]; then
+    # +    CA="${CA_PKCS11CA}"
+    # +  elif [ "${CA}" = "letsencrypt" ]; then
+    #      CA="${CA_LETSENCRYPT}"
+    #    elif [ "${CA}" = "letsencrypt-test" ]; then
+    #      CA="${CA_LETSENCRYPT_TEST}"
+    # @@ -529,7 +534,7 @@ load_config() {
+    #    [[ -z "${ALPNCERTDIR}" ]] && ALPNCERTDIR="${BASEDIR}/alpn-certs"
+    #    [[ -z "${CHAINCACHE}" ]] && CHAINCACHE="${BASEDIR}/chains"
+    #    [[ -z "${DOMAINS_TXT}" ]] && DOMAINS_TXT="${BASEDIR}/domains.txt"
+    # -  [[ -z "${WELLKNOWN}" ]] && WELLKNOWN="/var/www/dehydrated"
+    # +  [[ -z "${WELLKNOWN}" ]] && WELLKNOWN="http_server"
+    #    [[ -z "${LOCKFILE}" ]] && LOCKFILE="${BASEDIR}/lock"
+    #    [[ -z "${OPENSSL_CNF}" ]] && OPENSSL_CNF="$("${OPENSSL}" version -d | cut -d\\" -f2)/openssl.cnf"
+    #    [[ -n "${PARAM_LOCKFILE_SUFFIX:-}" ]] && LOCKFILE="${LOCKFILE}-${PARAM_LOCKFILE_SUFFIX}"
+    # """
+    #         subprocess.check_call(
+    #             ["bash", "-c", "git clone https://github.com/dehydrated-io/dehydrated.git dehydrated_repo"]
+    #         )
+    #         with open("pkcs11_ca.patch", "wb") as f_data:
+    #             f_data.write(dehydrated_patch.encode("utf-8"))
+    #         with open("acme_test.py", "wb") as f_data:
+    #             f_data.write(acme_test_script.encode("utf-8"))
+    #         subprocess.check_call(["bash", "-c", "cd dehydrated_repo && git apply ../pkcs11_ca.patch && cd .."])
+    #         subprocess.check_call(["bash", "-c", "cp dehydrated_repo/dehydrated ."])
+    #         subprocess.check_call(["bash", "-c", "python3 acme_test.py"])
+
     def test_acme(self) -> None:
         """
         Test acme
@@ -303,7 +351,7 @@ class TestAcme(unittest.TestCase):
         public_key = priv_key.public_key()
 
         jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
-        pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
         acme_req = create_new_account_jws(jwk, priv_key)
 
         req = requests.post(
@@ -357,6 +405,8 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue("status" in response_data)
 
         # Try with old key Update the account
         acme_req = create_update_account_jws(kid, priv_key)
@@ -433,11 +483,9 @@ class TestAcme(unittest.TestCase):
         challenge = response_data["challenges"][0]
 
         # Handle acme challenge in background http server
-        hash_module = hashlib.sha256()
-        hash_module.update(kid.encode("utf-8"))
-        key_authorization = f"{challenge['token']}.{to_base64url(hash_module.digest())}"
-        t = threading.Thread(target=run_http_server, args=(key_authorization,), daemon=True)
-        t.start()
+        key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk2))}"
+        thread = threading.Thread(target=run_http_server, args=(challenge["token"], key_authorization), daemon=True)
+        thread.start()
 
         # Trigger challenge
         acme_req = get_authz_jws(kid, priv_key2, challenge["url"])
@@ -487,7 +535,6 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
-        response_data = json.loads(req.text)
 
         # Get order after challenge
         acme_req = get_authz_jws(kid, priv_key2, order)
@@ -515,6 +562,8 @@ class TestAcme(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
+        self.assertTrue(len(certs) > 1)
+
         for index in range(len(certs)):
             if len(certs[index]) < 3:
                 continue

@@ -5,8 +5,6 @@ import os
 import sys
 import subprocess
 
-# from time import sleep
-
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 

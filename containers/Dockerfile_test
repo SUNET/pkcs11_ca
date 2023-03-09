@@ -19,6 +19,10 @@ RUN apt-get update \
     python3-pip \
     netcat \
     dnsutils \
+    git \
+    openssl \
+    bsdmainutils \
+    curl \
     && pip3 install -r /app/requirements.txt \
     && apt-get autoremove -y
     

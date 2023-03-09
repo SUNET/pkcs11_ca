@@ -12,7 +12,7 @@ Try with default ENV vars
 export CA_URL="https://ca:8005"
 export CA_DNS_NAME="ca"
 
-export ACME_ROOT="/acme"
+export ACME_ROOT="/acme" # no trailing /
 
 export PKCS11_SIGN_API_TOKEN="xyz"
 

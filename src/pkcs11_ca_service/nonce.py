@@ -58,6 +58,12 @@ async def verify_nonce(nonce: str) -> bool:
 
 
 def generate_nonce() -> str:
+    """Generate, store and returns a nonce
+
+    Returns:
+    str
+    """
+
     new_nonce = _generate_nonce()
     nonces.append(hash_nonce(new_nonce))
     return new_nonce

@@ -101,7 +101,7 @@ async def _authorized_by(request: Request) -> int:
 # Write this
 # raise HTTPException(status_code=401, detail="Unauthorized token.")
 async def authorized_by(request: Request) -> int:
-    """Authorize a request to to our http server.
+    """Authorize a request to our http server.
 
     Returns the ID of the public key in DB whoch was used to authorize the request.
 

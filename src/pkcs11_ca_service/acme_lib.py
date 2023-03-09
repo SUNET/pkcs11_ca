@@ -1,3 +1,7 @@
+"""ACME lib module
+
+Handle the ACME requests
+"""
 from typing import Any, Dict, Union, List
 from secrets import token_bytes
 import datetime
@@ -23,11 +27,14 @@ from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
 from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException, Response
+from fastapi import HTTPException, Response, Request
 from fastapi.background import BackgroundTasks
 
 import requests
-
+from requests.exceptions import (
+    ConnectionError as requestsConnectionError,
+    ConnectTimeout as requestsConnectTimeout,
+)
 from .base import db_load_data_class
 from .acme_authorization import AcmeAuthorization, AcmeAuthorizationInput, challenges_from_list
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
@@ -47,6 +54,8 @@ from .asn1 import (
     cert_pem_serial_number,
     aia_and_cdp_exts,
     pem_cert_verify_signature,
+    jwk_thumbprint,
+    pem_key_to_jwk,
 )
 from .config import (
     ACME_ROOT,
@@ -77,11 +86,29 @@ def random_string() -> str:
 
 
 def account_id_from_kid(kid: str) -> str:
+    """Get the account id from the acme KID by only keeping the id part.
+    Example KID: 'https://acme-server/path-to-acme/acct/djXYss-mx-L0wy3V47OBoNkLiyOQNUObz'
+
+    Parameters:
+    kid (str): The acme KID.
+
+    Returns:
+    str
+    """
+
     return kid.replace(ROOT_URL, "").replace(ACME_ROOT, "").replace("/acct/", "")
 
 
 async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAuthorization, None]:
-    """If exists then return the authorization"""
+    """If the acme authorization exists (in DB)
+
+    Parameters:
+    acme_authz_input (AcmeAuthorizationInput): The AcmeAuthorizationInput for the DB search.
+
+    Returns:
+    Union[AcmeAuthorization, None]
+    """
+
     db_acme_authz_objs = await db_load_data_class(AcmeAuthorization, acme_authz_input)
     for obj in db_acme_authz_objs:
         if isinstance(obj, AcmeAuthorization):
@@ -90,7 +117,15 @@ async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAu
 
 
 async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAccount, None]:
-    """If exists then return the account"""
+    """If the acme account exists (in DB)
+
+    Parameters:
+    acme_account_input (AcmeAccountInput): The AcmeAccountInput for the DB search.
+
+    Returns:
+    Union[AcmeAccount, None]
+    """
+
     db_acme_account_objs = await db_load_data_class(AcmeAccount, acme_account_input)
     for obj in db_acme_account_objs:
         if isinstance(obj, AcmeAccount):
@@ -98,11 +133,22 @@ async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAcco
     return None
 
 
-async def execute_challenge(kid: str, order: AcmeOrder, authz: AcmeAuthorization, challenge: Dict[str, str]) -> None:
+async def execute_challenge(
+    public_key_pem: str, order: AcmeOrder, authz: AcmeAuthorization, challenge: Dict[str, str]
+) -> None:
+    """Execute the acme challenge.
+    Retry once after 5 seconds if the challenge fails.
+
+    Parameters:
+    public_key_pem (str): The acme accounts public key in PEM form.
+    order (AcmeOrder): The acme order for this challenge.
+    authz (AcmeAuthorization): The acme AcmeAuthorization for this challenge.
+    challenge (Dict[str, Any]): The challenge.
+    """
+
     identifier = json.loads(from_base64url(authz.identifier))
-    hash_module = hashlib.sha256()
-    hash_module.update(f"{ROOT_URL}{ACME_ROOT}/acct/{kid}".encode("utf-8"))
-    key_authorization = f"{challenge['token']}.{to_base64url(hash_module.digest())}"
+    thumbprint_jwk = jwk_thumbprint(pem_key_to_jwk(public_key_pem))
+    key_authorization = f"{challenge['token']}.{to_base64url(thumbprint_jwk)}"
     challenges = authz.challenges_as_list()
 
     authz.status = "processing"
@@ -112,46 +158,72 @@ async def execute_challenge(kid: str, order: AcmeOrder, authz: AcmeAuthorization
     time.sleep(2)  # Ensure challenge responder has started
 
     chall_success = False
+    req: Union[requests.Response, None] = None
 
     if challenge["type"] == "http-01":
-        req = requests.get(
-            f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
-        )
+        try:
+            req = requests.get(
+                f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
+            )
+        except (requestsConnectionError, requestsConnectTimeout):
+            print(
+                f"(1) Failed to connect to ACME challenge at http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}"
+            )
 
-        if req.status_code == 200 and key_authorization in req.text:
+        if req is not None and req.status_code == 200 and key_authorization in req.text:
             chall_success = True
         else:
             print("Retrying after 5 seconds")
             time.sleep(5)
-            req = requests.get(
-                f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
-            )
+            try:
+                req = requests.get(
+                    f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}",
+                    verify=False,
+                    timeout=3,
+                )
+            except (requestsConnectionError, requestsConnectTimeout):
+                print(
+                    f"(2) Failed to connect to ACME challenge at http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}"
+                )
+                return
 
             if req.status_code == 200 and key_authorization in req.text:
                 chall_success = True
 
-        if chall_success:
-            for chall in challenges:
-                if chall["token"] == challenge["token"]:
-                    chall["status"] = "valid"
-                    chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        if not chall_success:
+            return
 
-            authz.challenges = challenges_from_list(challenges)
-            authz.status = "valid"
-            await authz.update()
+        for chall in challenges:
+            if chall["token"] == challenge["token"]:
+                chall["status"] = "valid"
+                chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
-            for order_auth_data in order.authorizations_as_list():
-                order_auth = await authz_exists(
-                    AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
-                )
-                if not isinstance(order_auth, AcmeAuthorization) or order_auth.status != "valid":
-                    break
-            else:
-                order.status = "ready"
-                await order.update()
+        authz.challenges = challenges_from_list(challenges)
+        authz.status = "valid"
+        await authz.update()
+
+        for order_auth_data in order.authorizations_as_list():
+            order_auth = await authz_exists(
+                AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
+            )
+            if not isinstance(order_auth, AcmeAuthorization) or order_auth.status != "valid":
+                break
+        else:
+            order.status = "ready"
+            await order.update()
+
+    else:  # Non valid challenge type
+        raise ValueError("Invalid challenge type")
 
 
 async def sign_cert(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
+    """Sign the validated csr into a certificate.
+
+    Parameters:
+    csr (asn1crypto.csr.CertificationRequest): The csr.
+    order (AcmeOrder): The acme order for this request.
+    """
+
     csr_pem = asn1_pem.armor("CERTIFICATE REQUEST", csr.dump()).decode("utf-8")
 
     pkcs11_key = (await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(key_label=ACME_SIGNER_KEY_LABEL)))[0]
@@ -197,6 +269,13 @@ async def sign_cert(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> Non
 
 
 def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
+    """Validate a csr to its orders identifications.
+
+    Parameters:
+    csr (asn1crypto.csr.CertificationRequest): The csr.
+    order (AcmeOrder): The acme order for this request.
+    """
+
     subject = csr["certification_request_info"]["subject"].native
 
     sans: List[str] = []
@@ -229,6 +308,17 @@ def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
 
 
 async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Response:
+    """Revoke an acme issued cert.
+    Authorization can be normal acme or the JWS being signed by the certs private key.
+
+    Parameters:
+    jws (Dict[str, Any]): The JWS.
+    request_url (str): The request url.
+
+    Returns:
+    fastapi.responses.Response
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
     reason: Union[int, None] = None
@@ -241,6 +331,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
     signed_data = jws["protected"] + "." + jws["payload"]
 
+    # Get certificate from request
     if "certificate" not in payload:
         raise HTTPException(status_code=400, detail="Certificate missing")
     certificate: str = payload["certificate"]
@@ -255,7 +346,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
     if isinstance(reason, int) and reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:
         raise HTTPException(status_code=400, detail="Invalid reason")
 
-    # Verify signature
+    # Verify using normal acme auth
     if "kid" in protected:
         # Ensure valid jwt
         await validate_jws(jws, request_url)
@@ -270,6 +361,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
         if order.issued_certificate != cert_pem or order.account != account.serial:
             raise HTTPException(status_code=401, detail="Non valid cert to revoke")
 
+    # Verify it's the certificate private key has signed the request
     elif "jwk" in protected:
         pem_cert_verify_signature(cert_pem, from_base64url(signature), signed_data.encode("utf-8"))
         order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
@@ -281,6 +373,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
     else:
         raise HTTPException(status_code=401, detail="No such account")
 
+    # Get cert from DB
     cert = (await db_load_data_class(Certificate, CertificateInput(pem=cert_pem)))[0]
     if not isinstance(cert, Certificate):
         raise HTTPException(status_code=401, detail="Non valid cert to revoke")
@@ -293,12 +386,18 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
 
 async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
-    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    if jws["payload"] == "":
-        payload = {"just_info": "just_info"}
-    else:
-        payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    """Fetch the issued certificate.
+    The certs issuer is included, it's a chain.
 
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.Response
+    """
+
+    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     cert_id: str = protected["url"]
 
     order: AcmeOrder
@@ -323,6 +422,17 @@ async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
 
 
 async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """Finalize the order by sending a csr which the acme CA will sign
+     as long as it conforms to the orders identifiers
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
@@ -357,7 +467,7 @@ async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
     validate_csr(csr_req, order)
 
     # Set status as processing since csr was valid
-    order.status = "prccessing"
+    order.status = "processing"
     await order.update()
 
     await sign_cert(csr_req, order)
@@ -383,6 +493,21 @@ async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
 
 
 async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_tasks: BackgroundTasks) -> JSONResponse:
+    """List or execute the acme challenge
+
+    The challenge will be executed if the payload is an empty json dict '{}'
+    by the server immediately after the http request finishes
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+    background_tasks (fastapi.background.BackgroundTasks):
+    The list of background tasks which will execute the challenge.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     if jws["payload"] == "":
         payload = {"just_info": "just_info"}
@@ -413,7 +538,9 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
                 for challenge in authz_obj.challenges_as_list():
                     if challenge["url"] == challenge_url:
                         if execute:
-                            background_tasks.add_task(execute_challenge, account.id, order, authz_obj, challenge)
+                            background_tasks.add_task(
+                                execute_challenge, account.public_key_pem, order, authz_obj, challenge
+                            )
 
                         return JSONResponse(
                             status_code=200,
@@ -426,8 +553,17 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
 
 
 async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """List the acme authorization
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    # payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     authz_id: str = protected["url"]
     authz_id = authz_id.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", "")
@@ -457,11 +593,17 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
 
 
 async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """List the acme order
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    if jws["payload"] == "":
-        payload = {}
-    else:
-        payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     # Ensure correct account access the orders list
     order_id: str = protected["url"].replace(f"{ROOT_URL}{ACME_ROOT}/order/", "")
@@ -496,7 +638,16 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
 
 
 async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
-    # protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
+    """Create a new acme order
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     request_not_before: Union[str, None] = None
@@ -613,6 +764,16 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
 
 
 async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:  # FIXME not overwrite key??
+    """Change key for the acme account
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
@@ -681,8 +842,17 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
 
 
 async def orders_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """List an acme order
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    # payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     # Ensure correct account access the orders list
     url: str = protected["url"].replace(f"{ROOT_URL}{ACME_ROOT}/orders/", "")
@@ -705,9 +875,18 @@ async def orders_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResp
 
 
 async def update_account_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """Update the acme account
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
-    encoded_contacts: List[str] = []
 
     # Update contact if contact is in payload
     account.contact = contact_from_payload(payload)
@@ -734,6 +913,15 @@ async def update_account_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
 
 
 async def existing_account_response(account: AcmeAccount) -> JSONResponse:
+    """List an existing acme account
+
+    Parameters:
+    account (AcmeAccount): The acme account class object.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     response_data = {
         "status": account.status,
         "contact": account.contact_as_list(),
@@ -748,8 +936,30 @@ async def existing_account_response(account: AcmeAccount) -> JSONResponse:
     )
 
 
-async def new_account_response(input_data: Dict[str, Any], public_key_pem: str) -> JSONResponse:
+async def new_account_response(request: Request) -> JSONResponse:
+    """Create a new acme account
+
+    Parameters:
+    request (fastapi.Request): The http request.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    input_data = await request.json()
     payload = json.loads(from_base64url(input_data["payload"]).decode("utf-8"))
+    if not isinstance(input_data, dict):
+        raise HTTPException(status_code=400, detail="Non valid jws")
+
+    # Ensure valid jwt
+    await validate_jws(input_data, str(request.url))
+
+    public_key_pem = pem_from_jws(input_data)
+
+    # If account exists
+    existing_account = await account_exists(AcmeAccountInput(public_key_pem=public_key_pem))
+    if existing_account is not None:
+        return await existing_account_response(existing_account)
 
     # Generate account_id
     account_id = random_string()
@@ -763,6 +973,7 @@ async def new_account_response(input_data: Dict[str, Any], public_key_pem: str) 
             "authorized_by": 1,  # FIXME
         }
     )
+    # Save account to DB
     await acme_account_obj.save()
 
     response_data = {
@@ -780,19 +991,31 @@ async def new_account_response(input_data: Dict[str, Any], public_key_pem: str) 
 
 
 def pem_from_jws(jws: Dict[str, Any]) -> str:
+    """Get a public key in PEM form from a JWS.
+
+    Parameters:
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    str
+    """
+
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
     return jwk_key_to_pem(protected["jwk"])
 
 
 def validate_signature(signer_public_key_data: str, data: str, signature: str) -> None:
+    """Validate a signature
+    Raises cryptography.exceptions.InvalidSignature or fastapi.HTTPException if failed
+
+    Parameters:
+    signer_public_key_data (str): Public key in PEM form
+    data (str): The signed data in base64url form.
+    signature (str): The signature in base64url form.
+    """
+
     # Load the signers public key
     signer_public_key = serialization.load_pem_public_key(signer_public_key_data.encode("utf-8"))
-    if (
-        not isinstance(signer_public_key, EllipticCurvePublicKey)
-        and not isinstance(signer_public_key, Ed25519PublicKey)
-        and not isinstance(signer_public_key, RSAPublicKey)
-    ):
-        raise HTTPException(status_code=400, detail="Non valid key in jwk")
 
     if isinstance(signer_public_key, RSAPublicKey):
         try:
@@ -825,9 +1048,7 @@ def validate_signature(signer_public_key_data: str, data: str, signature: str) -
         else:
             raise HTTPException(status_code=400, detail="Non valid key in jwk")
 
-    elif isinstance(signer_public_key, Ed25519PublicKey):  # EdDSA
-        signer_public_key.verify(from_base64url(signature), data.encode("utf-8"))
-    elif isinstance(signer_public_key, Ed448PublicKey):  # EdDSA
+    elif isinstance(signer_public_key, (Ed25519PublicKey, Ed448PublicKey)):  # EdDSA
         signer_public_key.verify(from_base64url(signature), data.encode("utf-8"))
 
     else:
@@ -835,6 +1056,15 @@ def validate_signature(signer_public_key_data: str, data: str, signature: str) -
 
 
 async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
+    """Validate an acme KID signature
+    Raises cryptography.exceptions.InvalidSignature or fastapi.HTTPException if KID not exists.
+
+    Parameters:
+    kid (str): The acme KID.
+    signed_data (str): The signed data in base64url form.
+    signature (str): The signature in base64url form.
+    """
+
     account = await account_exists(AcmeAccountInput(id=account_id_from_kid(kid)))
     if account is None or account.status == "deactivated":  # FIXME special error for deactivated
         raise NoSuchKID(kid)
@@ -843,6 +1073,18 @@ async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
 
 
 def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str) -> None:
+    """Validate a JWK signature to the specified alg
+
+    Parameters:
+    jwk (Dict[str, Any]): The JWK.
+    alg (str): The signature algorithm.
+    signed_data (str): The signed data in base64url form.
+    signature (str): The signature in base64url form.
+
+    Returns:
+    fastapi.Response
+    """
+
     if alg not in ["RS256", "ES256", "ES384", "ES512", "EdDSA"]:
         raise HTTPException(status_code=400, detail="Non valid alg in jwk")
 
@@ -850,7 +1092,18 @@ def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str
     validate_signature(signer_public_key_data, signed_data, signature)
 
 
-async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
+async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
+    """Validate an acme JWS by either acme KID or JWK.
+    Also validates url, nonce and alg according to acme
+
+    Parameters:
+    input_data (Dict[str, Any]): The JWS.
+    request_url (str): The request url.
+
+    Returns:
+    fastapi.Response
+    """
+
     if "protected" not in input_data or "payload" not in input_data or "signature" not in input_data:
         raise HTTPException(status_code=400, detail="Non valid jws")
 
@@ -880,6 +1133,7 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
     if not await verify_nonce(nonce):
         raise HTTPException(status_code=400, detail="No such nonce in jws")
 
+    # Cant have both jwk and kid
     if "jwk" in protected and "kid" in protected:
         raise HTTPException(status_code=400, detail="Non valid jws")
 
@@ -905,5 +1159,62 @@ async def _validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
         raise HTTPException(status_code=400, detail="Missing either jwk or kid in jws")
 
 
-async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
-    await _validate_jws(input_data, request_url)
+async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks) -> Response:
+    """All acme routes except new-nonce and directory are handled from here.
+
+    Parameters:
+    request (fastapi.Request): The http request.
+    background_tasks (fastapi.background.BackgroundTasks): A background to be run after the http request has finished.
+
+    Returns:
+    fastapi.Response
+    """
+
+    request_url = str(request.url)
+
+    if request_url == f"{ROOT_URL}{ACME_ROOT}/new-account":
+        return await new_account_response(request)
+
+    input_data = await request.json()
+    if not isinstance(input_data, dict):
+        raise HTTPException(status_code=400, detail="Non valid jws")
+
+    # Revoke cert does its own auth
+    if request_url == f"{ROOT_URL}{ACME_ROOT}/revoke-cert":
+        return await revoke_cert_response(input_data, request_url)
+
+    # Ensure valid jwt and account exists - Thus a valid acme request
+    await validate_jws(input_data, request_url)
+    protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
+    account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
+    if account is None:
+        return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/acct/"):
+        return await update_account_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/orders/"):
+        return await orders_response(account, input_data)
+
+    elif request_url == f"{ROOT_URL}{ACME_ROOT}/key-change":
+        return await key_change_response(account, input_data)
+
+    elif request_url == f"{ROOT_URL}{ACME_ROOT}/new-order":
+        return await new_order_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/") and request_url.endswith("/finalize"):
+        return await finalize_order_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/"):
+        return await order_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/authz/"):
+        return await authz_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/chall/"):
+        return await chall_response(account, input_data, background_tasks)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/cert/"):
+        return await cert_response(account, input_data)
+
+    raise HTTPException(status_code=404)
