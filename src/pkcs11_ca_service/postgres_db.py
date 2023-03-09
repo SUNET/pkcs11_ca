@@ -160,7 +160,7 @@ class PostgresDB(DataBaseObject):
                         rows = await conn.fetch(query, search[key])
                         fields_list += cls._rows_to_class_objects(rows, fields)
 
-                # If no search argument exists
+                # If no search argument exists, meaning SELECT FROM table, will be huge so limit to 10
                 else:
                     query = "SELECT "
                     for field in fields:

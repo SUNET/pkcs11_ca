@@ -1,11 +1,12 @@
 """ACME order module"""
 import json
-from typing import Dict, Union, Any, List
+from typing import Dict, Union, List, Any
 
 from fastapi import HTTPException
+
 from .base import DataClassObject, DataBaseObject, InputObject
-from .config import ACME_IDENTIFIER_TYPES
 from .asn1 import to_base64url, from_base64url
+from .config import ACME_IDENTIFIER_TYPES
 
 
 # FIXME use enum instead of str when appropriate
@@ -76,7 +77,20 @@ class AcmeOrder(DataClassObject):
         return ret
 
 
-def identifiers_from_order(payload: Dict[str, Any]) -> str:
+def authorizations_from_list(auths: List[str]) -> str:
+    """Base64url encode the acme authorizations.
+
+    Parameters:
+    auths (List[str]): List of auths.
+
+    Returns:
+    str
+    """
+
+    return to_base64url(json.dumps(auths).encode("utf-8"))
+
+
+def identifiers_from_payload(payload: Dict[str, Any]) -> str:
     """Encode the acme order identifiers to base64url
 
     Parameters:
@@ -113,16 +127,3 @@ def identifiers_from_order(payload: Dict[str, Any]) -> str:
         raise HTTPException(status_code=400, detail="Must have least one identifier")
 
     return to_base64url(json.dumps(identifier_entries).encode("utf-8"))
-
-
-def authorizations_from_list(auths: List[str]) -> str:
-    """Base64url encode the acme authorizations.
-
-    Parameters:
-    auths (List[str]): List of auths.
-
-    Returns:
-    str
-    """
-
-    return to_base64url(json.dumps(auths).encode("utf-8"))

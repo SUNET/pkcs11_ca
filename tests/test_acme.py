@@ -39,8 +39,8 @@ class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
             self.end_headers()
             self.wfile.write(b"error")
 
-        self.server.shutdown()
         self.server.server_close()
+        self.server.shutdown()
 
     # Disable logging in unittest
     def log_request(self, code: Union[int, str] = "-", size: Union[int, str] = "-") -> None:
@@ -121,6 +121,16 @@ def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[
     csr_asn1 = asn1_csr.CertificationRequest().load(csr)
 
     payload: Dict[str, str] = {"csr": to_base64url(csr_asn1.dump())}
+    return create_payload(protected, payload, priv_key)
+
+
+def new_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
+    payload = {
+        "identifier": {"type": "dns", "value": os.environ["HOSTNAME"]},
+        # {"type": "dns", "value": "www.test1"},
+    }
     return create_payload(protected, payload, priv_key)
 
 
@@ -251,8 +261,8 @@ class TestAcme(unittest.TestCase):
     #         self.end_headers()
     #
     #         self.wfile.write(key_auth)
-    #         self.server.shutdown()
     #         self.server.server_close()
+    #         self.server.shutdown()
     #
     #
     # def run_http_server() -> None:
@@ -484,6 +494,213 @@ class TestAcme(unittest.TestCase):
 
         # Handle acme challenge in background http server
         key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk2))}"
+        thread = threading.Thread(target=run_http_server, args=(challenge["token"], key_authorization), daemon=True)
+        thread.start()
+
+        # Trigger challenge
+        acme_req = get_authz_jws(kid, priv_key2, challenge["url"])
+        req = requests.post(
+            challenge["url"],
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Get authz after challenge
+        acme_req = get_authz_jws(kid, priv_key2, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "valid")
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "ready")
+        finalize_url = response_data["finalize"]
+
+        # Send csr
+        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
+        req = requests.post(
+            finalize_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "valid")
+        cert_url = response_data["certificate"]
+
+        # get cert
+        issued_cert_asn1 = asn1_x509.Certificate()
+        acme_req = get_authz_jws(kid, priv_key2, cert_url)
+        req = requests.post(
+            cert_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        certs = req.text.split("-----BEGIN CERTIFICATE-----")
+        self.assertTrue(len(certs) > 1)
+
+        for index in range(len(certs)):
+            if len(certs[index]) < 3:
+                continue
+
+            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
+            if asn1_pem.detect(data):
+                _, _, data = asn1_pem.unarmor(data)
+
+            cert_asn1 = asn1_x509.Certificate().load(data)
+            _ = cert_asn1.native
+
+            if index == 1:  # First cert in chain - the leaf
+                issued_cert_asn1 = asn1_x509.Certificate().load(data)
+
+        # Revoke cert
+        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+    def test_acme_pre_auth(self) -> None:
+        """
+        Test acme
+        """
+
+        request_headers = {"Content-Type": "application/jose+json"}
+
+        priv_key2 = generate_private_key(SECP256R1())
+        public_key2 = priv_key2.public_key()
+
+        jwk = pem_key_to_jwk(public_key2.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
+        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+        acme_req = create_new_account_jws(jwk, priv_key2)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        kid = req.headers["Location"]
+        orders = response_data["orders"]
+
+        acme_req = create_new_account_jws(jwk, priv_key2)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Create pre authz
+        acme_req = new_authz_jws(kid, priv_key2)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-authz",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+
+        # Create new order
+        acme_req = new_order_jws(kid, priv_key2)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-order",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        authz = response_data["authorizations"][0]
+
+        # List orders
+        acme_req = get_orders_jws(kid, priv_key2, orders)
+        req = requests.post(
+            orders,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        order = response_data["orders"][0]
+
+        # Get order
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "pending")
+
+        # Get authz
+        acme_req = get_authz_jws(kid, priv_key2, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        challenge = response_data["challenges"][0]
+
+        # Handle acme challenge in background http server
+        key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk))}"
         thread = threading.Thread(target=run_http_server, args=(challenge["token"], key_authorization), daemon=True)
         thread.start()
 

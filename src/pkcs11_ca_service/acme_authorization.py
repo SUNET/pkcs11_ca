@@ -11,6 +11,7 @@ from .asn1 import to_base64url, from_base64url
 class AcmeAuthorizationInput(InputObject):
     """Class to represent an acme authorization matching from HTTP post data"""
 
+    account: Union[int, None]
     id: Union[str, None]
 
 
@@ -18,7 +19,7 @@ class AcmeAuthorization(DataClassObject):
     """Class to represent an ACME authorization"""
 
     db: DataBaseObject
-    acme_order: int
+    account: int
     id: str
     status: str
     expires: str
@@ -28,7 +29,7 @@ class AcmeAuthorization(DataClassObject):
 
     db_table_name = "acme_authorization"
     db_fields = {
-        "acme_order": int,
+        "account": int,
         "id": str,
         "status": str,
         "expires": str,
@@ -50,15 +51,26 @@ class AcmeAuthorization(DataClassObject):
         ret: List[Dict[str, str]] = json.loads(from_base64url(self.challenges))
         return ret
 
+    def identifier_as_dict(self) -> Dict[str, str]:
+        """Get the orders identifiers as list.
+        They are stored in base64url.
 
-def challenges_from_list(auths: List[Dict[str, str]]) -> str:
+        Returns:
+        List[Dict[str, str]]
+        """
+
+        ret: Dict[str, str] = json.loads(from_base64url(self.identifier))
+        return ret
+
+
+def challenges_from_list(challenges: List[Dict[str, str]]) -> str:
     """Base64url encode the acme challenges.
 
     Parameters:
-    auths (List[Dict[str, str]]): List of challenges
+    challenges (List[Dict[str, str]]): List of challenges
 
     Returns:
     str
     """
 
-    return to_base64url(json.dumps(auths).encode("utf-8"))
+    return to_base64url(json.dumps(challenges).encode("utf-8"))

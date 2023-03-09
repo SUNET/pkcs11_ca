@@ -735,6 +735,7 @@ acme_endpoints = [
     "key-change",
     "new-order",
     "order/{id}",
+    "new-authz",
     "authz/{id}",
     "chall/{id}",
     "order/{id}/finalize",
@@ -751,6 +752,7 @@ for acme_endpoint in acme_endpoints:
         except (InvalidSignature, NoSuchKID) as exc:
             raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
         except (ValueError, IndexError, KeyError) as exc:
+            raise
             raise HTTPException(status_code=400, detail="Non valid jws") from exc
 
 

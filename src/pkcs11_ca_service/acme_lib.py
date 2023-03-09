@@ -1,6 +1,8 @@
 """ACME lib module
 
 Handle the ACME requests
+
+FIXME: handle and check for expired acme objects
 """
 from typing import Any, Dict, Union, List
 from secrets import token_bytes
@@ -38,7 +40,7 @@ from requests.exceptions import (
 from .base import db_load_data_class
 from .acme_authorization import AcmeAuthorization, AcmeAuthorizationInput, challenges_from_list
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
-from .acme_order import AcmeOrder, AcmeOrderInput, identifiers_from_order, authorizations_from_list
+from .acme_order import AcmeOrder, AcmeOrderInput, authorizations_from_list, identifiers_from_payload
 from .nonce import generate_nonce, verify_nonce
 from .public_key import PublicKey
 from .pkcs11_key import Pkcs11KeyInput, Pkcs11Key
@@ -99,8 +101,8 @@ def account_id_from_kid(kid: str) -> str:
     return kid.replace(ROOT_URL, "").replace(ACME_ROOT, "").replace("/acct/", "")
 
 
-async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAuthorization, None]:
-    """If the acme authorization exists (in DB)
+async def account_authzs(acme_authz_input: AcmeAuthorizationInput) -> List[AcmeAuthorization]:
+    """All acme authorizations for the account
 
     Parameters:
     acme_authz_input (AcmeAuthorizationInput): The AcmeAuthorizationInput for the DB search.
@@ -109,11 +111,13 @@ async def authz_exists(acme_authz_input: AcmeAuthorizationInput) -> Union[AcmeAu
     Union[AcmeAuthorization, None]
     """
 
+    authzs: List[AcmeAuthorization] = []
     db_acme_authz_objs = await db_load_data_class(AcmeAuthorization, acme_authz_input)
     for obj in db_acme_authz_objs:
         if isinstance(obj, AcmeAuthorization):
-            return obj
-    return None
+            authzs.append(obj)
+
+    return authzs
 
 
 async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAccount, None]:
@@ -154,7 +158,6 @@ async def execute_challenge(
     authz.status = "processing"
     await authz.update()
 
-    print("sleeping 2 seconds before executing challenge")
     time.sleep(2)  # Ensure challenge responder has started
 
     chall_success = False
@@ -203,10 +206,10 @@ async def execute_challenge(
         await authz.update()
 
         for order_auth_data in order.authorizations_as_list():
-            order_auth = await authz_exists(
+            order_auths = await account_authzs(
                 AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
             )
-            if not isinstance(order_auth, AcmeAuthorization) or order_auth.status != "valid":
+            if len(order_auths) == 0 or order_auths[0].status != "valid":
                 break
         else:
             order.status = "ready"
@@ -568,24 +571,105 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     authz_id: str = protected["url"]
     authz_id = authz_id.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", "")
 
-    authz = await authz_exists(AcmeAuthorizationInput(id=authz_id))
-    if authz is None:
+    authzs = await account_authzs(AcmeAuthorizationInput(id=authz_id))
+    if len(authzs) == 0:
         raise HTTPException(status_code=401, detail="Non valid authz")
 
     response_data = {
-        "status": authz.status,
-        "expires": authz.expires,
-        "identifier": json.loads(from_base64url(authz.identifier)),
-        "challenges": authz.challenges_as_list(),
+        "status": authzs[0].status,
+        "expires": authzs[0].expires,
+        "identifier": json.loads(from_base64url(authzs[0].identifier)),
+        "challenges": authzs[0].challenges_as_list(),
     }
 
-    if authz.status == "pending":
+    if authzs[0].status == "pending":
         headers = {"Replay-Nonce": generate_nonce(), "Retry-After": "10"}
     else:
         headers = {"Replay-Nonce": generate_nonce()}
 
     return JSONResponse(
         status_code=200,
+        headers=headers,
+        content=response_data,
+        media_type="application/json",
+    )
+
+
+async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """An ACME pre-authorization
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+    if "identifier" not in payload:
+        raise HTTPException(status_code=400, detail="Missing identifier")
+
+    identifier = payload["identifier"]
+    if not isinstance(identifier, dict) or "type" not in identifier or "value" not in identifier:
+        raise HTTPException(status_code=400, detail="Missing valid identifier")
+
+    identifier_type = identifier["type"]
+    identifier_value = identifier["value"]
+    if (
+        not isinstance(identifier_type, str)
+        or not isinstance(identifier_value, str)
+        or identifier_type not in ACME_IDENTIFIER_TYPES
+    ):
+        raise HTTPException(status_code=400, detail="Missing valid identifier")
+
+    if "*" in identifier_value:
+        raise HTTPException(status_code=400, detail="Cannot pre auth wildcard")
+
+    auth_id = random_string()
+    challenges: List[Dict[str, str]] = []  # FIXME add DNS challenge
+
+    if identifier_type == "dns":
+        challenges.append(
+            {
+                "type": "http-01",
+                "url": f"{ROOT_URL}{ACME_ROOT}/chall/{random_string()}",
+                "status": "pending",
+                "token": random_string(),
+            }
+        )
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported identifier type")
+
+    new_authorization = AcmeAuthorization(
+        {
+            "account": account.serial,
+            "id": auth_id,
+            "status": "pending",
+            "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
+                "%Y-%m-%dT%H:%M:%SZ"
+            ),
+            "identifier": to_base64url(
+                json.dumps({"type": identifier_type, "value": identifier_value}).encode("utf-8")
+            ),
+            "challenges": challenges_from_list(challenges),
+            "wildcard": 1 if "*" in identifier["value"] else 0,
+        }
+    )
+    # Save new auth to database
+    await new_authorization.save()
+
+    response_data = {
+        "status": new_authorization.status,
+        "expires": new_authorization.expires,
+        "identifier": json.loads(from_base64url(new_authorization.identifier)),
+        "challenges": new_authorization.challenges_as_list(),
+    }
+
+    headers = {"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/authz/{new_authorization.id}"}
+
+    return JSONResponse(
+        status_code=201,
         headers=headers,
         content=response_data,
         media_type="application/json",
@@ -689,7 +773,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
                 "%Y-%m-%dT%H:%M:%SZ"
             ),
-            "identifiers": identifiers_from_order(payload),
+            "identifiers": identifiers_from_payload(payload),
             "not_before": request_not_before
             if request_not_before is not None
             else (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365 * 3)).strftime(
@@ -706,9 +790,11 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "issued_certificate": random_string(),
         }
     )
-    new_order_serial = await new_order.save()
+    await new_order.save()
 
     new_order.finalize = f"{ROOT_URL}{ACME_ROOT}/order/{new_order.id}/finalize"
+
+    pre_authzs = await account_authzs(AcmeAuthorizationInput(account=account.serial))
 
     authorizations: List[str] = []
     for identifier in new_order.identifiers_as_list():
@@ -716,19 +802,40 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             raise HTTPException(status_code=400, detail="Non valid identifier type")
 
         auth_id = random_string()
-        authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{auth_id}")
 
-        challenges: List[Dict[str, str]] = [  # FIXME add DNS challenge
-            {
-                "type": "http-01",
-                "url": f"{ROOT_URL}{ACME_ROOT}/chall/{random_string()}",
-                "status": "pending",
-                "token": random_string(),
-            }
-        ]
+        # Get a pre auth if exists
+        found_identifier = False
+        for pre_authz in pre_authzs:
+            if (
+                pre_authz.identifier_as_dict()["value"] == identifier["value"]
+                and pre_authz.identifier_as_dict()["type"] == identifier["type"]
+                and pre_authz.status == "pending"
+            ):  # FIXME check expired
+                found_identifier = True
+                authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{pre_authz.id}")
+                break
+
+        if found_identifier:
+            continue
+
+        challenges: List[Dict[str, str]] = []  # FIXME add DNS challenge
+
+        if identifier["type"] == "dns":
+            challenges.append(
+                {
+                    "type": "http-01",
+                    "url": f"{ROOT_URL}{ACME_ROOT}/chall/{random_string()}",
+                    "status": "pending",
+                    "token": random_string(),
+                }
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported identifier type")
+
+        authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{auth_id}")
         new_authorization = AcmeAuthorization(
             {
-                "acme_order": new_order_serial,
+                "account": account.serial,
                 "id": auth_id,
                 "status": "pending",
                 "expires": new_order.expires,
@@ -936,25 +1043,22 @@ async def existing_account_response(account: AcmeAccount) -> JSONResponse:
     )
 
 
-async def new_account_response(request: Request) -> JSONResponse:
+async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONResponse:
     """Create a new acme account
 
     Parameters:
-    request (fastapi.Request): The http request.
+    jws (Dict[str, Any): The ACME jws
 
     Returns:
     fastapi.responses.JSONResponse
     """
 
-    input_data = await request.json()
-    payload = json.loads(from_base64url(input_data["payload"]).decode("utf-8"))
-    if not isinstance(input_data, dict):
-        raise HTTPException(status_code=400, detail="Non valid jws")
+    payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     # Ensure valid jwt
-    await validate_jws(input_data, str(request.url))
+    await validate_jws(jws, request_url)
 
-    public_key_pem = pem_from_jws(input_data)
+    public_key_pem = pem_from_jws(jws)
 
     # If account exists
     existing_account = await account_exists(AcmeAccountInput(public_key_pem=public_key_pem))
@@ -1172,12 +1276,16 @@ async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks
 
     request_url = str(request.url)
 
-    if request_url == f"{ROOT_URL}{ACME_ROOT}/new-account":
-        return await new_account_response(request)
+    try:
+        input_data = await request.json()
+    except json.decoder.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="invalid json")
 
-    input_data = await request.json()
     if not isinstance(input_data, dict):
         raise HTTPException(status_code=400, detail="Non valid jws")
+
+    if request_url == f"{ROOT_URL}{ACME_ROOT}/new-account":
+        return await new_account_response(input_data, request_url)
 
     # Revoke cert does its own auth
     if request_url == f"{ROOT_URL}{ACME_ROOT}/revoke-cert":
@@ -1207,6 +1315,9 @@ async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks
 
     elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/"):
         return await order_response(account, input_data)
+
+    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/new-authz"):
+        return await new_authz_response(account, input_data)
 
     elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/authz/"):
         return await authz_response(account, input_data)
