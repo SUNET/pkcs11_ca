@@ -8,6 +8,8 @@ import json
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
+import datetime
+import base64
 
 import requests
 
@@ -15,9 +17,20 @@ from asn1crypto import csr as asn1_csr
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
-from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from python_x509_pkcs11.crypto import convert_asn1_ec_signature
+
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PublicFormat,
+    PrivateFormat,
+    NoEncryption,
+    load_der_private_key,
+    load_pem_public_key,
+)
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePrivateKey, generate_private_key, SECP256R1
 from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography import x509
+from cryptography.x509.oid import NameOID
 
 from src.pkcs11_ca_service.asn1 import pem_key_to_jwk, to_base64url, jwk_thumbprint
 from src.pkcs11_ca_service.config import ROOT_URL, ACME_ROOT
@@ -60,6 +73,32 @@ def run_http_server(token: str, key_authorization: str) -> None:
 def acme_nonce() -> str:
     req = requests.head(f"{ROOT_URL}{ACME_ROOT}/new-nonce", timeout=10, verify="./tls_certificate.pem")
     return req.headers["Replay-Nonce"]
+
+
+def create_sunet_token(priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> str:
+    header = {
+        "alg": "ES256",
+        "typ": "JWT",
+        "url": "https://ca:8005/acme/new-authz",
+        "x5c": [base64.b64encode(cert_der).decode("utf-8")],
+    }
+    payload = {
+        "names": [os.environ["HOSTNAME"]],
+        "nonce": acme_nonce(),
+        "aud": "https://ca:8005/acme/new-authz",
+        "iat": 1678536328,
+        "exp": 1688536328,
+        "crit": ["exp"],
+    }
+    signed_data = (
+        to_base64url(json.dumps(header, separators=(",", ":")).encode("utf-8"))
+        + "."
+        + to_base64url(json.dumps(payload, separators=(",", ":")).encode("utf-8"))
+    )
+
+    raw_signature = priv_key.sign(signed_data.encode("utf-8"), ECDSA(SHA256()))
+    signature = to_base64url(convert_asn1_ec_signature(raw_signature, "secp256r1"))
+    return f"{signed_data}.{signature}"
 
 
 def create_payload(
@@ -121,6 +160,16 @@ def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[
     csr_asn1 = asn1_csr.CertificationRequest().load(csr)
 
     payload: Dict[str, str] = {"csr": to_base64url(csr_asn1.dump())}
+    return create_payload(protected, payload, priv_key)
+
+
+def new_authz_sunet_token_jws(kid: str, priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> Dict[str, Any]:
+    nonce = acme_nonce()
+    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
+    payload = {
+        "token": create_sunet_token(priv_key, cert_der)
+        # {"type": "dns", "value": "www.test1"},
+    }
     return create_payload(protected, payload, priv_key)
 
 
@@ -727,6 +776,256 @@ class TestAcme(unittest.TestCase):
         self.assertTrue(req.status_code == 200)
         response_data = json.loads(req.text)
         self.assertTrue(response_data["status"] == "valid")
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "ready")
+        finalize_url = response_data["finalize"]
+
+        # Send csr
+        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
+        req = requests.post(
+            finalize_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "valid")
+        cert_url = response_data["certificate"]
+
+        # get cert
+        issued_cert_asn1 = asn1_x509.Certificate()
+        acme_req = get_authz_jws(kid, priv_key2, cert_url)
+        req = requests.post(
+            cert_url,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        certs = req.text.split("-----BEGIN CERTIFICATE-----")
+        self.assertTrue(len(certs) > 1)
+
+        for index in range(len(certs)):
+            if len(certs[index]) < 3:
+                continue
+
+            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
+            if asn1_pem.detect(data):
+                _, _, data = asn1_pem.unarmor(data)
+
+            cert_asn1 = asn1_x509.Certificate().load(data)
+            _ = cert_asn1.native
+
+            if index == 1:  # First cert in chain - the leaf
+                issued_cert_asn1 = asn1_x509.Certificate().load(data)
+
+        # Revoke cert
+        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+    def test_acme_pre_auth_sunet_token(self) -> None:
+        """
+        Test acme
+        """
+
+        request_headers = {"Content-Type": "application/jose+json"}
+
+        issuer_priv_key = load_der_private_key(
+            b"0\x81\x87\x02\x01\x000\x13\x06\x07*\x86H\xce=\x02\x01\x06\x08*\x86H\xce=\x03\x01\x07\x04m0k\x02\x01\x01"
+            b"\x04 Y\x85Dy\xec\x92f^\xce\x14\xb5\xc9\xf2\x02\x06j\xa7E\xd1\xc2.&26\xa5a\x9c\xd9\xab\xb2\xd6\x86\xa1D"
+            b"\x03B\x00\x04\xb5\xa1x\xd6>\xa5\xc7t\x11bj#\x9c/\xe7Gog\x92\xb4\xc2\xf5\xd5\xceQ\xfa\xceL?FW\x02\xfa"
+            b"\xb8\x90\x8f\xba\x89\xfa\x1bf\xe8Xm\x13\x08\x97\xf5\x8a\x01\xb1;\xf8\xc4\xaf\x80Z\x178&k\xe5{\xce",
+            password=None,
+        )
+        if not isinstance(issuer_priv_key, EllipticCurvePrivateKey):
+            raise ValueError("Problem with private key")
+
+        # issuer_priv_key = generate_private_key(SECP256R1())
+        # if not isinstance(issuer_priv_key, EllipticCurvePrivateKey):
+        #     raise ValueError("Problem with private key")
+        # issuer_public_key = issuer_priv_key.public_key()
+        # issuer_priv_key_pem = issuer_priv_key.private_bytes(
+        #     Encoding.DER, PrivateFormat.PKCS8, encryption_algorithm=NoEncryption()
+        # )
+        # print("issuer_prib_key")
+        # print(issuer_priv_key_pem)
+
+        # priv_key2 = generate_private_key(SECP256R1())
+        priv_key2 = load_der_private_key(
+            b"0\x81\x87\x02\x01\x000\x13\x06\x07*\x86H\xce=\x02\x01\x06\x08*\x86H\xce=\x03\x01\x07\x04m0k\x02\x01\x01"
+            b"\x04 \x03\x86!\xadQ\xb4\xec\xd8\x04\xf1\x8a\xe0\xb2VY\x16\x937\xb2\x82\xab\xbc\x1bgJI\x86<\xf2Y\xddt"
+            b"\xa1D\x03B\x00\x04\xcc\xd8,\xe8wL\xb8\xf7\xe6\x90Z)K\xcdo \x05~*\x862\xae'\x85,\x18\x1c\x14("
+            b"\x19\x8cxJ\x9evr\xf1j?v\x8d\xc7!9\x1aG\xf1\xe6\x0c\x88n\xdd#J\x10\xeb\xc7\x0fE\x85\xe9\x92\xeb\xaf",
+            password=None,
+        )
+        if not isinstance(priv_key2, EllipticCurvePrivateKey):
+            raise ValueError("Problem with private key")
+        public_key2 = priv_key2.public_key()
+
+        # priv_key2_pem = priv_key2.private_bytes(Encoding.DER, PrivateFormat.PKCS8,
+        # encryption_algorithm=NoEncryption()) print(priv_key2_pem)
+
+        jwk = pem_key_to_jwk(public_key2.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
+
+        key_usage = x509.KeyUsage(
+            digital_signature=True,
+            content_commitment=False,
+            key_encipherment=False,
+            data_encipherment=False,
+            key_agreement=False,
+            key_cert_sign=True,
+            crl_sign=True,
+            encipher_only=False,
+            decipher_only=False,
+        )
+
+        issuer_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "dummy-issuer-name")])
+        # basic_contraints = x509.BasicConstraints(ca=True, path_length=None)
+
+        # now = datetime.datetime.utcnow()
+        # cert = (
+        #     x509.CertificateBuilder()
+        #     .subject_name(issuer_name)
+        #     .issuer_name(issuer_name)
+        #     .public_key(issuer_public_key)
+        #     .serial_number(2000)
+        #     .not_valid_before(now - datetime.timedelta(minutes=2))
+        #     .not_valid_after(now + datetime.timedelta(days=10 * 365))
+        #     .add_extension(basic_contraints, False)
+        #     .add_extension(key_usage, False)
+        #     .sign(issuer_priv_key, SHA256())
+        # )
+        # cert_der = cert.public_bytes(encoding=Encoding.DER)
+        # print("issuer_cert")
+        # print(cert.public_bytes(encoding=Encoding.PEM).decode("utf-8"))
+
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "dummy-cert-name")])
+        basic_contraints = x509.BasicConstraints(ca=True, path_length=None)
+
+        now = datetime.datetime.utcnow()
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(name)
+            .issuer_name(issuer_name)
+            .public_key(public_key2)
+            .serial_number(1000)
+            .not_valid_before(now - datetime.timedelta(minutes=2))
+            .not_valid_after(now + datetime.timedelta(days=10 * 365))
+            .add_extension(basic_contraints, False)
+            .add_extension(key_usage, False)
+            .sign(issuer_priv_key, SHA256())
+        )
+        cert_der = cert.public_bytes(encoding=Encoding.DER)
+        # print(cert.public_bytes(encoding=Encoding.PEM).decode("utf-8"))
+
+        # pub_key_pem2 = public_key2.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+        # print(pub_key_pem2)
+        acme_req = create_new_account_jws(jwk, priv_key2)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        kid = req.headers["Location"]
+        orders = response_data["orders"]
+
+        acme_req = create_new_account_jws(jwk, priv_key2)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Create pre authz
+        acme_req = new_authz_sunet_token_jws(kid, priv_key2, cert_der)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-authz",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+
+        # Create new order
+        acme_req = new_order_jws(kid, priv_key2)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-order",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        authz = response_data["authorizations"][0]
+
+        # List orders
+        acme_req = get_orders_jws(kid, priv_key2, orders)
+        req = requests.post(
+            orders,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        order = response_data["orders"][0]
+
+        # Get order
+        acme_req = get_authz_jws(kid, priv_key2, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "ready")
 
         # Get order after challenge
         acme_req = get_authz_jws(kid, priv_key2, order)

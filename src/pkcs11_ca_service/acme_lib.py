@@ -8,25 +8,16 @@ from typing import Any, Dict, Union, List
 from secrets import token_bytes
 import datetime
 import json
-import hashlib
 import time
+import base64
 
 from asn1crypto import csr as asn1_csr
 from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
-from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
-from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
 from cryptography.exceptions import InvalidSignature
 
-
 from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
-from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 from fastapi.responses import JSONResponse
 from fastapi import HTTPException, Response, Request
@@ -58,6 +49,9 @@ from .asn1 import (
     pem_cert_verify_signature,
     jwk_thumbprint,
     pem_key_to_jwk,
+    cert_from_der,
+    cert_issued_by_ca,
+    public_key_verify_signature,
 )
 from .config import (
     ACME_ROOT,
@@ -66,6 +60,7 @@ from .config import (
     ACME_SIGNER_KEY_TYPE,
     ACME_SIGNER_NAME_DICT,
     ACME_SIGNER_KEY_LABEL,
+    ACME_SUNET_TRUSTED_SIGNERS,
 )
 
 
@@ -383,8 +378,6 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
     # Revoke cert
     await cert.revoke(1, reason)
-    print("Revoked cert from acme revoke request")
-
     return Response(headers={"Replay-Nonce": generate_nonce()})
 
 
@@ -595,6 +588,120 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     )
 
 
+async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
+    response_data: Dict[str, Any] = {}
+    token_parts = token.split(".")
+    if len(token_parts) != 3:
+        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+
+    header = json.loads(from_base64url(token_parts[0]))
+    payload = json.loads(from_base64url(token_parts[1]))
+    signature = token_parts[2]
+
+    if (
+        "x5c" not in header
+        or "alg" not in header
+        or "typ" not in header
+        or "url" not in header
+        or "names" not in payload
+        or "nonce" not in payload
+    ):
+        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+
+    x5c = header["x5c"]
+    alg = header["alg"]
+    typ = header["typ"]
+    url = header["url"]
+    names = payload["names"]
+    nonce = payload["nonce"]
+    if (
+        not isinstance(x5c, list)
+        or len(x5c) == 0
+        or not isinstance(alg, str)
+        or not isinstance(typ, str)
+        or not isinstance(url, str)
+        or not isinstance(names, list)
+        or not isinstance(nonce, str)
+    ):
+        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+
+    encoded_cert = x5c[0]
+    if not isinstance(encoded_cert, str):
+        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+
+    cert_pem = cert_from_der(base64.b64decode(encoded_cert.encode("utf-8")))
+
+    # Verify token signature
+    try:
+        pem_cert_verify_signature(
+            cert_pem,
+            from_base64url(token_parts[2]),
+            f"{token_parts[0]}.{token_parts[1]}".encode("utf-8"),
+        )
+    except (InvalidSignature, ValueError):
+        raise HTTPException(status_code=401, detail="Token signature invalid1")
+
+    # Verify cert or certs CA is in config file
+    for config_cert in ACME_SUNET_TRUSTED_SIGNERS:
+        config_cert = config_cert.strip() + "\n"
+        if config_cert == cert_pem or cert_issued_by_ca(cert_pem, config_cert):
+            break
+    else:
+        raise HTTPException(status_code=401, detail="Cert was not a trusted cert or signed by trusted CA")
+
+    auth_id = random_string()
+    for index, name in enumerate(names):
+        if not isinstance(name, str):
+            raise HTTPException(status_code=400, detail="Invalid dns name")
+
+        if index == 0:
+            curr_auth_id = auth_id
+        else:
+            curr_auth_id = random_string()
+
+        challenges: List[Dict[str, str]] = [
+            {
+                "type": "http-01",  # FIXME change this to x-sunet-01
+                "url": f"{ROOT_URL}{ACME_ROOT}/chall/{random_string()}",
+                "status": "valid",
+                "validated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            }
+        ]
+
+        new_authorization = AcmeAuthorization(
+            {
+                "account": account.serial,
+                "id": curr_auth_id,
+                "status": "valid",
+                "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
+                    "%Y-%m-%dT%H:%M:%SZ"
+                ),
+                "identifier": to_base64url(json.dumps({"type": "signature", "value": name}).encode("utf-8")),
+                "challenges": challenges_from_list(challenges),
+                "wildcard": 1 if "*" in name else 0,
+            }
+        )
+        # Save new auth to database
+        await new_authorization.save()
+
+        if index == 0:
+            response_data = {
+                "status": new_authorization.status,
+                "expires": new_authorization.expires,
+                "identifier": json.loads(from_base64url(new_authorization.identifier)),
+                "challenges": new_authorization.challenges_as_list(),
+            }
+
+    headers = {"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/authz/{auth_id}"}
+
+    return JSONResponse(
+        status_code=201,
+        headers=headers,
+        content=response_data,
+        media_type="application/json",
+    )
+
+
 async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
     """An ACME pre-authorization
 
@@ -607,6 +714,13 @@ async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
     """
 
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
+
+    if "token" in payload:
+        token = payload["token"]
+        if isinstance(token, str):
+            return await sunet_acme_authz(account, token)
+        raise HTTPException(status_code=400, detail="Missing valid token for sunet acme authz")
+
     if "identifier" not in payload:
         raise HTTPException(status_code=400, detail="Missing identifier")
 
@@ -769,7 +883,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         {
             "account": account.serial,
             "id": random_string(),
-            "status": "pending",
+            "status": "ready",  # Changed to pending below if pending challenges exists for the order
             "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
                 "%Y-%m-%dT%H:%M:%SZ"
             ),
@@ -805,16 +919,30 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
 
         # Get a pre auth if exists
         found_identifier = False
+
+        # x-sunet-01
         for pre_authz in pre_authzs:
             if (
-                pre_authz.identifier_as_dict()["value"] == identifier["value"]
-                and pre_authz.identifier_as_dict()["type"] == identifier["type"]
-                and pre_authz.status == "pending"
+                pre_authz.identifier_as_dict()["type"] == "signature"
+                and pre_authz.identifier_as_dict()["value"] == identifier["value"]
+                and pre_authz.status == "valid"
             ):  # FIXME check expired
                 found_identifier = True
                 authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{pre_authz.id}")
                 break
+        if found_identifier:
+            continue
 
+        for pre_authz in pre_authzs:
+            if (
+                pre_authz.identifier_as_dict()["type"] == identifier["type"]
+                and pre_authz.identifier_as_dict()["value"] == identifier["value"]
+                and pre_authz.status == "pending"
+            ):  # FIXME check expired
+                found_identifier = True
+                new_order.status = "pending"
+                authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{pre_authz.id}")
+                break
         if found_identifier:
             continue
 
@@ -832,6 +960,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         else:
             raise HTTPException(status_code=400, detail="Unsupported identifier type")
 
+        new_order.status = "pending"
         authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{auth_id}")
         new_authorization = AcmeAuthorization(
             {
@@ -859,8 +988,10 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         "notAfter": new_order.not_after,
         "identifiers": new_order.identifiers_as_list(),
         "authorizations": new_order.authorizations_as_list(),
-        "finalize": new_order.finalize,
     }
+
+    if new_order.status == "ready" or new_order.status == "valid":
+        response_data["finalize"] = new_order.finalize
 
     return JSONResponse(
         status_code=201,
@@ -996,11 +1127,12 @@ async def update_account_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
     payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
     # Update contact if contact is in payload
-    account.contact = contact_from_payload(payload)
+    if "contact" in payload:
+        account.contact = contact_from_payload(payload)
 
     if "status" in payload:
         status = payload["status"]
-        if status == "deactivated":
+        if isinstance(status, str) and status == "deactivated":
             account.status = "deactivated"
 
     await account.update()
@@ -1108,55 +1240,17 @@ def pem_from_jws(jws: Dict[str, Any]) -> str:
     return jwk_key_to_pem(protected["jwk"])
 
 
-def validate_signature(signer_public_key_data: str, data: str, signature: str) -> None:
+def validate_signature(signer_public_key_data: str, signature: str, signed_data: str) -> None:
     """Validate a signature
     Raises cryptography.exceptions.InvalidSignature or fastapi.HTTPException if failed
 
     Parameters:
     signer_public_key_data (str): Public key in PEM form
-    data (str): The signed data in base64url form.
     signature (str): The signature in base64url form.
+    signed_data (str): The signed data in base64url form.
     """
 
-    # Load the signers public key
-    signer_public_key = serialization.load_pem_public_key(signer_public_key_data.encode("utf-8"))
-
-    if isinstance(signer_public_key, RSAPublicKey):
-        try:
-            signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA256())
-        except InvalidSignature:
-            try:
-                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA384())
-            except InvalidSignature:
-                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), PKCS1v15(), SHA512())
-
-    elif isinstance(signer_public_key, EllipticCurvePublicKey):
-        if signer_public_key.curve.name == "secp256r1":
-            try:
-                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA256()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp256r1")
-                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA256()))
-        elif signer_public_key.curve.name == "secp384r1":
-            try:
-                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA384()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp384r1")
-                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA384()))
-        elif signer_public_key.curve.name == "secp521r1":
-            try:
-                signer_public_key.verify(from_base64url(signature), data.encode("utf-8"), ECDSA(SHA512()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(from_base64url(signature), "secp521r1")
-                signer_public_key.verify(converted_signature, data.encode("utf-8"), ECDSA(SHA512()))
-        else:
-            raise HTTPException(status_code=400, detail="Non valid key in jwk")
-
-    elif isinstance(signer_public_key, (Ed25519PublicKey, Ed448PublicKey)):  # EdDSA
-        signer_public_key.verify(from_base64url(signature), data.encode("utf-8"))
-
-    else:
-        raise HTTPException(status_code=400, detail="Non valid key in jwk")
+    return public_key_verify_signature(signer_public_key_data, from_base64url(signature), signed_data.encode("utf-8"))
 
 
 async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
@@ -1173,7 +1267,7 @@ async def validate_kid(kid: str, signed_data: str, signature: str) -> None:
     if account is None or account.status == "deactivated":  # FIXME special error for deactivated
         raise NoSuchKID(kid)
 
-    validate_signature(account.public_key_pem, signed_data, signature)
+    validate_signature(account.public_key_pem, signature, signed_data)
 
 
 def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str) -> None:
@@ -1193,7 +1287,7 @@ def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str
         raise HTTPException(status_code=400, detail="Non valid alg in jwk")
 
     signer_public_key_data = jwk_key_to_pem(jwk)
-    validate_signature(signer_public_key_data, signed_data, signature)
+    validate_signature(signer_public_key_data, signature, signed_data)
 
 
 async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:

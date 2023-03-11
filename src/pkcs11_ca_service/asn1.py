@@ -130,24 +130,24 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     return ret
 
 
-def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) -> None:
-    """Verify signature dome by the certificates private key
-    raises cryptography.exceptions.InvalidSignature if invalid signature or ValueError if the public key is not supported.
+def public_key_verify_signature(public_key_info_pem: str, signature: bytes, signed_data: bytes) -> None:
+    """Verify signature with a public key
+    raises cryptography.exceptions.InvalidSignature
+    if invalid signature or ValueError if the public key is not supported.
 
     Potentially fails if the signature is made using nonstandard hashing of the data.
 
     Parameters:
-    pem (str): PEM input data.
-
+    public_key_info_pem (str): Public key in info in PEM form
     """
 
-    data = pem.encode("utf-8")
+    data = public_key_info_pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
 
-    cert = asn1_x509.Certificate().load(data)
+    pub_key_asn1 = PublicKeyInfo.load(data)
 
-    pub_key = load_der_public_key(cert["tbs_certificate"]["subject_public_key_info"].dump())
+    pub_key = load_der_public_key(pub_key_asn1.dump())
 
     if isinstance(pub_key, cryptoRSAPublicKey):
         try:
@@ -185,6 +185,52 @@ def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) ->
 
     else:
         raise ValueError("Non supported public key in certificate")
+
+
+def pem_cert_verify_signature(pem: str, signature: bytes, signed_data: bytes) -> None:
+    """Verify signature done by the certificates private key
+    raises cryptography.exceptions.InvalidSignature
+    if invalid signature or ValueError if the public key is not supported.
+
+    Potentially fails if the signature is made using nonstandard hashing of the data.
+
+    Parameters:
+    pem (str): PEM input data.
+    signature (bytes): The signature.
+    signed_data (bytes): The signed data.
+    """
+
+    data = pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+
+    cert = asn1_x509.Certificate().load(data)
+    pub_key_info_pem: bytes = asn1_pem.armor("PUBLIC KEY", cert["tbs_certificate"]["subject_public_key_info"].dump())
+    return public_key_verify_signature(pub_key_info_pem.decode("utf-8"), signature, signed_data)
+
+
+def cert_issued_by_ca(cert_pem: str, issuer_pem: str) -> bool:
+    """If cert is signed by a CA
+
+    Parameters:
+    cert_pem (str): cert PEM input data.
+    issuer (str): CA PEM input data.
+
+    Returns:
+    bool
+    """
+
+    data = cert_pem.encode("utf-8")
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+
+    cert = asn1_x509.Certificate().load(data)
+
+    try:
+        pem_cert_verify_signature(issuer_pem, cert["signature_value"].native, cert["tbs_certificate"].dump())
+        return True
+    except (InvalidSignature, ValueError):
+        return False
 
 
 def pem_cert_to_key_hash(pem: str) -> bytes:
@@ -377,10 +423,10 @@ def jwk_thumbprint(jwk: Dict[str, str]) -> bytes:
     https://www.rfc-editor.org/rfc/rfc7638
 
     Parameters:
-    jwk (str): The JWK.
+    jwk (Dict[str, str]): The JWK.
 
     Returns:
-    Dict[str, str]
+    bytes
     """
 
     keep = ["crv", "e", "k", "kty", "n", "x", "y"]  # In alphabetical order
@@ -474,7 +520,7 @@ def cert_pem_serial_number(pem: str) -> int:
     pem (str): PEM certificate input data.
 
     Returns:
-    str
+    int
     """
 
     data = pem.encode("utf-8")
@@ -584,7 +630,7 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     issuer_path (str): Path to issuer CA.
 
     Returns:
-    bool
+    asn1crypto.x509.Extensions
     """
 
     # AIA
@@ -692,7 +738,7 @@ def csr_from_der(der: bytes) -> str:
     der (bytes): DER encoded csr.
 
     Returns:
-    bytes
+    str
     """
 
     data = der
@@ -700,4 +746,22 @@ def csr_from_der(der: bytes) -> str:
         _, _, data = asn1_pem.unarmor(data)
     csr = asn1_csr.CertificationRequest().load(data)
     pem: bytes = asn1_pem.armor("CERTIFICATE REQUEST", csr.dump())
+    return pem.decode("utf-8")
+
+
+def cert_from_der(der: bytes) -> str:
+    """Get cert from DER form.
+
+    Parameters:
+    der (bytes): DER encoded cert.
+
+    Returns:
+    str
+    """
+
+    data = der
+    if asn1_pem.detect(data):
+        _, _, data = asn1_pem.unarmor(data)
+    cert = asn1_x509.Certificate().load(data)
+    pem: bytes = asn1_pem.armor("CERTIFICATE", cert.dump())
     return pem.decode("utf-8")
