@@ -10,6 +10,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 import subprocess
 import datetime
 import base64
+import secrets
 
 import requests
 
@@ -882,14 +883,7 @@ class TestAcme(unittest.TestCase):
         # print("issuer_prib_key")
         # print(issuer_priv_key_pem)
 
-        # priv_key2 = generate_private_key(SECP256R1())
-        priv_key2 = load_der_private_key(
-            b"0\x81\x87\x02\x01\x000\x13\x06\x07*\x86H\xce=\x02\x01\x06\x08*\x86H\xce=\x03\x01\x07\x04m0k\x02\x01\x01"
-            b"\x04 \x03\x86!\xadQ\xb4\xec\xd8\x04\xf1\x8a\xe0\xb2VY\x16\x937\xb2\x82\xab\xbc\x1bgJI\x86<\xf2Y\xddt"
-            b"\xa1D\x03B\x00\x04\xcc\xd8,\xe8wL\xb8\xf7\xe6\x90Z)K\xcdo \x05~*\x862\xae'\x85,\x18\x1c\x14("
-            b"\x19\x8cxJ\x9evr\xf1j?v\x8d\xc7!9\x1aG\xf1\xe6\x0c\x88n\xdd#J\x10\xeb\xc7\x0fE\x85\xe9\x92\xeb\xaf",
-            password=None,
-        )
+        priv_key2 = generate_private_key(SECP256R1())
         if not isinstance(priv_key2, EllipticCurvePrivateKey):
             raise ValueError("Problem with private key")
         public_key2 = priv_key2.public_key()
@@ -931,7 +925,7 @@ class TestAcme(unittest.TestCase):
         # print("issuer_cert")
         # print(cert.public_bytes(encoding=Encoding.PEM).decode("utf-8"))
 
-        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "dummy-cert-name")])
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, os.environ["HOSTNAME"])])
         basic_contraints = x509.BasicConstraints(ca=True, path_length=None)
 
         now = datetime.datetime.utcnow()
@@ -940,7 +934,7 @@ class TestAcme(unittest.TestCase):
             .subject_name(name)
             .issuer_name(issuer_name)
             .public_key(public_key2)
-            .serial_number(1000)
+            .serial_number(secrets.randbelow(1000000000))
             .not_valid_before(now - datetime.timedelta(minutes=2))
             .not_valid_after(now + datetime.timedelta(days=10 * 365))
             .add_extension(basic_contraints, False)
