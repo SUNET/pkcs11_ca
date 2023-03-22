@@ -1,2 +1,6 @@
 python:
-  version: 3.9
+  version: 3.8
+
+# use this instead of python: to get latest python
+# build:
+#   image: testing
