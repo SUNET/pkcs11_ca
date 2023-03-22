@@ -10,7 +10,7 @@ import os
 import sys
 from sphinx.ext.apidoc import main as sphinx_apidoc
 
-# sys.path.insert(0, os.path.abspath('../src/pkcs11_ca_service/'))
+sys.path.insert(0, os.path.abspath('../../src/pkcs11_ca_service/'))
 # print(sys.path)
 
 # Auto generate docs with sphinx api docs
