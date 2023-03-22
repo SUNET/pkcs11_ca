@@ -57,7 +57,7 @@ def contact_from_payload(payload: Dict[str, Any]) -> str:
     :type payload: dict[str, Any]
 
     :return: The json list contacts as a base64url encoded string
-    :rtype: str
+    :rtype: int
     """
 
     contacts: List[str] = []
