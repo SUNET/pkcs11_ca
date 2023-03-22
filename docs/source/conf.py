@@ -14,6 +14,14 @@ sys.path.insert(0, os.path.abspath('../../src/pkcs11_ca_service/'))
 # print(sys.path)
 
 # Auto generate docs with sphinx api docs
+try:
+    os.remove("pkcs11_ca_service.rst")
+except OSError:
+    pass
+try:
+    os.remove("modules.rst")
+except OSError:
+    pass
 if sphinx_apidoc(['--implicit-namespaces', '-o', '.', '../../src/pkcs11_ca_service/']) != 0:
     print("ERROR: Could not auto generate docs")
     sys.exit(1)
