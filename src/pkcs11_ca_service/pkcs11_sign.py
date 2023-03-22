@@ -68,7 +68,7 @@ response_schema = {
 }
 
 
-def validate_input(request: dict[str, Any]) -> None:
+def validate_input(request: Dict[str, Any]) -> None:
     """Validate the json input with our schema, raises HTTP error 400 if invalid
 
     Parameters:
