@@ -6,13 +6,19 @@ Installation
 
 To use PKCS11 CA, first install it using
 
-.. code-block:: shell
+.. code-block:: bash
+   :caption: Script
+   :linenos:
+
    # Clone down the repository
    $ git clone https://github.com/SUNET/pkcs11_ca.git
    
    # Install openssl, docker and docker-compose. For example: sudo apt-get install docker.io openssl && pip3 install docker-compose
-   
-.. code-block:: shell
+
+.. code-block:: bash
+   :caption: Script
+   :linenos:
+
    # Export env variables
    $ export CA_URL="https://ca:8005"
    $ export CA_DNS_NAME="ca"
@@ -32,7 +38,10 @@ To use PKCS11 CA, first install it using
    $ export POSTGRES_DATABASE="pkcs11_testdb1"
    $ export POSTGRES_TIMEOUT="5"
 
-.. code-block:: shell
+.. code-block:: bash
+   :caption: Script
+   :linenos:
+
    # Create and start the containers
    $ dev-run.sh
    
