@@ -10,3 +10,4 @@ openapi_schema_validator
 pkgutil-resolve-name
 importlib-resources
 sphinx
+zipp
