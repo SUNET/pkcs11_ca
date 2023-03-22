@@ -27,6 +27,5 @@ Contents
 
 .. toctree::
 
-   modules
    usage
-   
+   modules   
