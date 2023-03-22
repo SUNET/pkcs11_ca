@@ -13,6 +13,8 @@ from sphinx.ext.apidoc import main as sphinx_apidoc
 # sys.path.insert(0, os.path.abspath('../src/pkcs11_ca_service/'))
 # print(sys.path)
 
+print(os.listdir("."))
+
 # Auto generate docs with sphinx api docs
 if sphinx_apidoc(['--implicit-namespaces', '-o', 'docs/source/', 'src/pkcs11_ca_service/']) != 0:
     print("ERROR: Could not auto generate docs")
