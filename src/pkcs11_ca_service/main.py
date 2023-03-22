@@ -1,5 +1,6 @@
 """Main module, FastAPI runs from here"""
 import json
+import os
 from typing import Union, Dict
 import asyncio
 import hashlib
@@ -43,8 +44,12 @@ from .auth import authorized_by
 from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
 from .config import KEY_TYPES, ACME_ROOT, ROOT_URL, PKCS11_SIGN_API_TOKEN
 
-loop = asyncio.get_running_loop()
-startup_task = loop.create_task(startup())
+
+if "_" in os.environ and "sphinx-build" in os.environ["_"]:
+    pass
+else:
+    loop = asyncio.get_running_loop()
+    startup_task = loop.create_task(startup())
 
 # Create fastapi app
 # Disable swagger and docs endpoints for now
