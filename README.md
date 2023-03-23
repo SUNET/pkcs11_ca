@@ -5,7 +5,7 @@ The documentation is [here](https://pkcs11-ca.readthedocs.io/).
 
 ## To run, deploy, test and everything run
 ``` bash
-bash dev-run.sh
+bash deploy.sh
 ```
 
 ## Reset the system

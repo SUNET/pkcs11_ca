@@ -39,7 +39,7 @@ To use PKCS11 CA, first install it using
 .. code-block:: bash
 
    # Create and start the containers
-   dev-run.sh
+   bash deploy.sh
    
 
 Using an ACME client with the PKCS11 CA
@@ -49,7 +49,7 @@ Allowing the automated deployment of public key infrastructure at very low cost.
 It was designed by the Internet Security Research Group (ISRG) for their Let's Encrypt service.
 The protocol, based on passing JSON-formatted messages over HTTPS has been published as an Internet Standard in RFC 8555 by its own chartered IETF working group
 
-We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our ACME client.
+We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our ACME client for this example.
 
 .. code-block:: bash
 
@@ -57,10 +57,10 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
    git clone https://github.com/dehydrated-io/dehydrated.git
    cd dehydrated
 
-   # The CA uses a self-signed certificate for its https connections so lets add the '-k' option to dehydrated's curl
+   # The CA uses a self-signed certificate by default for its https connections so lets add the '-k' option to dehydrated's curl command
    sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated
 
-   # Get the dns hostname for dehydrated to use
+   # Get the dns hostname which the certificate will be issued to.
    echo $HOSTNAME > domains.txt
 
    # Create a CSR for our hostname, this does not have to be using RSA, an EC curve is preferable.
@@ -72,7 +72,8 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
 
 .. code-block:: python
 
-   # Run this python script with runs dehydrated and also responds to the CA's ACME challenge
+   # Copy and run this python script
+   # which runs dehydrated and also responds to the CA's ACME challenge
    from typing import Union
    import threading
    from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -112,6 +113,7 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
    time.sleep(2)
 
    # Run dehydrated to register an ACME account with the CA
+   # The CA url is configurable in the config file
    subprocess.call(["bash", "-c", "bash dehydrated --register --accept-terms --ca 'https://ca:8005/acme/directory' --algo secp384r1"])
 
    # Run dehydrated to request the CA to sign our CSR
@@ -124,6 +126,6 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
    # The private key for the issued certificate
    print("Private key file: csr_rsa.key")
 
-   # Revoking is done in this way. It will cause the CA to put the certificate on its revoked CRL list.
+   # Revoking is done in this way. It will, among other things, cause the CA to put the certificate on its CRL.
    # subprocess.call(["bash", "-c", "bash dehydrated --revoke chain.pem --ca 'https://ca:8005/acme/directory'"])
 

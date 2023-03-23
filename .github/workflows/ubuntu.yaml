@@ -31,4 +31,4 @@ jobs:
           cd pkcs11_ca && \
           python3 -m pip install -r requirements.txt && \
           python3 -m pip install types-requests mypy black pylint && \
-          bash dev-run.sh'
+          bash deploy.sh'
