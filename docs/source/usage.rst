@@ -90,10 +90,12 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
    # rm -rf /var/www/dehydrated accounts/
    mkdir -p /var/www/dehydrated
 
-.. code-block:: python
+Copy and run this python script
+which runs dehydrated and also responds to the CA's ACME challenge
 
-   # Copy and run this python script
-   # which runs dehydrated and also responds to the CA's ACME challenge
+.. code-block:: python
+   #!/usr/bin/env python3
+
    from typing import Union
    from http.server import BaseHTTPRequestHandler, HTTPServer
    import time, subprocess, sys, os, threading

@@ -82,6 +82,24 @@ def random_string() -> str:
     return to_base64url(token_bytes(64).strip(b"="))
 
 
+def is_expired(expiry_date: str) -> bool:
+    """If the current date is past the expiry date
+
+    Parameters:
+    expiry_date (str): The expiry date as string in %Y-%m-%dT%H:%M:%SZ
+
+    Returns:
+    bool
+    """
+
+    curr_datetime = datetime.datetime.now(datetime.timezone.utc)
+    expire_datetime = datetime.datetime.strptime(expiry_date, "%Y-%m-%dT%H:%M:%SZ").astimezone(tz=datetime.timezone.utc)
+
+    if curr_datetime >= expire_datetime:
+        return True
+    return False
+
+
 def account_id_from_kid(kid: str) -> str:
     """Get the account id from the acme KID by only keeping the id part.
     Example KID: 'https://acme-server/path-to-acme/acct/djXYss-mx-L0wy3V47OBoNkLiyOQNUObz'
@@ -352,6 +370,10 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
         if account is None:
             raise HTTPException(status_code=401, detail="No such account")
 
+        # Check if the acme account is deactivated
+        if account.status == "deactivated":
+            return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+
         order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
         if not isinstance(order, AcmeOrder):
             raise HTTPException(status_code=401, detail="Non valid cert to revoke")
@@ -366,6 +388,14 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
         if not isinstance(order, AcmeOrder):
             raise HTTPException(status_code=401, detail="Non valid cert to revoke")
 
+        # Check if the acme account is deactivated
+        account = await account_exists(AcmeAccountInput(serial=order.account))
+        if account is None:
+            raise HTTPException(status_code=401, detail="No such account")
+
+        if account.status == "deactivated":
+            return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+
         if order.issued_certificate != cert_pem:
             raise HTTPException(status_code=401, detail="Non valid cert to revoke")
     else:
@@ -378,6 +408,7 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
     # Revoke cert
     await cert.revoke(1, reason)
+
     return Response(headers={"Replay-Nonce": generate_nonce()})
 
 
@@ -402,19 +433,13 @@ async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
         if not isinstance(obj, AcmeOrder):
             raise HTTPException(status_code=401, detail="Non valid order")
 
-        if obj.certificate == cert_id:
+        if obj.certificate == cert_id and obj.status == "valid":
             order = obj
             break
     else:
         raise HTTPException(status_code=401, detail="Non valid order")
 
-    pkcs11_key = (await db_load_data_class(Pkcs11Key, Pkcs11KeyInput(key_label=ACME_SIGNER_KEY_LABEL)))[0]
-    if not isinstance(pkcs11_key, Pkcs11Key):
-        raise HTTPException(status_code=400, detail="Non valid acme signer ca")
-
-    issuer = await ca_request(CaInput(pkcs11_key=pkcs11_key.serial))
-
-    return Response(content=f"{order.issued_certificate}{issuer.pem}", media_type="application/pem-certificate-chain")
+    return Response(content=f"{order.issued_certificate}", media_type="application/pem-certificate-chain")
 
 
 async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
@@ -446,6 +471,11 @@ async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
             break
     else:
         raise HTTPException(status_code=401, detail="Non valid order")
+
+    if is_expired(order.expires):
+        order.status = "invalid"
+        await order.update()
+        raise HTTPException(status_code=401, detail="order has expired")  # Fixme handle error better see rfc
 
     if order.status != "ready":
         raise HTTPException(status_code=403, detail="orderNotReady")  # Fixme handle error better see rfc
@@ -505,7 +535,7 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
     """
 
     protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-    if jws["payload"] == "":
+    if jws["payload"] == "":  # Here since some clients sends "" instead of "{}"
         payload = {"just_info": "just_info"}
     else:
         payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
@@ -533,7 +563,16 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
 
                 for challenge in authz_obj.challenges_as_list():
                     if challenge["url"] == challenge_url:
-                        if execute:
+                        # Check expired
+                        if is_expired(order.expires):
+                            order.status = "invalid"
+                            await order.update()
+                        if is_expired(authz_obj.expires):
+                            authz_obj.status = "expired"
+                            await authz_obj.update()
+
+                        # Execute the challenge if the client requested it and it's not expired
+                        if execute and order.status == "pending" and authz_obj.status == "pending":
                             background_tasks.add_task(
                                 execute_challenge, account.public_key_pem, order, authz_obj, challenge
                             )
@@ -567,6 +606,11 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     authzs = await account_authzs(AcmeAuthorizationInput(id=authz_id))
     if len(authzs) == 0:
         raise HTTPException(status_code=401, detail="Non valid authz")
+
+    # Check if the authz has expired
+    if is_expired(authzs[0].expires):
+        authzs[0].status = "expired"
+        await authzs[0].update()
 
     response_data = {
         "status": authzs[0].status,
@@ -814,6 +858,11 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
         if order.id != order_id:
             continue
 
+        # Check if order has expired
+        if is_expired(order.expires):
+            order.status = "invalid"
+            await order.update()
+
         response_data = {
             "status": order.status,
             "expires": order.expires,
@@ -926,7 +975,8 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
                 pre_authz.identifier_as_dict()["type"] == "signature"
                 and pre_authz.identifier_as_dict()["value"] == identifier["value"]
                 and pre_authz.status == "valid"
-            ):  # FIXME check expired
+                and not is_expired(pre_authz.expires)
+            ):
                 found_identifier = True
                 authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{pre_authz.id}")
                 break
@@ -938,7 +988,8 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
                 pre_authz.identifier_as_dict()["type"] == identifier["type"]
                 and pre_authz.identifier_as_dict()["value"] == identifier["value"]
                 and pre_authz.status == "pending"
-            ):  # FIXME check expired
+                and not is_expired(pre_authz.expires)
+            ):
                 found_identifier = True
                 new_order.status = "pending"
                 authorizations.append(f"{ROOT_URL}{ACME_ROOT}/authz/{pre_authz.id}")
@@ -1390,6 +1441,10 @@ async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks
     protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
     account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
     if account is None:
+        return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+
+    # Check if the acme account is deactivated
+    if account.status == "deactivated":
         return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
 
     if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/acct/"):
