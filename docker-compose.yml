@@ -62,8 +62,6 @@ services:
     build:
       context: .
       dockerfile: containers/Dockerfile_test
-    ports:
-      - "80:8080"
     depends_on:
       - "ca"
     restart: "no"

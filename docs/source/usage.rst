@@ -95,12 +95,8 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
    # Copy and run this python script
    # which runs dehydrated and also responds to the CA's ACME challenge
    from typing import Union
-   import threading
    from http.server import BaseHTTPRequestHandler, HTTPServer
-   import time
-   import subprocess
-   import sys
-   import os
+   import time, subprocess, sys, os, threading
 
    class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
 
@@ -123,7 +119,8 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
 
 
    def run_http_server() -> None:
-     server_address = ("", 8080)
+     # In the odd case you need root to bind to port 80 then run the container with 'docker run --user 0'
+     server_address = ("", 80)
      httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
      httpd.timeout = 10
      httpd.handle_request()

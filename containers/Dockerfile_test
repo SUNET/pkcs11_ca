@@ -23,6 +23,7 @@ RUN apt-get update \
     openssl \
     vim-tiny \
     nano \
+    emacs-nox \
     bsdmainutils \
     curl \
     && pip3 install -r /app/requirements.txt \
