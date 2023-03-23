@@ -58,7 +58,7 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
    cd dehydrated
 
    # The CA uses a self-signed certificate for its https connections so lets add the '-k' option to dehydrated's curl
-   sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated/dehydrated
+   sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated
 
    # Get the dns hostname for dehydrated to use
    echo $HOSTNAME > domains.txt
@@ -72,7 +72,7 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
 
 .. code-block:: python
 
-   # Lets run a python script with runs dehydrated and responds to the CA's ACME challenge
+   # Run this python script with runs dehydrated and also responds to the CA's ACME challenge
    from typing import Union
    import threading
    from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -101,11 +101,11 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
        self.server.shutdown()
 
 
-     def run_http_server() -> None:
-       server_address = ("", 80)
-       httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
-       httpd.timeout = 10
-       httpd.handle_request()
+   def run_http_server() -> None:
+     server_address = ("", 80)
+     httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
+     httpd.timeout = 10
+     httpd.handle_request()
 
    t = threading.Thread(target=run_http_server, daemon=True)
    t.start()
