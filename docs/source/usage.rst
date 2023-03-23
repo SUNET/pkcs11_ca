@@ -42,8 +42,88 @@ To use PKCS11 CA, first install it using
    dev-run.sh
    
 
-Creating recipes
+Using an ACME client with the PKCS11 CA
 ----------------
+The Automatic Certificate Management Environment (ACME) protocol is a communications protocol for automating interactions between certificate authorities and their users' servers.
+Allowing the automated deployment of public key infrastructure at very low cost.
+It was designed by the Internet Security Research Group (ISRG) for their Let's Encrypt service.
+The protocol, based on passing JSON-formatted messages over HTTPS has been published as an Internet Standard in RFC 8555 by its own chartered IETF working group
 
-# To retrieve a list of random ingredients,
-# you can use the ``lumache.get_random_ingredients()`` function:
+We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our ACME client.
+
+.. code-block:: bash
+
+   # Get dehydrated
+   git clone https://github.com/dehydrated-io/dehydrated.git
+   cd dehydrated
+
+   # The CA uses a self-signed certificate for its https connections so lets add the '-k' option to dehydrated's curl
+   sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated/dehydrated
+
+   # Get the dns hostname for dehydrated to use
+   echo $HOSTNAME > domains.txt
+
+   # Create a CSR for our hostname, this does not have to be using RSA, an EC curve is preferable.
+   openssl req -subj "/C=SE/CN=my-web-server" -addext "subjectAltName = DNS:${HOSTNAME}" -new -newkey rsa:2048 -nodes -keyout csr_rsa.key -out csr_rsa.pem
+
+   # Remove old ACME account if exists and create ACME challenge folder
+   # rm -rf /var/www/dehydrated accounts/
+   mkdir -p /var/www/dehydrated
+
+.. code-block:: python
+
+   # Lets run a python script with runs dehydrated and responds to the CA's ACME challenge
+   from typing import Union
+   import threading
+   from http.server import BaseHTTPRequestHandler, HTTPServer
+   import time
+   import subprocess
+   import sys
+   import os
+
+   class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
+
+     def do_GET(self) -> None:
+       tokens = os.listdir("/var/www/dehydrated")
+       if len(tokens) != 1:
+         print("ERROR: must have only one token in /var/www/dehydrated")
+         sys.exit(1)
+
+       with open(f"/var/www/dehydrated/{tokens[0]}", "rb") as f_data:
+         key_auth = f_data.read()
+
+       self.send_response(200)
+       self.send_header("Content-Length", str(len(key_auth)))
+       self.end_headers()
+
+       self.wfile.write(key_auth)
+       self.server.server_close()
+       self.server.shutdown()
+
+
+     def run_http_server() -> None:
+       server_address = ("", 80)
+       httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
+       httpd.timeout = 10
+       httpd.handle_request()
+
+   t = threading.Thread(target=run_http_server, daemon=True)
+   t.start()
+   time.sleep(2)
+
+   # Run dehydrated to register an ACME account with the CA
+   subprocess.call(["bash", "-c", "bash dehydrated --register --accept-terms --ca 'https://ca:8005/acme/directory' --algo secp384r1"])
+
+   # Run dehydrated to request the CA to sign our CSR
+   subprocess.call(["bash", "-c", "bash dehydrated --accept-terms --signcsr csr_rsa.pem --ca 'https://ca:8005/acme/directory' | grep -v '# CERT #' > chain.pem"])
+
+   # The issued certificate and its chain
+   print("Certificate chain from the CA")
+   subprocess.call(["bash", "-c", "cat chain.pem"])
+
+   # The private key for the issued certificate
+   print("Private key file: csr_rsa.key")
+
+   # Revoking is done in this way. It will cause the CA to put the certificate on its revoked CRL list.
+   # subprocess.call(["bash", "-c", "bash dehydrated --revoke chain.pem --ca 'https://ca:8005/acme/directory'"])
+
