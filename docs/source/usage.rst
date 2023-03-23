@@ -56,7 +56,7 @@ Start a container in the CA's docker network
 .. code-block:: bash
 
    # To start a container inside the CA's docker network
-   docker run --user 0 -it --entrypoint /bin/bash --network pkcs11_ca_default pkcs11_ca_test1
+   docker run -it --entrypoint /bin/bash --network pkcs11_ca_default pkcs11_ca_test1
 
 
 Using an ACME client with the PKCS11 CA

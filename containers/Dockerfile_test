@@ -43,6 +43,9 @@ COPY ./containers/healthcheck.sh /app/healthcheck.sh
 COPY ./containers/healthcheck.py /app/healthcheck.py
 COPY ./data/tls_certificate.pem /app/tls_certificate.pem
 
+RUN mkdir -p /var/www/dehydrated
+RUN chown 1501 /var/www/dehydrated
+
 RUN chown -R pkcs11_ca_test1 /app
 
 # Run as user
