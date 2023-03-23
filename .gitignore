@@ -1,5 +1,6 @@
 dist
 venv
+docs/build
 data/trusted_keys
 data/tls_certificate.pem
 data/tls_key.key
