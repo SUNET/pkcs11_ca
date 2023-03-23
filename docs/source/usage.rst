@@ -72,7 +72,7 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
 
 .. code-block:: bash
 
-   # Client with mutual dns access to the CA, maybe the container you started above
+   # Client with mutual DNS access to the CA, maybe the container you started above
    # Get dehydrated
    git clone https://github.com/dehydrated-io/dehydrated.git
    cd dehydrated
