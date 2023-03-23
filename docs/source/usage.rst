@@ -44,8 +44,13 @@ To use PKCS11 CA, first install it using
 .. note::
 
    Your CA's $CA_URL **MUST** be reachable from your client and the clients DNS name **MUST** be reachable from the CA.
-   A simple way is ensuring the CA and client uses public DNS **or** your having your client in a container inside the CA's docker network.
 
+   | A simple way is ensuring that both the CA and client uses public DNS
+   | **or** your having your client in a container in the CA's docker network.
+
+
+Start a container in the CA's docker network
+----------------
 
 .. code-block:: bash
 
@@ -64,6 +69,7 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
 
 .. code-block:: bash
 
+   # Inside the container you started above
    # Get dehydrated
    git clone https://github.com/dehydrated-io/dehydrated.git
    cd dehydrated
