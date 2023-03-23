@@ -46,7 +46,7 @@ To use PKCS11 CA, first install it using
    Your CA's $CA_URL **MUST** be reachable from your client and the clients DNS name **MUST** be reachable from the CA.
 
    | A simple way is ensuring that both the CA and client uses public DNS
-   | **or** your having your client in a container in the CA's docker network.
+   | **or** having your client in a container in the CA's docker network.
 
 
 Start a container in the CA's docker network
@@ -141,7 +141,7 @@ We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our A
    subprocess.call(["bash", "-c", "cat chain.pem"])
 
    # The private key for the issued certificate
-   print("Private key file: csr_rsa.key")
+   print("Private key file: ./csr_rsa.key")
 
    # Revoking is done in this way. It will, among other things, cause the CA to put the certificate on its CRL.
    # subprocess.call(["bash", "-c", "bash dehydrated --revoke chain.pem --ca 'https://ca:8005/acme/directory'"])
