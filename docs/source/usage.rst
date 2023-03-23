@@ -123,7 +123,7 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
 
 
    def run_http_server() -> None:
-     server_address = ("", 80)
+     server_address = ("", 8080)
      httpd = HTTPServer(server_address, AcmeChallengeHTTPRequestHandler)
      httpd.timeout = 10
      httpd.handle_request()
