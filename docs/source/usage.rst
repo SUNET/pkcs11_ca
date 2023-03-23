@@ -12,7 +12,8 @@ To use PKCS11 CA, first install it using
    git clone https://github.com/SUNET/pkcs11_ca.git
    
    # Install openssl python3-pip, docker and docker-compose
-   # For example: sudo apt-get install docker.io openssl python3-pip
+   # For example:
+   # sudo apt-get install docker.io openssl python3-pip
    # pip3 install docker-compose
 
 .. code-block:: bash
