@@ -44,9 +44,11 @@ To use PKCS11 CA, first install it using
 .. note::
 
    Your CA's $CA_URL **MUST** be reachable from your client and the clients DNS name **MUST** be reachable from the CA.
-   Simple way is ensuring the CA and client use public DNS or your having your client in a container inside the CA's docker network.
+   A simple way is ensuring the CA and client uses public DNS **or** your having your client in a container inside the CA's docker network.
+
 
 .. code-block:: bash
+
    # To start a container inside the CA's docker network
    docker run --user 0 -it --entrypoint /bin/bash --network pkcs11_ca_default pkcs11_ca_test1
 
