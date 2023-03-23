@@ -67,9 +67,11 @@ The protocol, based on passing JSON-formatted messages over HTTPS has been publi
 
 We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our ACME client for this example.
 
+We will use the client's ENV $HOSTNAME for the hostname the certificate to be issued to.
+
 .. code-block:: bash
 
-   # Inside the container you started above
+   # Client with mutual dns access to the CA, maybe the container you started above
    # Get dehydrated
    git clone https://github.com/dehydrated-io/dehydrated.git
    cd dehydrated
