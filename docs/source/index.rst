@@ -7,7 +7,10 @@ PKCS11 offers a *simple* and *intuitive* API including ACME and CMC.
 .. note::
 
    This project is under active development.
+
    `Start here <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_
+
+   `Hacking / Internal API <https://pkcs11-ca.readthedocs.io/en/latest/modules.html>`_
 
 
 .. toctree::
@@ -30,4 +33,3 @@ Contents
 .. toctree::
 
    usage
-   modules   
