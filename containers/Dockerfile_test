@@ -21,6 +21,8 @@ RUN apt-get update \
     dnsutils \
     git \
     openssl \
+    vim-tiny \
+    nano \
     bsdmainutils \
     curl \
     && pip3 install -r /app/requirements.txt \

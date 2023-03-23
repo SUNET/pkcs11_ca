@@ -1,16 +1,17 @@
-Welcome to PKCS11CA's documentation!
+Welcome to PKCS11 CA's documentation!
 ====================================
 
-**PKCS11CA** is a Certificate Authority written in python. Key private keys are stored in an PKCS11 (HSM) device.
-PKCS11 offers a *simple* and *intuitive* API including ACME and CMC.
+**PKCS11 CA** is a Certificate Authority written in python. Keys are stored in an PKCS11 (HSM) device.
+Default is to use softhsm which is a free software emulated HSM.
+PKCS11 CA offers a *simple* and *intuitive* API including ACME and CMC.
 
 .. note::
 
    This project is under active development.
 
-   `Start here <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_
+   Please start at the `usage guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_
 
-   `Hacking / Internal API <https://pkcs11-ca.readthedocs.io/en/latest/modules.html>`_
+   `For hacking / Internal API <https://pkcs11-ca.readthedocs.io/en/latest/modules.html>`_
 
 
 .. toctree::
