@@ -203,7 +203,7 @@ async def execute_challenge(
                 )
                 return
 
-            if req.status_code == 200 and key_authorization in req.text:
+            if req is not None and req.status_code == 200 and key_authorization in req.text:
                 chall_success = True
 
         if not chall_success:
@@ -571,7 +571,7 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
                             authz_obj.status = "expired"
                             await authz_obj.update()
 
-                        # Execute the challenge if the client requested it and it's not expired
+                        # Execute the challenge if the client requested it, and it's not expired
                         if execute and order.status == "pending" and authz_obj.status == "pending":
                             background_tasks.add_task(
                                 execute_challenge, account.public_key_pem, order, authz_obj, challenge
@@ -604,7 +604,7 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     authz_id = authz_id.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", "")
 
     authzs = await account_authzs(AcmeAuthorizationInput(id=authz_id))
-    if len(authzs) == 0:
+    if len(authzs) != 1:
         raise HTTPException(status_code=401, detail="Non valid authz")
 
     # Check if the authz has expired
@@ -615,7 +615,7 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     response_data = {
         "status": authzs[0].status,
         "expires": authzs[0].expires,
-        "identifier": json.loads(from_base64url(authzs[0].identifier)),
+        "identifier": authzs[0].identifier_as_dict(),
         "challenges": authzs[0].challenges_as_list(),
     }
 

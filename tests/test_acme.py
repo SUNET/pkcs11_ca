@@ -11,6 +11,7 @@ import subprocess
 import datetime
 import base64
 import secrets
+import time
 
 import requests
 
@@ -558,6 +559,9 @@ class TestAcme(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
+        # Ensure the DB has updated
+        time.sleep(2)
+
         # Get authz after challenge
         acme_req = get_authz_jws(kid, priv_key2, authz)
         req = requests.post(
@@ -764,6 +768,9 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
+
+        # Ensure the DB has updated
+        time.sleep(2)
 
         # Get authz after challenge
         acme_req = get_authz_jws(kid, priv_key2, authz)

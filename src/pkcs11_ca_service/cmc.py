@@ -6,14 +6,6 @@ from random import randint
 
 from fastapi import HTTPException
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
-from cryptography.hazmat.primitives.asymmetric import padding
-
-from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import InvalidSignature
 
 from asn1crypto import csr as asn1_csr
