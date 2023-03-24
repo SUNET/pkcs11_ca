@@ -9,6 +9,7 @@ from fastapi import HTTPException
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey
 from cryptography.hazmat.primitives.asymmetric import padding
 
@@ -23,6 +24,7 @@ from asn1crypto import cms as asn1_cms
 from asn1crypto import algos as asn1_algos
 
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
+from python_x509_pkcs11.lib import signed_digest_algo
 from python_x509_pkcs11.csr import sign_csr
 
 from python_cmc import cmc as asn1_cmc
@@ -40,10 +42,12 @@ from .asn1 import (
     pem_cert_to_key_hash,
     cert_pem_serial_number,
     pem_cert_to_name_dict,
+    pem_cert_verify_signature,
 )
 from .base import db_load_data_class
 from .config import (
     CMC_CERT_ISSUING_KEY_LABEL,
+    CMC_KEYS_TYPE,
     CMC_CERT_ISSUING_NAME_DICT,
     CMC_SIGNING_KEY_LABEL,
     CMC_REQUEST_CERTS,
@@ -296,9 +300,7 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
                                 "digest_algorithm": asn1_algos.DigestAlgorithm(
                                     {"algorithm": asn1_algos.DigestAlgorithmId("2.16.840.1.101.3.4.2.1")}
                                 ),
-                                "signature_algorithm": asn1_algos.SignedDigestAlgorithm(
-                                    {"algorithm": asn1_algos.SignedDigestAlgorithmId("1.2.840.10045.4.3.2")}
-                                ),
+                                "signature_algorithm": signed_digest_algo(CMC_KEYS_TYPE),
                             }
                         )
                     ]
@@ -312,11 +314,9 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     signer_info["digest_algorithm"] = asn1_algos.DigestAlgorithm(
         {"algorithm": asn1_algos.DigestAlgorithmId("2.16.840.1.101.3.4.2.1")}
     )
-    signer_info["signature_algorithm"] = asn1_algos.SignedDigestAlgorithm(
-        {"algorithm": asn1_algos.SignedDigestAlgorithmId("1.2.840.10045.4.3.2")}
-    )
+    signer_info["signature_algorithm"] = signed_digest_algo(CMC_KEYS_TYPE)
     signer_info["signature"] = await PKCS11Session().sign(
-        "cmc_signer_test3", signer_info["signed_attrs"].retag(17).dump(), key_type="secp256r1"
+        "cmc_signer_test3", signer_info["signed_attrs"].retag(17).dump(), key_type=CMC_KEYS_TYPE
     )
 
     signed_data["signer_infos"] = asn1_cms.SignerInfos({signer_info})
@@ -332,7 +332,7 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     return ret
 
 
-# This need to be improved to fully support crmf, not just basics
+# FIXME This need to be improved to fully support crmf, not just basics
 def create_csr_from_crmf(cert_req: asn1_cmc.CertReqMsg) -> asn1_csr.CertificationRequest:
     """Manually handle the CRMF request into a CSR
     since we use CSR as data type in the database and currently all certs have a csr which the are created from"""
@@ -363,43 +363,24 @@ def create_csr_from_crmf(cert_req: asn1_cmc.CertReqMsg) -> asn1_csr.Certificatio
     return cert_req
 
 
-def _do_check_signature(pub_key_data: bytes, signature: bytes, data: bytes) -> bool:
-    loaded_public_key = serialization.load_pem_public_key(pub_key_data)
-
-    try:
-        if isinstance(loaded_public_key, EllipticCurvePublicKey):
-            loaded_public_key.verify(signature, data, ECDSA(hashes.SHA256()))
-        elif isinstance(loaded_public_key, RSAPublicKey):
-            loaded_public_key.verify(signature, data, padding.PKCS1v15(), hashes.SHA256())  # hash
-        elif isinstance(loaded_public_key, Ed25519PublicKey):
-            loaded_public_key.verify(signature, data)
-        return True
-    except InvalidSignature:
-        print("Failed to validate CMC request signature")
-    return False
-
-
-# FIXME check for different ec curves, rsa and ed25519
 def _check_request_signature(request_signers: asn1_cms.CertificateSet, signer_infos: asn1_cms.SignerInfos) -> None:
-    was_valid = False
-
     for _, request_signer in enumerate(request_signers):
         for valid_cert in CMC_REQUEST_CERTS:
             _, _, valid_cert_pem = asn1_pem.unarmor(valid_cert.encode("UTF-8"))
             if request_signer.chosen.native == asn1_x509.Certificate.load(valid_cert_pem).native:
                 for _, signer_info in enumerate(signer_infos):
-                    pub_key_data = asn1_pem.armor(
-                        "PUBLIC KEY", request_signer.chosen["tbs_certificate"]["subject_public_key_info"].dump()
-                    )
-                    if _do_check_signature(
-                        pub_key_data,
-                        signer_info["signature"].contents,
-                        signer_info["signed_attrs"].retag(17).dump(),
-                    ):
-                        was_valid = True
+                    signer_cert: bytes = asn1_pem.armor("CERTIFICATE", request_signer.chosen.dump())
+                    try:
+                        pem_cert_verify_signature(
+                            signer_cert.decode("utf-8"),
+                            signer_info["signature"].contents,
+                            signer_info["signed_attrs"].retag(17).dump(),
+                        )
+                        return
+                    except (InvalidSignature, ValueError, TypeError):
+                        pass
 
-    if not was_valid:
-        raise HTTPException(status_code=401, detail="Wrong or missing CMS signer")
+    raise HTTPException(status_code=401, detail="Wrong or missing CMS signer")
 
 
 # FIXME handle errors and store all CMC control attributes not only reginfo and nonce

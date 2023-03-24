@@ -155,10 +155,7 @@ def public_key_verify_signature(public_key_info_pem: str, signature: bytes, sign
         try:
             pub_key.verify(signature, signed_data, PKCS1v15(), SHA256())
         except InvalidSignature:
-            try:
-                pub_key.verify(signature, signed_data, PKCS1v15(), SHA384())
-            except InvalidSignature:
-                pub_key.verify(signature, signed_data, PKCS1v15(), SHA512())
+            pub_key.verify(signature, signed_data, PKCS1v15(), SHA512())
 
     elif isinstance(pub_key, EllipticCurvePublicKey):
         if pub_key.curve.name == "secp256r1":
