@@ -11,10 +11,16 @@ To use PKCS11 CA, first install it using
    # Clone down the repository
    git clone https://github.com/SUNET/pkcs11_ca.git
    
-   # Install openssl python3-pip, docker and docker-compose
-   # For example:
-   # sudo apt-get install docker.io openssl python3-pip
-   # pip3 install docker-compose
+   # Install docker and docker-compose
+   # For example on ubuntu/debian:
+   # sudo apt-get install docker.io docker-compose
+
+   # Add user to docker group
+   sudo usermod -aG docker $USER
+
+   # Update your docker group membership **or** open a new shell
+   exec sudo su -l $USER
+
 
 .. code-block:: bash
 
@@ -90,7 +96,7 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
    # rm -rf /var/www/dehydrated accounts/
    mkdir -p /var/www/dehydrated
 
-Copy and run this python script
+Copy paste this script as **acme_run.py**
 which runs dehydrated and also responds to the CA's ACME challenge
 
 .. code-block:: python
@@ -148,4 +154,11 @@ which runs dehydrated and also responds to the CA's ACME challenge
 
    # Revoking is done in this way. It will, among other things, cause the CA to put the certificate on its CRL.
    # subprocess.call(["bash", "-c", "bash dehydrated --revoke chain.pem --ca 'https://ca:8005/acme/directory'"])
+
+
+Run the python script
+
+.. code-block:: bash
+
+   python3 acme_run.py
 
