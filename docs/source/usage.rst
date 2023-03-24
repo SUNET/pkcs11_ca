@@ -4,7 +4,7 @@ Usage
 Installation
 ------------
 
-To use PKCS11 CA, first install it using
+To use PKCS11 CA, first install it. Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/latest/requirements.html>`_
 
 .. code-block:: bash
 
