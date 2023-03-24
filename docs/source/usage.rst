@@ -175,8 +175,8 @@ Run the python script
 
    python3 acme_run.py
 
-Retrieving the issuer from a certificate
-----------------------------------------
+Retrieving the issuer for a certificate
+---------------------------------------
 
 | **All** non root certificates issued by the PKCS11 CA have the Authority Information Access extension with **CA Issuers**
 | It contains an URL to the certificate's issuer certificate.
