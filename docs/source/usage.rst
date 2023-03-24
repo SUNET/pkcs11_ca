@@ -4,7 +4,7 @@ Usage
 Installation
 ------------
 
-To use PKCS11 CA, first install it. Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/latest/requirements.html>`_
+To use PKCS11 CA, first install it. Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/latest/requirements.html>`_.
 
 .. code-block:: bash
 
@@ -228,7 +228,7 @@ OCSP
 | It contains an URL to the certificate's issuer OCSP responder.
 | This is defined in `RFC 5280 <https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1>`_
 
-This can be used send OCSP requests to verify that the certificate has not been revoked.
+This can be used to send an OCSP request to check if the certificate has been revoked or not
 
 .. code-block:: bash
 
