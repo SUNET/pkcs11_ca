@@ -4,7 +4,7 @@ python_cmc>=1.22
 pyjwt
 fastapi
 asyncpg
-cryptography>=39.0.1
+cryptography>=40.0.0
 requests
 openapi_schema_validator
 pkgutil-resolve-name

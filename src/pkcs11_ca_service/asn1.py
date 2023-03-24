@@ -14,6 +14,8 @@ from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey as cryptoRSAPublicKey
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
+from cryptography import x509 as cryptography_x509
+
 
 from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
@@ -530,6 +532,24 @@ def cert_pem_serial_number(pem: str) -> int:
 
     ret: int = cert["tbs_certificate"]["serial_number"].native
     return ret
+
+
+def cert_is_self_signed(pem: str) -> bool:
+    """If certificate is self-signed (root CA)
+
+    Parameters:
+    pem (str): PEM certificate input data.
+
+    Returns:
+    bool
+    """
+
+    cert = cryptography_x509.load_pem_x509_certificate(pem.encode("utf-8"))
+    try:
+        cert.verify_directly_issued_by(cert)
+        return True
+    except InvalidSignature:
+        return False
 
 
 def cert_is_ca(pem: str) -> bool:

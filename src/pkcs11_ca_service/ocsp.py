@@ -17,7 +17,7 @@ from .public_key import PublicKeyInput
 from .ca import CaInput
 
 from .route_functions import public_key_request, pkcs11_key_request, ca_request, crl_request
-from .asn1 import cert_revoked, ocsp_decode, pem_cert_to_key_hash, cert_revoked_time
+from .asn1 import cert_revoked, ocsp_decode, pem_cert_to_key_hash, cert_revoked_time, cert_is_self_signed
 
 # Sign the request with the key for the first single request
 # single requests for certificates by another CA will get unknown status
@@ -33,9 +33,11 @@ async def _ocsp_check_valid_cert(
     pkcs11_key_obj = await pkcs11_key_request(Pkcs11KeyInput(public_key=public_key_obj.serial))
     issuer_obj = await ca_request(CaInput(pkcs11_key=pkcs11_key_obj.serial))
 
-    # Fix chain not just assume root is above issuer
-    root_pem = await issuer_obj.issuer_pem()
-    chain: List[str] = [issuer_obj.pem, root_pem]
+    chain: List[str] = [issuer_obj.pem]
+
+    # Add issuer to chain if this is not a self-signed cert
+    if not cert_is_self_signed(issuer_obj.pem):
+        chain.append(await issuer_obj.issuer_pem())
 
     # If cert is revoked
     crl = await crl_request(1, issuer_obj)

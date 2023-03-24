@@ -683,7 +683,7 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
             f"{token_parts[0]}.{token_parts[1]}".encode("utf-8"),
         )
     except (InvalidSignature, ValueError):
-        raise HTTPException(status_code=401, detail="Token signature invalid1")
+        raise HTTPException(status_code=401, detail="Token signature invalid")
 
     # Verify cert or certs CA is in config file
     for config_cert in ACME_SUNET_TRUSTED_SIGNERS:

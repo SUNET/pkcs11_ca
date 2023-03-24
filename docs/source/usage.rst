@@ -57,7 +57,7 @@ To use PKCS11 CA, first install it using
 
 
 Start a container in the CA's docker network
-----------------
+--------------------------------------------
 
 .. code-block:: bash
 
@@ -66,7 +66,8 @@ Start a container in the CA's docker network
 
 
 Using an ACME client with the PKCS11 CA
-----------------
+---------------------------------------
+
 The Automatic Certificate Management Environment (ACME) protocol is a communications protocol for automating interactions between certificate authorities and their users' servers.
 Allowing the automated deployment of public key infrastructure at very low cost.
 It was designed by the Internet Security Research Group (ISRG) for their Let's Encrypt service.
@@ -75,6 +76,9 @@ The protocol, based on passing JSON-formatted messages over HTTPS has been publi
 We will use `Dehydrated <https://github.com/dehydrated-io/dehydrated>`_ as our ACME client for this example.
 
 We will use the client's ENV $HOSTNAME for the hostname the certificate to be issued to.
+
+Copy paste this script as **acme_setup.sh**
+which runs dehydrated and also responds to the CA's ACME challenge
 
 .. code-block:: bash
 
@@ -95,6 +99,15 @@ We will use the client's ENV $HOSTNAME for the hostname the certificate to be is
    # Remove old ACME account if exists and create ACME challenge folder
    # rm -rf /var/www/dehydrated accounts/
    mkdir -p /var/www/dehydrated
+
+Copy paste this script as **acme_setup.py**
+which sets up dehydrated and creates a CSR for the CA to sign using our ACME client
+
+
+.. code-block:: bash
+
+   bash acme_setup.sh
+
 
 Copy paste this script as **acme_run.py**
 which runs dehydrated and also responds to the CA's ACME challenge
@@ -162,3 +175,69 @@ Run the python script
 
    python3 acme_run.py
 
+Retrieving the issuer from a certificate
+----------------------------------------
+
+| **All** non root certificates issued by the PKCS11 CA have the Authority Information Access extension with **CA Issuers**
+| It contains an URL to the certificate's issuer certificate.
+| This is defined in `RFC 3280 <https://datatracker.ietf.org/doc/html/rfc3280#section-4.2.2.1>`_
+
+This can be used to fetch the certificate chain.
+
+.. code-block:: bash
+
+   # Assuming your certificate file is cert.pem
+   ISSUER=$(openssl x509 -noout -text -in cert.pem | grep "CA Issuers - " | cut -f 2-4 -d ':')
+   curl -k $ISSUER | openssl x509 -inform DER > issuer.pem
+
+   # View the certificate, '-text' for extra info
+   openssl x509 -noout -text -in issuer.pem
+
+   # Verify the issuer *actually is* the issuer of the certificate
+   openssl verify -CAfile issuer.pem cert.pem
+
+Retrieving the CRL for the issuer of a certificate
+--------------------------------------------------
+
+| **All** non root certificates issued by the PKCS11 CA have the CRL Distribution Points extension
+| It contains an URL to the certificate's issuer CRL.
+| This is defined in `RFC 3280 <https://datatracker.ietf.org/doc/html/rfc3280#section-4.2.1.14>`_
+
+This can be used to fetch the CRL needed to verify that the certificate has not been revoked.
+
+.. code-block:: bash
+
+   # Assuming your certificate file is cert.pem
+   CRL=$(openssl x509 -noout -text -in cert.pem  | grep -A 4 "CRL Distribution Points:" | grep "URI:" | cut -f 2-4 -d ':')
+   curl -k $CRL | openssl crl -inform DER > crl.pem
+
+   # To use the CRL to verify the certificate we also need the certificate issuer for it
+   ISSUER=$(openssl x509 -noout -text -in cert.pem | grep "CA Issuers - " | cut -f 2-4 -d ':')
+   curl -k $ISSUER | openssl x509 -inform DER > issuer.pem
+
+   # View the CRL, '-text' for extra info
+   openssl crl -noout -in crl.pem -text
+
+   # Verify the certificate using the crl
+   openssl verify -crl_check -CRLfile crl.pem -CAfile issuer.pem cert.pem
+
+OCSP
+----
+
+| **All** non root certificates issued by the PKCS11 CA have the Authority Information Access extension with **OCSP**
+| It contains an URL to the certificate's issuer OCSP responder.
+| This is defined in `RFC 5280 <https://www.rfc-editor.org/rfc/rfc5280#section-4.2.2.1>`_
+
+This can be used send OCSP requests to verify that the certificate has not been revoked.
+
+.. code-block:: bash
+
+   # Assuming your certificate file is cert.pem
+   OCSP=$(openssl x509 -noout -text -in cert.pem  | grep "OCSP - " | cut -f 2-4 -d ':')
+
+   # To use OCSP to verify the certificate we also need the certificate issuer for it
+   ISSUER=$(openssl x509 -noout -text -in cert.pem | grep "CA Issuers - " | cut -f 2-4 -d ':')
+   curl -k $ISSUER | openssl x509 -inform DER > issuer.pem
+
+   # Send an OCSP request to the PKCS11 CA to verify the certificate, '-text' for extra info
+   openssl ocsp -issuer issuer.pem -cert cert.pem -text -url $OCSP
