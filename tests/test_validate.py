@@ -8,7 +8,6 @@ import os
 import requests
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -38,14 +37,13 @@ class TestValidate(unittest.TestCase):
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-validate-16.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
         # Test @ and key_label
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
         data = json.loads('{"key_label": ' + '"' + "dummy_string@" + '"' + "}")
         data["name_dict"] = name_dict
-        data["issuer_pem"] = get_cas(self.ca_url, pub_key, priv_key)[-1]
+        data["issuer_pem"] = "dummyhere"
         req = requests.post(
             self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )

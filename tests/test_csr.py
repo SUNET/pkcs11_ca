@@ -11,7 +11,7 @@ from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas, verify_cert
+from .lib import create_i_ca, verify_cert
 
 
 class TestCsr(unittest.TestCase):
@@ -24,6 +24,15 @@ class TestCsr(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    name_dict = {
+        "country_name": "SE",
+        "state_or_province_name": "Stockholm",
+        "locality_name": "Stockholm_test",
+        "organization_name": "SUNET_csr",
+        "organizational_unit_name": "SUNET Infrastructure",
+        "common_name": "ca-test-csr-51.sunet.se",
+    }
+
     def test_csr(self) -> None:
         """
         Sign csrs
@@ -33,8 +42,6 @@ class TestCsr(unittest.TestCase):
             priv_key = f_data.read()
         with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
             pub_key = f_data.read()
-
-        cas = get_cas(self.ca_url, pub_key, priv_key)
 
         # Sign a csr
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
@@ -58,17 +65,7 @@ wN8Kg29Nb5vW5Pq0vUy3o1Hc/51W6Lyr1Go=
 -----END CERTIFICATE REQUEST-----
 """
 
-        data = json.loads(
-            '{"pem": "'
-            + test_csr.replace("\n", "\\n")
-            + '"'
-            + ","
-            + '"ca_pem": '
-            + '"'
-            + cas[0].replace("\n", "\\n")
-            + '"'
-            + "}"
-        )
+        data = {"pem": test_csr, "ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
         req = requests.post(
             self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )

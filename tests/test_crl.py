@@ -11,7 +11,7 @@ from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, crl_expired
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas
+from .lib import create_i_ca
 
 
 class TestCrl(unittest.TestCase):
@@ -24,6 +24,15 @@ class TestCrl(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    name_dict = {
+        "country_name": "SE",
+        "state_or_province_name": "Stockholm",
+        "locality_name": "Stockholm_test",
+        "organization_name": "SUNET_crl",
+        "organizational_unit_name": "SUNET Infrastructure",
+        "common_name": "ca-test-crl-49.sunet.se",
+    }
+
     def test_crl(self) -> None:
         """
         Test crls
@@ -34,13 +43,10 @@ class TestCrl(unittest.TestCase):
         with open("data/trusted_keys/privkey1.key", "rb") as f_data:
             priv_key = f_data.read()
 
-        # Get all CAs
-        cas = get_cas(self.ca_url, pub_key, priv_key)
-
         # create a crl
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/crl")}
 
-        data = json.loads('{"ca_pem": ' + '"' + cas[0].replace("\n", "\\n") + '"' + "}")
+        data = {"ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
         req = requests.post(
             self.ca_url + "/crl", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )

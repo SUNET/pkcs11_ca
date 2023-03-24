@@ -15,7 +15,7 @@ from asn1crypto import crl as asn1_crl
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, cert_revoked, crl_expired, cert_pem_serial_number
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas, cdp_url
+from .lib import cdp_url, create_i_ca
 
 TEST_CSR1 = """-----BEGIN CERTIFICATE REQUEST-----
 MIIC2DCCAcACAQAwgZIxCzAJBgNVBAYTAlNFMRMwEQYDVQQIDApTb21lLVN0YXRl
@@ -48,6 +48,15 @@ class TestRevoke(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    name_dict = {
+        "country_name": "SE",
+        "state_or_province_name": "Stockholm",
+        "locality_name": "Stockholm_test",
+        "organization_name": "SUNET_revoke",
+        "organizational_unit_name": "SUNET Infrastructure",
+        "common_name": "ca-test-revoke-47.sunet.se",
+    }
+
     def test_revoke(self) -> None:
         """
         Test revoke
@@ -61,18 +70,8 @@ class TestRevoke(unittest.TestCase):
         # Sign a csr
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
 
-        all_cas = get_cas(self.ca_url, pub_key, priv_key)
-        data = json.loads(
-            '{"pem": "'
-            + TEST_CSR1.replace("\n", "\\n")
-            + '"'
-            + ","
-            + '"ca_pem": '
-            + '"'
-            + all_cas[0].replace("\n", "\\n")
-            + '"'
-            + "}"
-        )
+        data = {"pem": TEST_CSR1, "ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
+
         req = requests.post(
             self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )
@@ -95,10 +94,10 @@ class TestRevoke(unittest.TestCase):
         url = cdp_url(cert)
         req = requests.get(url, headers=request_headers, timeout=10, verify="./tls_certificate.pem")
         self.assertTrue(req.status_code == 200)
-        data = req.content
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-        curr_crl = asn1_crl.CertificateList.load(data)
+        resp_data = req.content
+        if asn1_pem.detect(resp_data):
+            _, _, resp_data = asn1_pem.unarmor(resp_data)
+        curr_crl = asn1_crl.CertificateList.load(resp_data)
         curr_crl_pem: str = asn1_pem.armor("X509 CRL", curr_crl.dump()).decode("utf-8")
         self.assertTrue(isinstance(curr_crl, asn1_crl.CertificateList))
         self.assertTrue(cert_revoked(cert_pem_serial_number(cert), curr_crl_pem))
@@ -122,7 +121,6 @@ class TestRevoke(unittest.TestCase):
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-revoke-22.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
@@ -130,8 +128,6 @@ class TestRevoke(unittest.TestCase):
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
         data = json.loads('{"key_label": ' + '"' + new_key_label + '"' + "}")
         data["name_dict"] = name_dict
-        # all_cas = get_cas(self.ca_url, pub_key, priv_key)
-        # dta["issuer_pem"] = all_cas[0]
 
         req = requests.post(
             self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
@@ -147,7 +143,6 @@ class TestRevoke(unittest.TestCase):
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-revoke-33.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}

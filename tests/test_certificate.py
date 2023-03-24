@@ -13,7 +13,7 @@ from asn1crypto import pem as asn1_pem
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas
+from .lib import create_i_ca
 
 
 class TestCertificate(unittest.TestCase):
@@ -25,6 +25,15 @@ class TestCertificate(unittest.TestCase):
         ca_url = os.environ["CA_URL"]
     else:
         ca_url = ROOT_URL
+
+    name_dict = {
+        "country_name": "SE",
+        "state_or_province_name": "Stockholm",
+        "locality_name": "Stockholm_test",
+        "organization_name": "SUNET_cert",
+        "organizational_unit_name": "SUNET Infrastructure",
+        "common_name": "ca-test-certificate-48.sunet.se",
+    }
 
     def test_certificate(self) -> None:
         """
@@ -54,10 +63,8 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 4afzNzZEQ9AI0J9WsJgFo26jNyOHUQ==
 -----END CERTIFICATE REQUEST-----"""
 
-        cas = get_cas(self.ca_url, pub_key, priv_key)
-
         data = json.loads('{"pem": "' + csr_pem.replace("\n", "\\n") + '"' + "}")
-        data["ca_pem"] = cas[0]
+        data["ca_pem"] = create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
         req = requests.post(

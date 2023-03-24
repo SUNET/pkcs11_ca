@@ -12,23 +12,47 @@ from asn1crypto import pem as asn1_pem
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
-def get_cas(root_url: str, pub_key: bytes, priv_key: bytes) -> List[str]:
-    """Get all CAs"""
-    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, root_url + "/search/ca")}
-    req = requests.get(root_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem")
+def create_root_ca(root_url: str, pub_key: bytes, priv_key: bytes) -> str:
+    new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
+
+    name_dict = {
+        "country_name": "SE",
+        "state_or_province_name": "Stockholm",
+        "locality_name": "Stockholm_test",
+        "organization_name": "SUNET",
+        "organizational_unit_name": "SUNET Infrastructure",
+        "common_name": f"ca-test-{new_key_label[0:10]}.sunet.se",
+    }
+
+    # Create a root ca
+    request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, root_url + "/ca")}
+
+    data = json.loads('{"key_label": ' + '"' + new_key_label[:-2] + '"' + "}")
+    data["name_dict"] = name_dict
+
+    req = requests.post(
+        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+    )
     if req.status_code != 200:
-        raise ValueError("NOT OK status when fetching all CAs")
-    cas: List[str] = json.loads(req.text)["cas"]
-    return cas
+        raise ValueError("Could not create root CA")
+
+    ret = json.loads(req.text)["certificate"]
+    if not isinstance(ret, str):
+        raise ValueError("Could not create root CA")
+
+    return ret
 
 
 def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[str, str]) -> str:
-    """Create a CA"""
+    """Create an intermediate CA"""
+
+    root_ca_pem = create_root_ca(root_url, pub_key, priv_key)
+
     request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, root_url + "/ca")}
 
     data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
     data["name_dict"] = name_dict
-    data["issuer_pem"] = get_cas(root_url, pub_key, priv_key)[-1]
+    data["issuer_pem"] = root_ca_pem
 
     req = requests.post(
         root_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
@@ -36,7 +60,7 @@ def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[
     if req.status_code != 200:
         raise ValueError("NOT OK posting a new CA")
     new_ca: str = json.loads(req.text)["certificate"]
-    if len(new_ca) < 10:
+    if len(new_ca) < 10 or not isinstance(new_ca, str):
         raise ValueError("Problem with new CA")
     return new_ca
 

@@ -16,7 +16,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data, request
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, ocsp_encode
 from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import get_cas, create_i_ca
+from .lib import create_i_ca
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -41,7 +41,6 @@ class TestOCSP(unittest.TestCase):
         "organization_name": "SUNET_ocsp",
         "organizational_unit_name": "SUNET Infrastructure",
         "common_name": "ca-test-ocsp-45.sunet.se",
-        "email_address": "soc@sunet.se",
     }
 
     def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp: asn1_ocsp.OCSPResponse) -> None:
@@ -370,22 +369,11 @@ zu/HPacJI420g3IC4vMVHeZznEM=
 -----END CERTIFICATE REQUEST-----
 """
 
-        cas = get_cas(self.ca_url, pub_key, priv_key)
+        data = {"pem": csr_pem, "ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
 
         # Sign a csr
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
 
-        data = json.loads(
-            '{"pem": "'
-            + csr_pem.replace("\n", "\\n")
-            + '"'
-            + ","
-            + '"ca_pem": '
-            + '"'
-            + cas[-1].replace("\n", "\\n")
-            + '"'
-            + "}"
-        )
         req = requests.post(
             self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
         )

@@ -15,7 +15,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
-from .lib import get_cas, create_i_ca, cdp_url, verify_cert
+from .lib import create_i_ca, cdp_url, verify_cert
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -58,21 +58,13 @@ class TestCa(unittest.TestCase):
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-create-13.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
-        cas = get_cas(self.ca_url, pub_key, priv_key)
-
         new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
         if asn1_pem.detect(data):
             _, _, data = asn1_pem.unarmor(data)
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
-
-        cas2 = get_cas(self.ca_url, pub_key, priv_key)
-
-        # Ensure we now have more ca than before
-        self.assertTrue(len(cas2) > len(cas) or len(cas2) >= 10)
 
         new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
         data = new_ca.encode("utf-8")
@@ -80,7 +72,7 @@ class TestCa(unittest.TestCase):
             _, _, data = asn1_pem.unarmor(data)
 
         self.assertTrue(isinstance(asn1_x509.Certificate.load(data), asn1_x509.Certificate))
-        self.get_single_ca(cas)
+        self.get_single_ca([new_ca])
 
     def test_root_ca(self) -> None:
         """
@@ -94,7 +86,6 @@ class TestCa(unittest.TestCase):
             "organization_name": "SUNET",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-create-17.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
         new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
@@ -138,7 +129,6 @@ class TestCa(unittest.TestCase):
             "organization_name": "SUNET_ca",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-create-20.sunet.se",
-            "email_address": "soc@sunet.se",
         }
 
         new_ca = create_i_ca(self.ca_url, pub_key, priv_key, name_dict)
@@ -194,14 +184,22 @@ class TestCa(unittest.TestCase):
             "organization_name": "SUNET_ca",
             "organizational_unit_name": "SUNET Infrastructure",
             "common_name": "ca-test-create-21.sunet.se",
-            "email_address": "soc@sunet.se",
+        }
+
+        issuer_name_dict = {
+            "country_name": "SE",
+            "state_or_province_name": "Stockholm",
+            "locality_name": "Stockholm_test",
+            "organization_name": "SUNET_ca",
+            "organizational_unit_name": "SUNET Infrastructure",
+            "common_name": "ca-test-create-31.sunet.se",
         }
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
         data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
         data["name_dict"] = name_dict
-        data["issuer_pem"] = get_cas(self.ca_url, pub_key, priv_key)[-1]
+        data["issuer_pem"] = create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict)
         data["key_type"] = "dummy_not_exist"
 
         req = requests.post(
@@ -222,14 +220,21 @@ class TestCa(unittest.TestCase):
                 "organization_name": "SUNET_ca",
                 "organizational_unit_name": "SUNET Infrastructure",
                 "common_name": "ca-test-create-22-" + key_type + ".sunet.se",
-                "email_address": "soc@sunet.se",
+            }
+            issuer_name_dict = {
+                "country_name": "SE",
+                "state_or_province_name": "Stockholm",
+                "locality_name": "Stockholm_test",
+                "organization_name": "SUNET_ca",
+                "organizational_unit_name": "SUNET Infrastructure",
+                "common_name": "ca-test-create-32-" + key_type + ".sunet.se",
             }
 
             request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
             data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
             data["name_dict"] = name_dict
-            data["issuer_pem"] = get_cas(self.ca_url, pub_key, priv_key)[0]  # first ca for depth level 1
+            data["issuer_pem"] = create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict)
             data["key_type"] = key_type
 
             req = requests.post(

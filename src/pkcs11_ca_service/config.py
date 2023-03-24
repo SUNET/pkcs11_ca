@@ -43,7 +43,6 @@ ROOT_CA_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test.sunet.se",
-    "email_address": "soc@sunet.se",
 }
 
 CMC_ROOT_KEY_LABEL = "cmc_root_test3"
@@ -59,7 +58,6 @@ CMC_ROOT_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test-cmc3-root.sunet.se",
-    "email_address": "soc@sunet.se",
 }
 CMC_SIGNING_NAME_DICT = {
     "country_name": "SE",
@@ -68,7 +66,6 @@ CMC_SIGNING_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test-cmc3-signer.sunet.se",
-    "email_address": "soc@sunet.se",
 }
 CMC_CERT_ISSUING_NAME_DICT = {
     "country_name": "SE",
@@ -77,7 +74,6 @@ CMC_CERT_ISSUING_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test-cmc3-issuer.sunet.se",
-    "email_address": "soc@sunet.se",
 }
 
 CMC_REQUEST_CERTS = [
@@ -106,7 +102,6 @@ ACME_SIGNER_NAME_DICT = {
     "organization_name": "SUNET",
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "acme_signer.sunet.se",
-    "email_address": "soc@sunet.se",
 }
 ACME_SIGNER_KEY_LABEL = "acme_root_test3"
 ACME_SIGNER_KEY_TYPE = "secp256r1"

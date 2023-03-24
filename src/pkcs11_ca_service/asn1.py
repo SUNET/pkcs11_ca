@@ -548,7 +548,7 @@ def cert_is_self_signed(pem: str) -> bool:
     try:
         cert.verify_directly_issued_by(cert)
         return True
-    except InvalidSignature:
+    except (InvalidSignature, ValueError):
         return False
 
 
