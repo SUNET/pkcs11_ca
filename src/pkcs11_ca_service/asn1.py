@@ -16,7 +16,6 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
 from cryptography import x509 as cryptography_x509
 
-
 from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 import jwt
@@ -132,7 +131,9 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     return ret
 
 
-def public_key_verify_signature(public_key_info_pem: str, signature: bytes, signed_data: bytes) -> None:
+def public_key_verify_signature(  # pylint: disable=too-many-branches
+    public_key_info_pem: str, signature: bytes, signed_data: bytes
+) -> None:
     """Verify signature with a public key
     raises cryptography.exceptions.InvalidSignature
     if invalid signature or ValueError if the public key is not supported.

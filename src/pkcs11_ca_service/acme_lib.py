@@ -150,11 +150,40 @@ async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAcco
     return None
 
 
+def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
+    """Execute the http-01 ACME challenge, return true if successful, false if failed
+    Retry 5 times each after 5 seconds if the challenge fails.
+
+    Parameters:
+    url (str): The challenge's URL
+    token (str): The challenge's token
+    key_authorization (str): The challenge's key_authorization
+
+    Returns:
+    bool
+
+    """
+    req: Union[requests.Response, None] = None
+
+    for _ in range(5):
+        try:
+            req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", verify=False, timeout=3)
+            if req is not None and req.status_code == 200 and key_authorization in req.text:
+                return True
+            return False
+
+        except (requestsConnectionError, requestsConnectTimeout):
+            print(f"(1) Failed to connect to ACME challenge at " f"http://{url}/.well-known/acme-challenge/{token}")
+
+        time.sleep(5)
+
+    return False
+
+
 async def execute_challenge(
     public_key_pem: str, order: AcmeOrder, authz: AcmeAuthorization, challenge: Dict[str, str]
 ) -> None:
     """Execute the acme challenge.
-    Retry once after 5 seconds if the challenge fails.
 
     Parameters:
     public_key_pem (str): The acme accounts public key in PEM form.
@@ -171,65 +200,32 @@ async def execute_challenge(
     authz.status = "processing"
     await authz.update()
 
-    time.sleep(2)  # Ensure challenge responder has started
-
-    chall_success = False
-    req: Union[requests.Response, None] = None
-
     if challenge["type"] == "http-01":
-        try:
-            req = requests.get(
-                f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}", verify=False, timeout=3
-            )
-        except (requestsConnectionError, requestsConnectTimeout):
-            print(
-                f"(1) Failed to connect to ACME challenge at http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}"
-            )
-
-        if req is not None and req.status_code == 200 and key_authorization in req.text:
-            chall_success = True
-        else:
-            print("Retrying after 5 seconds")
-            time.sleep(5)
-            try:
-                req = requests.get(
-                    f"http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}",
-                    verify=False,
-                    timeout=3,
-                )
-            except (requestsConnectionError, requestsConnectTimeout):
-                print(
-                    f"(2) Failed to connect to ACME challenge at http://{identifier['value']}/.well-known/acme-challenge/{challenge['token']}"
-                )
-                return
-
-            if req is not None and req.status_code == 200 and key_authorization in req.text:
-                chall_success = True
-
-        if not chall_success:
+        if not http_01_challenge(identifier["value"], challenge["token"], key_authorization):
             return
-
-        for chall in challenges:
-            if chall["token"] == challenge["token"]:
-                chall["status"] = "valid"
-                chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-        authz.challenges = challenges_from_list(challenges)
-        authz.status = "valid"
-        await authz.update()
-
-        for order_auth_data in order.authorizations_as_list():
-            order_auths = await account_authzs(
-                AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
-            )
-            if len(order_auths) == 0 or order_auths[0].status != "valid":
-                break
-        else:
-            order.status = "ready"
-            await order.update()
-
-    else:  # Non valid challenge type
+    else:
         raise ValueError("Invalid challenge type")
+
+    # Challenge was successful
+    for chall in challenges:
+        if chall["token"] == challenge["token"]:
+            chall["status"] = "valid"
+            chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    authz.challenges = challenges_from_list(challenges)
+    authz.status = "valid"
+    await authz.update()
+
+    # Update order if all authz for the order are valid now due to the challenge was successful
+    for order_auth_data in order.authorizations_as_list():
+        order_auths = await account_authzs(
+            AcmeAuthorizationInput(id=order_auth_data.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
+        )
+        if len(order_auths) == 0 or order_auths[0].status != "valid":
+            break
+    else:
+        order.status = "ready"
+        await order.update()
 
 
 async def sign_cert(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
@@ -284,7 +280,7 @@ async def sign_cert(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> Non
     await order.update()
 
 
-def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
+def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:  # pylint: disable=too-many-branches
     """Validate a csr to its orders identifications.
 
     Parameters:
@@ -296,7 +292,7 @@ def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
 
     sans: List[str] = []
     csr_exts = csr["certification_request_info"]["attributes"].native
-    for csr_ext in csr_exts:
+    for csr_ext in csr_exts:  # pylint: disable=too-many-nested-blocks
         if csr_ext["type"] == "extension_request":
             for exts in csr_ext["values"]:
                 for ext in exts:
@@ -321,6 +317,43 @@ def validate_csr(csr: asn1_csr.CertificationRequest, order: AcmeOrder) -> None:
     for san in sans:
         if san not in identifiers and san != subject["common_name"]:
             raise HTTPException(status_code=400, detail="csr not matching identifier")
+
+
+async def _check_revoke_jwk(signature: str, signed_data: str, cert_pem: str) -> None:
+    pem_cert_verify_signature(cert_pem, from_base64url(signature), signed_data.encode("utf-8"))
+    order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
+    if not isinstance(order, AcmeOrder):
+        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+    # Check if the acme account is deactivated
+    account = await account_exists(AcmeAccountInput(serial=order.account))
+    if account is None:
+        raise HTTPException(status_code=401, detail="No such account")
+
+    if account.status == "deactivated":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if order.issued_certificate != cert_pem:
+        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+
+async def _check_revoke_kid(jws: Dict[str, Any], request_url: str, protected: Dict[str, Any], cert_pem: str) -> None:
+    # Ensure valid jwt
+    await validate_jws(jws, request_url)
+    account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
+    if account is None:
+        raise HTTPException(status_code=401, detail="No such account")
+
+    # Check if the acme account is deactivated
+    if account.status == "deactivated":
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
+    if not isinstance(order, AcmeOrder):
+        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+
+    if order.issued_certificate != cert_pem or order.account != account.serial:
+        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
 
 
 async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Response:
@@ -359,45 +392,16 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
 
     if "reason" in payload:
         reason = payload["reason"]
-    if isinstance(reason, int) and reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:
+    if isinstance(reason, int) and reason not in [0, 1, 2, 3, 4, 5, 6, 8, 9, 10]:  # 7 not here
         raise HTTPException(status_code=400, detail="Invalid reason")
 
     # Verify using normal acme auth
     if "kid" in protected:
-        # Ensure valid jwt
-        await validate_jws(jws, request_url)
-        account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
-        if account is None:
-            raise HTTPException(status_code=401, detail="No such account")
+        await _check_revoke_kid(jws, request_url, protected, cert_pem)
 
-        # Check if the acme account is deactivated
-        if account.status == "deactivated":
-            return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
-
-        order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
-        if not isinstance(order, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
-
-        if order.issued_certificate != cert_pem or order.account != account.serial:
-            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
-
-    # Verify it's the certificate private key has signed the request
+    # Verify it's the certificate private key that has signed the request
     elif "jwk" in protected:
-        pem_cert_verify_signature(cert_pem, from_base64url(signature), signed_data.encode("utf-8"))
-        order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
-        if not isinstance(order, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
-
-        # Check if the acme account is deactivated
-        account = await account_exists(AcmeAccountInput(serial=order.account))
-        if account is None:
-            raise HTTPException(status_code=401, detail="No such account")
-
-        if account.status == "deactivated":
-            return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
-
-        if order.issued_certificate != cert_pem:
-            raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        await _check_revoke_jwk(signature, signed_data, cert_pem)
     else:
         raise HTTPException(status_code=401, detail="No such account")
 
@@ -442,12 +446,12 @@ async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
     return Response(content=f"{order.issued_certificate}", media_type="application/pem-certificate-chain")
 
 
-async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+async def finalize_order_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
     """Finalize the order by sending a csr which the acme CA will sign
      as long as it conforms to the orders identifiers
 
     Parameters:
-    account (AcmeAccount): The acme account that made this request.
+    _ (AcmeAccount): The acme account that made this request. Here for uniformity with the other ACME functions
     jws (Dict[str, Any): The JWS.
 
     Returns:
@@ -518,7 +522,9 @@ async def finalize_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
     )
 
 
-async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_tasks: BackgroundTasks) -> JSONResponse:
+async def chall_response(  # pylint: disable=too-many-branches
+    account: AcmeAccount, jws: Dict[str, Any], background_tasks: BackgroundTasks
+) -> JSONResponse:
     """List or execute the acme challenge
 
     The challenge will be executed if the payload is an empty json dict '{}'
@@ -540,10 +546,8 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
     else:
         payload = json.loads(from_base64url(jws["payload"]).decode("utf-8"))
 
-    if isinstance(payload, dict) and payload == {}:
-        execute = True
-    else:
-        execute = False
+    # Should we execute the challenge or is the client just listing it
+    execute = isinstance(payload, dict) and not bool(payload)
 
     challenge_url: str = protected["url"]
     orders: List[AcmeOrder] = []
@@ -552,7 +556,7 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
         if isinstance(obj, AcmeOrder):
             orders.append(obj)
 
-    for order in orders:
+    for order in orders:  # pylint: disable=too-many-nested-blocks
         for authz in order.authorizations_as_list():
             db_acme_authz_objs = await db_load_data_class(
                 AcmeAuthorization, AcmeAuthorizationInput(id=authz.replace(f"{ROOT_URL}{ACME_ROOT}/authz/", ""))
@@ -587,11 +591,11 @@ async def chall_response(account: AcmeAccount, jws: Dict[str, Any], background_t
     raise HTTPException(status_code=401, detail="Non valid challenge")
 
 
-async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+async def authz_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
     """List the acme authorization
 
     Parameters:
-    account (AcmeAccount): The acme account that made this request.
+    _ (AcmeAccount): The acme account that made this request. Here for uniformity with the other ACME functions
     jws (Dict[str, Any): The JWS.
 
     Returns:
@@ -633,6 +637,16 @@ async def authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
 
 
 async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
+    """A SUNET type challenge ACME pre-authorization
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
     response_data: Dict[str, Any] = {}
     token_parts = token.split(".")
     if len(token_parts) != 3:
@@ -682,8 +696,8 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
             from_base64url(token_parts[2]),
             f"{token_parts[0]}.{token_parts[1]}".encode("utf-8"),
         )
-    except (InvalidSignature, ValueError):
-        raise HTTPException(status_code=401, detail="Token signature invalid")
+    except (InvalidSignature, ValueError) as exc:
+        raise HTTPException(status_code=401, detail="Token signature invalid") from exc
 
     # Verify cert or certs CA is in config file
     for config_cert in ACME_SUNET_TRUSTED_SIGNERS:
@@ -1041,7 +1055,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         "authorizations": new_order.authorizations_as_list(),
     }
 
-    if new_order.status == "ready" or new_order.status == "valid":
+    if new_order.status in ["ready", "valid"]:
         response_data["finalize"] = new_order.finalize
 
     return JSONResponse(
@@ -1341,7 +1355,7 @@ def validate_jwk(jwk: Dict[str, Any], alg: str, signed_data: str, signature: str
     validate_signature(signer_public_key_data, signature, signed_data)
 
 
-async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
+async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:  # pylint: disable=too-many-branches
     """Validate an acme JWS by either acme KID or JWK.
     Also validates url, nonce and alg according to acme
 
@@ -1408,7 +1422,9 @@ async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:
         raise HTTPException(status_code=400, detail="Missing either jwk or kid in jws")
 
 
-async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks) -> Response:
+async def handle_acme_routes(  # pylint: disable=too-many-return-statements,too-many-branches
+    request: Request, background_tasks: BackgroundTasks
+) -> Response:
     """All acme routes except new-nonce and directory are handled from here.
 
     Parameters:
@@ -1423,8 +1439,8 @@ async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks
 
     try:
         input_data = await request.json()
-    except json.decoder.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="invalid json")
+    except json.decoder.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="invalid json") from exc
 
     if not isinstance(input_data, dict):
         raise HTTPException(status_code=400, detail="Non valid jws")
@@ -1450,31 +1466,31 @@ async def handle_acme_routes(request: Request, background_tasks: BackgroundTasks
     if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/acct/"):
         return await update_account_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/orders/"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/orders/"):
         return await orders_response(account, input_data)
 
-    elif request_url == f"{ROOT_URL}{ACME_ROOT}/key-change":
+    if request_url == f"{ROOT_URL}{ACME_ROOT}/key-change":
         return await key_change_response(account, input_data)
 
-    elif request_url == f"{ROOT_URL}{ACME_ROOT}/new-order":
+    if request_url == f"{ROOT_URL}{ACME_ROOT}/new-order":
         return await new_order_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/") and request_url.endswith("/finalize"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/") and request_url.endswith("/finalize"):
         return await finalize_order_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/order/"):
         return await order_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/new-authz"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/new-authz"):
         return await new_authz_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/authz/"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/authz/"):
         return await authz_response(account, input_data)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/chall/"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/chall/"):
         return await chall_response(account, input_data, background_tasks)
 
-    elif request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/cert/"):
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/cert/"):
         return await cert_response(account, input_data)
 
     raise HTTPException(status_code=404)

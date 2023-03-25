@@ -469,7 +469,7 @@ class TestAcme(unittest.TestCase):
         response_data = json.loads(req.text)
         self.assertTrue("status" in response_data)
 
-        # Try with old key Update the account
+        # Try with old key to update the account
         acme_req = create_update_account_jws(kid, priv_key)
         req = requests.post(
             f"{kid}",
@@ -480,7 +480,7 @@ class TestAcme(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 401)
 
-        # Try with old key Update the account
+        # Try with new key to update the account
         acme_req = create_update_account_jws(kid, priv_key2)
         req = requests.post(
             f"{kid}",
@@ -1105,3 +1105,124 @@ class TestAcme(unittest.TestCase):
             verify="./tls_certificate.pem",
         )
         self.assertTrue(req.status_code == 200)
+
+    def test_acme_challenge_fail(self) -> None:
+        """
+        Test acme
+        """
+
+        request_headers = {"Content-Type": "application/jose+json"}
+
+        priv_key = generate_private_key(SECP256R1())
+        public_key = priv_key.public_key()
+
+        jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
+        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
+        acme_req = create_new_account_jws(jwk, priv_key)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        kid = req.headers["Location"]
+        orders = response_data["orders"]
+
+        jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
+        acme_req = create_new_account_jws(jwk, priv_key)
+
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-account",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        # Create new order
+        acme_req = new_order_jws(kid, priv_key)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/new-order",
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 201)
+        response_data = json.loads(req.text)
+        authz = response_data["authorizations"][0]
+
+        # List orders
+        acme_req = get_orders_jws(kid, priv_key, orders)
+        req = requests.post(
+            orders,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        order = response_data["orders"][0]
+
+        # Get order
+        acme_req = get_authz_jws(kid, priv_key, order)
+        req = requests.post(
+            order,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] == "pending")
+
+        # Get authz
+        acme_req = get_authz_jws(kid, priv_key, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        challenge = response_data["challenges"][0]
+
+        # Handle acme challenge in background http server with an invalid key_authorization
+        key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk))[:-2]}"
+        thread = threading.Thread(target=run_http_server, args=(challenge["token"], key_authorization), daemon=True)
+        thread.start()
+
+        # Trigger challenge
+        acme_req = get_authz_jws(kid, priv_key, challenge["url"])
+        req = requests.post(
+            challenge["url"],
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+
+        # Ensure the DB has updated
+        time.sleep(2)
+
+        # Get authz after challenge
+        acme_req = get_authz_jws(kid, priv_key, authz)
+        req = requests.post(
+            authz,
+            headers=request_headers,
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        response_data = json.loads(req.text)
+        self.assertTrue(response_data["status"] in ["processing", "invalid"])  # NOT VALID

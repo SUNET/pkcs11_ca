@@ -5,8 +5,6 @@ import json
 from .base import DataClassObject, DataBaseObject, InputObject
 from .asn1 import to_base64url, from_base64url
 
-# FIXME use enum instead of str when appropriate
-
 
 class AcmeAuthorizationInput(InputObject):
     """Class to represent an acme authorization matching from HTTP post data"""
@@ -26,6 +24,7 @@ class AcmeAuthorization(DataClassObject):
     identifier: str
     challenges: str  # stored as base64url split by ","in DB
     wildcard: int
+    created: str
 
     db_table_name = "acme_authorization"
     db_fields = {
@@ -36,6 +35,7 @@ class AcmeAuthorization(DataClassObject):
         "identifier": str,
         "challenges": str,  # stored as base64url split by ","in DB
         "wildcard": int,  # boolean
+        "created": str,
     }
     db_reference_fields: Dict[str, str] = {"acme_order": "acme_order(serial)"}
     db_unique_fields = ["id"]

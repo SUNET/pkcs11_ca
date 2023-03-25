@@ -5,9 +5,6 @@ import json
 from .base import DataClassObject, DataBaseObject, InputObject
 from .asn1 import from_base64url, to_base64url
 
-# FIXME use enum instead of str when appropriate
-# FIXME add date_created field
-
 
 class AcmeAccountInput(InputObject):
     """Class to represent an acme account matching from HTTP post data"""
@@ -24,6 +21,7 @@ class AcmeAccount(DataClassObject):
     status: str
     id: str
     contact: str
+    created: str
 
     db_table_name = "acme_account"
     db_fields = {
@@ -34,6 +32,7 @@ class AcmeAccount(DataClassObject):
         # "termsOfServiceAgreed": int,  # boolean fixme
         # onlyReturnExisting, int, # fixme
         # "externalAccountBinding": str, # fixme
+        "created": str,
     }
     db_reference_fields: Dict[str, str] = {}
     db_unique_fields = ["id", "public_key_pem"]

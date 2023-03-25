@@ -1,6 +1,5 @@
 """ACME order module"""
 import json
-import datetime
 from typing import Dict, Union, List, Any
 
 from fastapi import HTTPException
@@ -8,9 +7,6 @@ from fastapi import HTTPException
 from .base import DataClassObject, DataBaseObject, InputObject
 from .asn1 import to_base64url, from_base64url
 from .config import ACME_IDENTIFIER_TYPES
-
-
-# FIXME use enum instead of str when appropriate
 
 
 class AcmeOrderInput(InputObject):
@@ -36,6 +32,7 @@ class AcmeOrder(DataClassObject):
     finalize: str
     certificate: str
     issued_certificate: str
+    created: str
 
     db_table_name = "acme_order"
     db_fields = {
@@ -51,6 +48,7 @@ class AcmeOrder(DataClassObject):
         "finalize": str,
         "certificate": str,
         "issued_certificate": str,
+        "created": str,
     }
     db_reference_fields: Dict[str, str] = {"account": "acme_account(serial)"}
     db_unique_fields = ["id", "issued_certificate"]

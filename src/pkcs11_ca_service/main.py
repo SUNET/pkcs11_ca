@@ -1,10 +1,9 @@
 """Main module, FastAPI runs from here"""
-import json
-import os
 from typing import Union, Dict
 import asyncio
 import hashlib
 import base64
+import os
 from secrets import token_bytes
 
 from cryptography.exceptions import InvalidSignature
@@ -750,18 +749,34 @@ acme_endpoints = [
 
 for acme_endpoint in acme_endpoints:
 
-    @app.post(f"{ACME_ROOT}/{acme_endpoint}")
+    @app.post(f"{ACME_ROOT}/{acme_endpoint}")  # pylint: disable=cell-var-from-loop
     async def post_acme_routes(request: Request, background_tasks: BackgroundTasks) -> Response:
+        """Handle all acme endpoints except for /directory endpoint
+
+        Parameters:
+        request (Request): The http request
+        background_tasks (BackgroundTasks): The list of background task to append to, for example executing challenges
+
+        Returns:
+        Response
+        """
+
         try:
             return await handle_acme_routes(request, background_tasks)
         except (InvalidSignature, NoSuchKID) as exc:
             raise HTTPException(status_code=401, detail="Invalid jws signature or kid") from exc
         except (ValueError, IndexError, KeyError) as exc:
-            raise HTTPException(status_code=400, detail="Non valid jws") from exc
+            raise HTTPException(status_code=400, detail="Non valid jws or url") from exc
 
 
 @app.get(ACME_ROOT + "/directory")
 async def get_acme_directory() -> JSONResponse:
+    """ACME GET directory endpoint
+
+    Returns:
+    Response
+    """
+
     paths = ["new-nonce", "new-account", "new-order", "new-authz", "revoke-cert", "key-change"]
     directory: Dict[str, str] = {}
 
@@ -777,11 +792,23 @@ async def get_acme_directory() -> JSONResponse:
 
 @app.get(ACME_ROOT + "/new-nonce")
 async def get_acme_new_nonce() -> Response:
+    """ACME GET new-nonce endpoint
+
+    Returns:
+    Response
+    """
+
     return nonce_response(204)
 
 
 @app.head(ACME_ROOT + "/new-nonce")
 async def head_acme_new_nonce() -> Response:
+    """ACME HEAD new-nonce endpoint
+
+    Returns:
+    Response
+    """
+
     return nonce_response(200)
 
 
