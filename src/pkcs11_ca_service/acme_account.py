@@ -30,7 +30,6 @@ class AcmeAccount(DataClassObject):
         "id": str,
         "contact": str,  # stored in base64url split by "," in DB
         # "termsOfServiceAgreed": int,  # boolean fixme
-        # onlyReturnExisting, int, # fixme
         # "externalAccountBinding": str, # fixme
         "created": str,
     }

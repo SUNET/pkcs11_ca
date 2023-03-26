@@ -1262,6 +1262,14 @@ async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONRes
     if existing_account is not None:
         return await existing_account_response(existing_account)
 
+    # onlyReturnExisting for an unknown account
+    if "onlyReturnExisting" in payload and isinstance(payload["onlyReturnExisting"], bool) and payload["onlyReturnExisting"]:
+        return JSONResponse(
+            status_code=400,
+            headers={"Replay-Nonce": generate_nonce()},
+            content={"type": "urn:ietf:params:acme:error:accountDoesNotExist", "detail": "No such account"},
+        )
+
     # Generate account_id
     account_id = random_string()
 
