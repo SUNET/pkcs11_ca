@@ -1,6 +1,6 @@
 """Global functions"""
 
-from typing import List, Dict
+from typing import Dict
 import json
 import os
 import subprocess
@@ -13,6 +13,8 @@ from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
 def create_root_ca(root_url: str, pub_key: bytes, priv_key: bytes) -> str:
+    """Create a root CA"""
+
     new_key_label = hex(int.from_bytes(os.urandom(20), "big") >> 1)
 
     name_dict = {

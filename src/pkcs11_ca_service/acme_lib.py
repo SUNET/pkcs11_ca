@@ -502,22 +502,10 @@ async def finalize_order_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONRe
 
     await sign_cert(csr_req, order)
 
-    response_data = {
-        "status": order.status,
-        "expires": order.expires,
-        "notBefore": order.not_before,
-        "notAfter": order.not_after,
-        "identifiers": order.identifiers_as_list(),
-        "authorizations": order.authorizations_as_list(),
-        "finalize": order.finalize,
-    }
-    if order.status == "valid":
-        response_data["certificate"] = order.certificate
-
     return JSONResponse(
         status_code=200,
         headers={"Replay-Nonce": generate_nonce()},
-        content=response_data,
+        content=order.response_data(),
         media_type="application/json",
     )
 
@@ -616,13 +604,6 @@ async def authz_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
         authzs[0].status = "expired"
         await authzs[0].update()
 
-    response_data = {
-        "status": authzs[0].status,
-        "expires": authzs[0].expires,
-        "identifier": authzs[0].identifier_as_dict(),
-        "challenges": authzs[0].challenges_as_list(),
-    }
-
     if authzs[0].status == "pending":
         headers = {"Replay-Nonce": generate_nonce(), "Retry-After": "10"}
     else:
@@ -631,7 +612,7 @@ async def authz_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
     return JSONResponse(
         status_code=200,
         headers=headers,
-        content=response_data,
+        content=authzs[0].response_data(),
         media_type="application/json",
     )
 
@@ -708,6 +689,8 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
         raise HTTPException(status_code=401, detail="Cert was not a trusted cert or signed by trusted CA")
 
     auth_id = random_string()
+    first_authorization: Union[AcmeAuthorization, None] = None
+
     for index, name in enumerate(names):
         if not isinstance(name, str):
             raise HTTPException(status_code=400, detail="Invalid dns name")
@@ -743,19 +726,17 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
         await new_authorization.save()
 
         if index == 0:
-            response_data = {
-                "status": new_authorization.status,
-                "expires": new_authorization.expires,
-                "identifier": json.loads(from_base64url(new_authorization.identifier)),
-                "challenges": new_authorization.challenges_as_list(),
-            }
+            first_authorization = new_authorization
 
     headers = {"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/authz/{auth_id}"}
+
+    if first_authorization is None:
+        raise HTTPException(status_code=400, detail="Could not create authz")
 
     return JSONResponse(
         status_code=201,
         headers=headers,
-        content=response_data,
+        content=first_authorization.response_data(),
         media_type="application/json",
     )
 
@@ -831,19 +812,12 @@ async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
     # Save new auth to database
     await new_authorization.save()
 
-    response_data = {
-        "status": new_authorization.status,
-        "expires": new_authorization.expires,
-        "identifier": json.loads(from_base64url(new_authorization.identifier)),
-        "challenges": new_authorization.challenges_as_list(),
-    }
-
     headers = {"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/authz/{new_authorization.id}"}
 
     return JSONResponse(
         status_code=201,
         headers=headers,
-        content=response_data,
+        content=new_authorization.response_data(),
         media_type="application/json",
     )
 
@@ -877,22 +851,10 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
             order.status = "invalid"
             await order.update()
 
-        response_data = {
-            "status": order.status,
-            "expires": order.expires,
-            "notBefore": order.not_before,
-            "notAfter": order.not_after,
-            "identifiers": order.identifiers_as_list(),
-            "authorizations": order.authorizations_as_list(),
-            "finalize": order.finalize,
-        }
-        if order.status == "valid":
-            response_data["certificate"] = order.certificate
-
         return JSONResponse(
             status_code=200,
             headers={"Replay-Nonce": generate_nonce()},
-            content=response_data,
+            content=order.response_data(),
             media_type="application/json",
         )
     raise HTTPException(status_code=401, detail="Non valid order")
@@ -1046,22 +1008,43 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
     # Save new order to database
     await new_order.update()
 
-    response_data = {
-        "status": new_order.status,
-        "expires": new_order.expires,
-        "notBefore": new_order.not_before,
-        "notAfter": new_order.not_after,
-        "identifiers": new_order.identifiers_as_list(),
-        "authorizations": new_order.authorizations_as_list(),
-    }
-
-    if new_order.status in ["ready", "valid"]:
-        response_data["finalize"] = new_order.finalize
-
     return JSONResponse(
         status_code=201,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/order/{new_order.id}"},
-        content=response_data,
+        content=new_order.response_data(),
+        media_type="application/json",
+    )
+
+
+async def orders_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
+    """List acme orders
+
+    Parameters:
+    account (AcmeAccount): The acme account that made this request.
+    jws (Dict[str, Any): The JWS.
+
+    Returns:
+    fastapi.responses.JSONResponse
+    """
+
+    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
+
+    # Ensure correct account access the orders list
+    account_id: str = protected["url"].replace(f"{ROOT_URL}{ACME_ROOT}/orders/", "")
+    order_account = await account_exists(AcmeAccountInput(id=account_id))
+    if order_account is None or order_account.id != account.id:
+        raise HTTPException(status_code=401, detail="Non valid orders")
+
+    orders: List[str] = []
+    db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
+    for order in db_acme_order_objs:
+        if isinstance(order, AcmeOrder):
+            orders.append(f"{ROOT_URL}{ACME_ROOT}/order/{order.id}")
+
+    return JSONResponse(
+        status_code=200,
+        headers={"Replay-Nonce": generate_nonce()},
+        content={"orders": orders},
         media_type="application/json",
     )
 
@@ -1130,49 +1113,10 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
     account.public_key_pem = inner_signer_public_key_data
     await account.update()
 
-    response_data = {
-        "status": account.status,
-        "contact": account.contact_as_list(),
-        "orders": f"{protected['kid']}/orders",
-    }
-
     return JSONResponse(
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": protected["url"]},
-        content=response_data,
-        media_type="application/json",
-    )
-
-
-async def orders_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
-    """List an acme order
-
-    Parameters:
-    account (AcmeAccount): The acme account that made this request.
-    jws (Dict[str, Any): The JWS.
-
-    Returns:
-    fastapi.responses.JSONResponse
-    """
-
-    protected = json.loads(from_base64url(jws["protected"]).decode("utf-8"))
-
-    # Ensure correct account access the orders list
-    url: str = protected["url"].replace(f"{ROOT_URL}{ACME_ROOT}/orders/", "")
-    order_account = await account_exists(AcmeAccountInput(id=url))
-    if order_account is None or order_account.id != account.id:
-        raise HTTPException(status_code=401, detail="Non valid orders")
-
-    orders: List[str] = []
-    db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
-    for order in db_acme_order_objs:
-        if isinstance(order, AcmeOrder):
-            orders.append(f"{ROOT_URL}{ACME_ROOT}/order/{order.id}")
-
-    return JSONResponse(
-        status_code=200,
-        headers={"Replay-Nonce": generate_nonce()},
-        content={"orders": orders},
+        content=account.response_data(),
         media_type="application/json",
     )
 
@@ -1202,16 +1146,10 @@ async def update_account_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
 
     await account.update()
 
-    response_data = {
-        "status": account.status,
-        "contact": account.contact_as_list(),
-        "orders": f"{protected['url']}/orders",
-    }
-
     return JSONResponse(
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": protected["url"]},
-        content=response_data,
+        content=account.response_data(),
         media_type="application/json",
     )
 
@@ -1226,16 +1164,10 @@ async def existing_account_response(account: AcmeAccount) -> JSONResponse:
     fastapi.responses.JSONResponse
     """
 
-    response_data = {
-        "status": account.status,
-        "contact": account.contact_as_list(),
-        "orders": f"{ROOT_URL}{ACME_ROOT}/acct/{account.id}/orders",
-    }
-
     return JSONResponse(
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/acct/{account.id}"},
-        content=response_data,
+        content=account.response_data(),
         media_type="application/json",
     )
 
@@ -1263,7 +1195,11 @@ async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONRes
         return await existing_account_response(existing_account)
 
     # onlyReturnExisting for an unknown account
-    if "onlyReturnExisting" in payload and isinstance(payload["onlyReturnExisting"], bool) and payload["onlyReturnExisting"]:
+    if (
+        "onlyReturnExisting" in payload
+        and isinstance(payload["onlyReturnExisting"], bool)
+        and payload["onlyReturnExisting"]
+    ):
         return JSONResponse(
             status_code=400,
             headers={"Replay-Nonce": generate_nonce()},
@@ -1285,16 +1221,10 @@ async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONRes
     # Save account to DB
     await acme_account_obj.save()
 
-    response_data = {
-        "status": acme_account_obj.status,
-        "contact": acme_account_obj.contact_as_list(),
-        "orders": f"{ROOT_URL}{ACME_ROOT}/orders/{account_id}",
-    }
-
     return JSONResponse(
         status_code=201,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/acct/{account_id}"},
-        content=response_data,
+        content=acme_account_obj.response_data(),
         media_type="application/json",
     )
 
@@ -1474,11 +1404,11 @@ async def handle_acme_routes(  # pylint: disable=too-many-return-statements,too-
     if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/acct/"):
         return await update_account_response(account, input_data)
 
-    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/orders/"):
-        return await orders_response(account, input_data)
-
     if request_url == f"{ROOT_URL}{ACME_ROOT}/key-change":
         return await key_change_response(account, input_data)
+
+    if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/orders/"):
+        return await orders_response(account, input_data)
 
     if request_url == f"{ROOT_URL}{ACME_ROOT}/new-order":
         return await new_order_response(account, input_data)

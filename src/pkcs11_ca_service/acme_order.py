@@ -53,6 +53,29 @@ class AcmeOrder(DataClassObject):
     db_reference_fields: Dict[str, str] = {"account": "acme_account(serial)"}
     db_unique_fields = ["id", "issued_certificate"]
 
+    def response_data(self) -> Dict[str, Any]:
+        """The json view for an acme order
+
+        Returns:
+        Dict[str, Any]
+        """
+
+        ret = {
+            "status": self.status,
+            "expires": self.expires,
+            "notBefore": self.not_before,
+            "notAfter": self.not_after,
+            "identifiers": self.identifiers_as_list(),
+            "authorizations": self.authorizations_as_list(),
+        }
+        if self.status in ["ready", "valid"]:
+            ret["finalize"] = self.finalize
+
+        if self.status == "valid":
+            ret["certificate"] = self.certificate
+
+        return ret
+
     def identifiers_as_list(self) -> List[Dict[str, str]]:
         """Get the orders identifiers as list.
         They are stored in base64url.

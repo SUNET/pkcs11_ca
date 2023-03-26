@@ -39,10 +39,14 @@ from src.pkcs11_ca_service.config import ROOT_URL, ACME_ROOT
 
 
 class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for ACME challenge"""
+
     token: str
     key_authorization: str
 
-    def do_GET(self) -> None:
+    def do_GET(self) -> None:  # pylint: disable=invalid-name
+        """Handle GET requests"""
+
         if self.path == f"/.well-known/acme-challenge/{self.token}":
             self.send_response(200)
             self.send_header("Content-Length", str(len(self.key_authorization.encode("utf-8"))))
@@ -59,10 +63,12 @@ class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
 
     # Disable logging in unittest
     def log_request(self, code: Union[int, str] = "-", size: Union[int, str] = "-") -> None:
-        pass
+        """Prevent the unittest from writing the http access log"""
 
 
 def run_http_server(token: str, key_authorization: str) -> None:
+    """Run the HTTP server"""
+
     server_address = ("", 80)
     AcmeChallengeHTTPRequestHandler.token = token
     AcmeChallengeHTTPRequestHandler.key_authorization = key_authorization
@@ -73,11 +79,15 @@ def run_http_server(token: str, key_authorization: str) -> None:
 
 
 def acme_nonce() -> str:
+    """Get a nonce for ACME"""
+
     req = requests.head(f"{ROOT_URL}{ACME_ROOT}/new-nonce", timeout=10, verify="./tls_certificate.pem")
     return req.headers["Replay-Nonce"]
 
 
 def create_sunet_token(priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> str:
+    """Create a sunet ACME challenge token"""
+
     header = {
         "alg": "ES256",
         "typ": "JWT",
@@ -106,6 +116,8 @@ def create_sunet_token(priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> st
 def create_payload(
     protected: Dict[str, Any], payload: Dict[str, Any], priv_key: EllipticCurvePrivateKey
 ) -> Dict[str, Any]:
+    """Create a ACME JWS"""
+
     signed_data = (
         to_base64url(json.dumps(protected, separators=(",", ":")).encode("utf-8"))
         + "."
@@ -122,6 +134,8 @@ def create_payload(
 
 
 def get_orders_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    """Create ACME orders JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, str] = {}
@@ -131,6 +145,8 @@ def get_orders_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dic
 def revoke_cert_jws(
     kid: str, priv_key: EllipticCurvePrivateKey, url: str, cert: asn1_x509.Certificate
 ) -> Dict[str, Any]:
+    """Create ACME revoke cert JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, Union[str, int]] = {"certificate": to_base64url(cert.dump()), "reason": 4}
@@ -138,6 +154,8 @@ def revoke_cert_jws(
 
 
 def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    """Create ACME send CSR JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
 
@@ -166,6 +184,8 @@ def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[
 
 
 def new_authz_sunet_token_jws(kid: str, priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> Dict[str, Any]:
+    """Create sunet ACME challenge JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
     payload = {
@@ -176,6 +196,8 @@ def new_authz_sunet_token_jws(kid: str, priv_key: EllipticCurvePrivateKey, cert_
 
 
 def new_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    """Create ACME new authz JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
     payload = {
@@ -186,6 +208,8 @@ def new_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]
 
 
 def get_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
+    """Create ACME authz JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
     payload: Dict[str, str] = {}
@@ -193,6 +217,8 @@ def get_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict
 
 
 def new_order_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    """Create ACME new order JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-order"}
     payload = {
@@ -213,6 +239,8 @@ def create_key_change_jws(
     priv_key: EllipticCurvePrivateKey,
     priv_key2: EllipticCurvePrivateKey,
 ) -> Dict[str, Any]:
+    """Create ACME key-change JWS"""
+
     nonce = acme_nonce()
     inner_protected = {"alg": "ES256", "jwk": inner_jwk, "url": f"{ROOT_URL}{ACME_ROOT}/key-change"}
     inner_payload = {"account": kid, "oldKey": old_jwk}
@@ -235,6 +263,8 @@ def create_key_change_jws(
 
 
 def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    """Create ACME update account JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": kid}
     payload = {
@@ -245,6 +275,8 @@ def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Di
 
 
 def create_new_account_jws(jwk: Dict[str, Any], priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
+    """Create ACME new account JWS"""
+
     nonce = acme_nonce()
     protected = {"alg": "ES256", "jwk": jwk, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-account"}
     payload = {
@@ -265,6 +297,8 @@ class TestAcme(unittest.TestCase):
         ca_url = ROOT_URL
 
     def test_acme_directory(self) -> None:
+        """Test ACME directory"""
+
         acme_urls = ["newNonce", "newAccount", "newOrder", "revokeCert", "keyChange"]
 
         req = requests.get(
@@ -286,8 +320,8 @@ class TestAcme(unittest.TestCase):
             self.assertTrue(req.status_code not in (200, 404))
 
     # Works but cant bind to port 80 due to test_acme() also binds to port 80
-    #     def test_acme_dehydrated(self) -> None:
-    #         acme_test_script = """from typing import Union
+    # def test_acme_dehydrated(self) -> None:
+    #     acme_test_script = """from typing import Union
     # import threading
     # from http.server import BaseHTTPRequestHandler, HTTPServer
     # import time
@@ -335,7 +369,7 @@ class TestAcme(unittest.TestCase):
     # subprocess.call(["bash", "-c", "rm -rf http_server/ accounts/ && mkdir -p http_server/ && bash dehydrated --register --accept-terms && sleep 1 && bash dehydrated --signcsr csr_rsa.pem | grep -v '# CERT #' > chain.pem && sleep 1 && bash dehydrated --revoke chain.pem"])
     # """
     #
-    #         dehydrated_patch = """diff --git a/dehydrated b/dehydrated
+    # dehydrated_patch = """diff --git a/dehydrated b/dehydrated
     # index a2bff40..fe8a3f4 100755
     # --- a/dehydrated
     # +++ b/dehydrated
@@ -390,16 +424,16 @@ class TestAcme(unittest.TestCase):
     #    [[ -z "${OPENSSL_CNF}" ]] && OPENSSL_CNF="$("${OPENSSL}" version -d | cut -d\\" -f2)/openssl.cnf"
     #    [[ -n "${PARAM_LOCKFILE_SUFFIX:-}" ]] && LOCKFILE="${LOCKFILE}-${PARAM_LOCKFILE_SUFFIX}"
     # """
-    #         subprocess.check_call(
-    #             ["bash", "-c", "git clone https://github.com/dehydrated-io/dehydrated.git dehydrated_repo"]
-    #         )
-    #         with open("pkcs11_ca.patch", "wb") as f_data:
-    #             f_data.write(dehydrated_patch.encode("utf-8"))
-    #         with open("acme_test.py", "wb") as f_data:
-    #             f_data.write(acme_test_script.encode("utf-8"))
-    #         subprocess.check_call(["bash", "-c", "cd dehydrated_repo && git apply ../pkcs11_ca.patch && cd .."])
-    #         subprocess.check_call(["bash", "-c", "cp dehydrated_repo/dehydrated ."])
-    #         subprocess.check_call(["bash", "-c", "python3 acme_test.py"])
+    # subprocess.check_call(
+    #     ["bash", "-c", "git clone https://github.com/dehydrated-io/dehydrated.git dehydrated_repo"]
+    #  )
+    # with open("pkcs11_ca.patch", "wb") as f_data:
+    #    f_data.write(dehydrated_patch.encode("utf-8"))
+    # with open("acme_test.py", "wb") as f_data:
+    #     f_data.write(acme_test_script.encode("utf-8"))
+    # subprocess.check_call(["bash", "-c", "cd dehydrated_repo && git apply ../pkcs11_ca.patch && cd .."])
+    # subprocess.check_call(["bash", "-c", "cp dehydrated_repo/dehydrated ."])
+    # subprocess.check_call(["bash", "-c", "python3 acme_test.py"])
 
     def test_acme(self) -> None:
         """
@@ -628,11 +662,11 @@ class TestAcme(unittest.TestCase):
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
         self.assertTrue(len(certs) > 1)
 
-        for index in range(len(certs)):
-            if len(certs[index]) < 3:
+        for index, cert in enumerate(certs):
+            if len(cert) < 3:
                 continue
 
-            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
+            data = ("-----BEGIN CERTIFICATE-----" + cert).encode("utf-8")
             if asn1_pem.detect(data):
                 _, _, data = asn1_pem.unarmor(data)
 
@@ -655,7 +689,7 @@ class TestAcme(unittest.TestCase):
 
     def test_acme_pre_auth(self) -> None:
         """
-        Test acme
+        Test acme pre auth
         """
 
         request_headers = {"Content-Type": "application/jose+json"}
@@ -838,11 +872,11 @@ class TestAcme(unittest.TestCase):
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
         self.assertTrue(len(certs) > 1)
 
-        for index in range(len(certs)):
-            if len(certs[index]) < 3:
+        for index, cert in enumerate(certs):
+            if len(cert) < 3:
                 continue
 
-            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
+            data = ("-----BEGIN CERTIFICATE-----" + cert).encode("utf-8")
             if asn1_pem.detect(data):
                 _, _, data = asn1_pem.unarmor(data)
 
@@ -865,7 +899,7 @@ class TestAcme(unittest.TestCase):
 
     def test_acme_pre_auth_sunet_token(self) -> None:
         """
-        Test acme
+        Test acme pre auth sunet token
         """
 
         request_headers = {"Content-Type": "application/jose+json"}
@@ -1081,11 +1115,11 @@ class TestAcme(unittest.TestCase):
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
         self.assertTrue(len(certs) > 1)
 
-        for index in range(len(certs)):
-            if len(certs[index]) < 3:
+        for index, resp_cert in enumerate(certs):
+            if len(resp_cert) < 3:
                 continue
 
-            data = ("-----BEGIN CERTIFICATE-----" + certs[index]).encode("utf-8")
+            data = ("-----BEGIN CERTIFICATE-----" + resp_cert).encode("utf-8")
             if asn1_pem.detect(data):
                 _, _, data = asn1_pem.unarmor(data)
 
@@ -1108,7 +1142,7 @@ class TestAcme(unittest.TestCase):
 
     def test_acme_challenge_fail(self) -> None:
         """
-        Test acme
+        Test acme challenge fail
         """
 
         request_headers = {"Content-Type": "application/jose+json"}

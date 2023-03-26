@@ -4,6 +4,7 @@ import json
 
 from .base import DataClassObject, DataBaseObject, InputObject
 from .asn1 import from_base64url, to_base64url
+from .config import ROOT_URL, ACME_ROOT
 
 
 class AcmeAccountInput(InputObject):
@@ -35,6 +36,19 @@ class AcmeAccount(DataClassObject):
     }
     db_reference_fields: Dict[str, str] = {}
     db_unique_fields = ["id", "public_key_pem"]
+
+    def response_data(self) -> Dict[str, Any]:
+        """The json view for an acme account
+
+        Returns:
+        Dict[str, Any]
+        """
+
+        return {
+            "status": self.status,
+            "contact": self.contact_as_list(),
+            "orders": f"{ROOT_URL}{ACME_ROOT}/orders/{self.id}",
+        }
 
     def contact_as_list(self) -> List[str]:
         """Get the contacts for this account as a json list

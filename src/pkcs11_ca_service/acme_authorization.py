@@ -1,5 +1,5 @@
 """ACME authorization module"""
-from typing import Dict, Union, List
+from typing import Dict, Union, List, Any
 import json
 
 from .base import DataClassObject, DataBaseObject, InputObject
@@ -39,6 +39,20 @@ class AcmeAuthorization(DataClassObject):
     }
     db_reference_fields: Dict[str, str] = {"acme_order": "acme_order(serial)"}
     db_unique_fields = ["id"]
+
+    def response_data(self) -> Dict[str, Any]:
+        """The json view for an acme authorization
+
+        Returns:
+        Dict[str, Any]
+        """
+
+        return {
+            "status": self.status,
+            "expires": self.expires,
+            "identifier": self.identifier_as_dict(),
+            "challenges": self.challenges_as_list(),
+        }
 
     def challenges_as_list(self) -> List[Dict[str, str]]:
         """Get the authorizations challenges as list.
