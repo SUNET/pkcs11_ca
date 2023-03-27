@@ -34,4 +34,5 @@ Contents
 .. toctree::
 
    requirements
+   configuration
    usage

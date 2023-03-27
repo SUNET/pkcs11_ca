@@ -6,8 +6,10 @@
 if [ -z "$CA_URL" ]
 then
     echo "Set ENV CA_URL"
-    echo """
-Try with default ENV vars
+    echo '''
+# Documentation here: https://pkcs11-ca.readthedocs.io/en/latest/configuration.htm
+
+Try with default ENV vars below:
 
 export CA_URL="https://ca:8005"
 export CA_DNS_NAME="ca"
@@ -16,9 +18,9 @@ export ACME_ROOT="/acme" # no trailing /
 
 export PKCS11_SIGN_API_TOKEN="xyz"
 
-export PKCS11_TOKEN=my_test_token_1
-export PKCS11_PIN=1234
-export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
+export PKCS11_TOKEN="my_test_token_1"
+export PKCS11_PIN="1234"
+export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 
 export POSTGRES_HOST="postgres"
 export POSTGRES_USER="pkcs11_testuser1"
@@ -26,7 +28,7 @@ export POSTGRES_PASSWORD="DBUserPassword"
 export POSTGRES_PORT="5432"
 export POSTGRES_DATABASE="pkcs11_testdb1"
 export POSTGRES_TIMEOUT="5"
-"""
+'''
     exit 1
 fi
 
