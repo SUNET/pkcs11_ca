@@ -67,9 +67,8 @@ class AcmeOrder(DataClassObject):
             "notAfter": self.not_after,
             "identifiers": self.identifiers_as_list(),
             "authorizations": self.authorizations_as_list(),
+            "finalize": self.finalize,
         }
-        if self.status in ["ready", "valid"]:
-            ret["finalize"] = self.finalize
 
         if self.status == "valid":
             ret["certificate"] = self.certificate

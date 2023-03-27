@@ -99,16 +99,15 @@ which runs dehydrated and also responds to the CA's ACME challenge
    # Client with mutual DNS access to the CA, maybe the container you started above
    # Get dehydrated
    git clone https://github.com/dehydrated-io/dehydrated.git
-   cd dehydrated
 
    # The CA uses a self-signed certificate by default for its https connections so lets add the '-k' option to dehydrated's curl command
-   sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated
+   sed -i 's/ CURL_OPTS=$/ CURL_OPTS=" -k "/g' dehydrated/dehydrated
 
    # Get the dns hostname which the certificate will be issued to.
    echo $HOSTNAME > domains.txt
 
    # Create a CSR for our hostname, this does not have to be using RSA, an EC curve is preferable.
-   openssl req -subj "/C=SE/CN=my-web-server" -addext "subjectAltName = DNS:${HOSTNAME}" -new -newkey rsa:2048 -nodes -keyout csr_rsa.key -out csr_rsa.pem
+   openssl req -subj "/C=SE/CN=my-https-server" -addext "subjectAltName = DNS:${HOSTNAME}" -new -newkey rsa:2048 -nodes -keyout csr_rsa.key -out csr_rsa.pem
 
    # Create ACME challenge folder
    mkdir -p /var/www/dehydrated
@@ -166,10 +165,10 @@ which runs dehydrated and also responds to the CA's ACME challenge
 
    # Run dehydrated to register an ACME account with the CA
    # The CA url is configurable in the config file
-   subprocess.call(["bash", "-c", "bash dehydrated --register --accept-terms --ca 'https://ca:8005/acme/directory' --algo secp384r1"])
+   subprocess.call(["bash", "-c", "bash dehydrated/dehydrated --register --accept-terms --ca 'https://ca:8005/acme/directory' --algo secp384r1"])
 
    # Run dehydrated to request the CA to sign our CSR
-   subprocess.call(["bash", "-c", "bash dehydrated --accept-terms --signcsr csr_rsa.pem --ca 'https://ca:8005/acme/directory' | grep -v '# CERT #' > cert.pem"])
+   subprocess.call(["bash", "-c", "bash dehydrated/dehydrated --accept-terms --signcsr csr_rsa.pem --ca 'https://ca:8005/acme/directory' | grep -v '# CERT #' > cert.pem"])
 
    # The issued certificate and its chain
    print("Certificate chain from the CA")
@@ -179,7 +178,7 @@ which runs dehydrated and also responds to the CA's ACME challenge
    print("Private key file: ./csr_rsa.key")
 
    # Revoking is done in this way. It will, among other things, cause the CA to put the certificate on its CRL.
-   # subprocess.call(["bash", "-c", "bash dehydrated --revoke cert.pem --ca 'https://ca:8005/acme/directory'"])
+   # subprocess.call(["bash", "-c", "bash dehydrated/dehydrated --revoke cert.pem --ca 'https://ca:8005/acme/directory'"])
 
 
 Run the python script
