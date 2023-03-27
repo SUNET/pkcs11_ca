@@ -19,10 +19,10 @@ Default variables are located the top of `deploy.sh <https://github.com/SUNET/pk
    export CA_URL="https://ca:8005"
    export CA_DNS_NAME="ca"
 
-   # The ACME root endpoint
+   # The ACME root url endpoint
    export ACME_ROOT="/acme" # no trailing /
 
-   # The API token for the PKCS11 raw signature endpoint
+   # The API token for the PKCS11 raw signature url endpoint
    export PKCS11_SIGN_API_TOKEN="xyz"
 
    # PKCS11 token and pin
@@ -32,7 +32,7 @@ Default variables are located the top of `deploy.sh <https://github.com/SUNET/pk
    # Path to PKCS11 library, SOFTHSM on ubuntu/debian as default
    export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 
-   # Database configs
+   # Database variables
    export POSTGRES_HOST="postgres"
    export POSTGRES_USER="pkcs11_testuser1"
    export POSTGRES_PASSWORD="DBUserPassword"

@@ -26,24 +26,34 @@ Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/lates
 
 .. code-block:: bash
 
-   # Export env variables
+   # Lets run with default values for this usage guide.
+   # Export the following env variables
+
+   # The URL and DNS name for the PKCS11 CA
    export CA_URL="https://ca:8005"
    export CA_DNS_NAME="ca"
 
+   # The ACME root url endpoint
    export ACME_ROOT="/acme" # no trailing /
 
+   # The API token for the PKCS11 raw signature url endpoint
    export PKCS11_SIGN_API_TOKEN="xyz"
 
-   export PKCS11_TOKEN=my_test_token_1
-   export PKCS11_PIN=1234
-   export PKCS11_MODULE=/usr/lib/softhsm/libsofthsm2.so
+   # PKCS11 token and pin
+   export PKCS11_TOKEN="my_test_token_1"
+   export PKCS11_PIN="1234"
 
+   # Path to PKCS11 library, SOFTHSM on ubuntu/debian as default
+   export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
+
+   # Database variables
    export POSTGRES_HOST="postgres"
    export POSTGRES_USER="pkcs11_testuser1"
    export POSTGRES_PASSWORD="DBUserPassword"
    export POSTGRES_PORT="5432"
    export POSTGRES_DATABASE="pkcs11_testdb1"
    export POSTGRES_TIMEOUT="5"
+
 
 .. code-block:: bash
 
@@ -57,7 +67,7 @@ Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/lates
    Your CA's $CA_URL **MUST** be reachable from your client and the clients DNS name **MUST** be reachable from the CA.
 
    * A simple way is ensuring that both the CA and client uses public DNS
-   * **or** having your client in a container in the CA's docker network.
+   * **or** having your client in a container in the CA's docker network, see below.
 
 
 Start a container in the CA's docker network
@@ -100,8 +110,7 @@ which runs dehydrated and also responds to the CA's ACME challenge
    # Create a CSR for our hostname, this does not have to be using RSA, an EC curve is preferable.
    openssl req -subj "/C=SE/CN=my-web-server" -addext "subjectAltName = DNS:${HOSTNAME}" -new -newkey rsa:2048 -nodes -keyout csr_rsa.key -out csr_rsa.pem
 
-   # Remove old ACME account if exists and create ACME challenge folder
-   # rm -rf /var/www/dehydrated accounts/
+   # Create ACME challenge folder
    mkdir -p /var/www/dehydrated
 
 Copy paste this script as **acme_setup.py**

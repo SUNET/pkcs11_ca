@@ -11,17 +11,24 @@ then
 
 Try with default ENV vars below:
 
+# The URL and DNS name for the PKCS11 CA
 export CA_URL="https://ca:8005"
 export CA_DNS_NAME="ca"
 
+# The ACME root url endpoint
 export ACME_ROOT="/acme" # no trailing /
 
+# The API token for the PKCS11 raw signature url endpoint
 export PKCS11_SIGN_API_TOKEN="xyz"
 
+# PKCS11 token and pin
 export PKCS11_TOKEN="my_test_token_1"
 export PKCS11_PIN="1234"
+
+# Path to PKCS11 library, SOFTHSM on ubuntu/debian as default
 export PKCS11_MODULE="/usr/lib/softhsm/libsofthsm2.so"
 
+# Database variables
 export POSTGRES_HOST="postgres"
 export POSTGRES_USER="pkcs11_testuser1"
 export POSTGRES_PASSWORD="DBUserPassword"
