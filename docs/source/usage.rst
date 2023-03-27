@@ -4,7 +4,9 @@ Usage
 Installation
 ------------
 
-To use PKCS11 CA, first install it. Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/latest/requirements.html>`_.
+To use PKCS11 CA, first install it.
+
+Quickly check the first `requirements <https://pkcs11-ca.readthedocs.io/en/latest/requirements.html>`_.
 
 .. code-block:: bash
 
@@ -50,10 +52,12 @@ To use PKCS11 CA, first install it. Quickly check the first `requirements <https
 
 .. note::
 
+   Config documentation is `here <https://pkcs11-ca.readthedocs.io/en/latest/configuration.html>`_.
+
    Your CA's $CA_URL **MUST** be reachable from your client and the clients DNS name **MUST** be reachable from the CA.
 
-   | A simple way is ensuring that both the CA and client uses public DNS
-   | **or** having your client in a container in the CA's docker network.
+   * A simple way is ensuring that both the CA and client uses public DNS
+   * **or** having your client in a container in the CA's docker network.
 
 
 Start a container in the CA's docker network
@@ -156,17 +160,17 @@ which runs dehydrated and also responds to the CA's ACME challenge
    subprocess.call(["bash", "-c", "bash dehydrated --register --accept-terms --ca 'https://ca:8005/acme/directory' --algo secp384r1"])
 
    # Run dehydrated to request the CA to sign our CSR
-   subprocess.call(["bash", "-c", "bash dehydrated --accept-terms --signcsr csr_rsa.pem --ca 'https://ca:8005/acme/directory' | grep -v '# CERT #' > chain.pem"])
+   subprocess.call(["bash", "-c", "bash dehydrated --accept-terms --signcsr csr_rsa.pem --ca 'https://ca:8005/acme/directory' | grep -v '# CERT #' > cert.pem"])
 
    # The issued certificate and its chain
    print("Certificate chain from the CA")
-   subprocess.call(["bash", "-c", "cat chain.pem"])
+   subprocess.call(["bash", "-c", "cat cert.pem"])
 
    # The private key for the issued certificate
    print("Private key file: ./csr_rsa.key")
 
    # Revoking is done in this way. It will, among other things, cause the CA to put the certificate on its CRL.
-   # subprocess.call(["bash", "-c", "bash dehydrated --revoke chain.pem --ca 'https://ca:8005/acme/directory'"])
+   # subprocess.call(["bash", "-c", "bash dehydrated --revoke cert.pem --ca 'https://ca:8005/acme/directory'"])
 
 
 Run the python script

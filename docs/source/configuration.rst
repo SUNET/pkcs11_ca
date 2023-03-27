@@ -5,8 +5,8 @@ Configuration
 
    The PKCS11 CA currently has two types of configurations.
 
-   | Environment variables such as hostname and database url.
-   | The config file with options such as allowed signing algorithms.
+   * Environment variables such as hostname and database url.
+   * The config file with options such as allowed signing algorithms.
 
 Environment variables
 ---------------------
