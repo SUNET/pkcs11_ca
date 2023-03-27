@@ -163,11 +163,10 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
     bool
 
     """
-    req: Union[requests.Response, None] = None
 
-    for _ in range(5):
+    for _ in range(3):
         try:
-            req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", verify=False, timeout=3)
+            req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", timeout=3)
             if req is not None and req.status_code == 200 and key_authorization in req.text:
                 return True
             return False
@@ -175,7 +174,7 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
         except (requestsConnectionError, requestsConnectTimeout):
             print(f"(1) Failed to connect to ACME challenge at " f"http://{url}/.well-known/acme-challenge/{token}")
 
-        time.sleep(5)
+        time.sleep(3)
 
     return False
 
