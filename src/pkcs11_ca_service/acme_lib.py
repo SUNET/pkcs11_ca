@@ -167,7 +167,11 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
     for _ in range(3):
         try:
             req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", timeout=3)
-            if req is not None and req.status_code == 200 and key_authorization in req.text:
+            if req is None or req.status_code != 200:
+                return False
+
+            data = req.text
+            if isinstance(data, str) and len(data) > 0 and key_authorization in data:
                 return True
             return False
 
