@@ -33,6 +33,7 @@ Contents
 
 .. toctree::
 
+   features
    requirements
    configuration
    usage
