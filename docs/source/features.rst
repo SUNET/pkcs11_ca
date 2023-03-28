@@ -10,11 +10,11 @@ Features
 PKCS11 (HSM) key storage
 ------------------------
 
-| The PKCS11 CA stores its keys in a `PKCS11 <https://en.wikipedia.org/wiki/PKCS_11>`_. device. Default is to use the free software HSM emulator called SOFTHSM.
+| The PKCS11 CA stores its keys in a `PKCS11 <https://en.wikipedia.org/wiki/PKCS_11>`_ device. Default is to use the free software HSM emulator called SOFTHSM.
 | Switching to a physical HSM is as simple as changing your PKCS11 library path in the `config file <https://pkcs11-ca.readthedocs.io/en/latest/configuration.html>`_.
 | It is also possible to use a PKCS11 configured yubikey.
 
-| The PKCS11 CA uses `python-x509-pkcs11 <https://github.com/SUNET/python_x509_pkcs11>`_. as its PKCS11 library.
+| The PKCS11 CA uses `python-x509-pkcs11 <https://github.com/SUNET/python_x509_pkcs11>`_ as its PKCS11 library.
 | It is written by the same authors as the PKCS11 CA. The library in turn uses `python-pkcs11 <https://python-pkcs11.readthedocs.io/en/latest/>`_.
 
 ACME
