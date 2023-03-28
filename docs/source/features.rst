@@ -1,13 +1,14 @@
 Features
 ========
 
-| `PKCS11 (HSM) key storage <https://pkcs11-ca.readthedocs.io/en/latest/features.html#PKCS11-(HSM)-key-storage>`_
+| `PKCS11 (HSM) key storage <https://pkcs11-ca.readthedocs.io/en/latest/features.html#PKCS11-key-storage>`_
 | `ACME <https://pkcs11-ca.readthedocs.io/en/latest/features.html#ACME>`_
 | `CMC <https://pkcs11-ca.readthedocs.io/en/latest/features.html#CMC>`_
+| `Automatic CRL, OCSP, and CA Issuers <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#retrieving-the-issuer-for a-certificate>`_
 | `Management API <https://pkcs11-ca.readthedocs.io/en/latest/features.html#Management-API>`_
 
 
-PKCS11 (HSM) key storage
+PKCS11 key storage
 ------------------------
 
 | The PKCS11 CA stores its keys in a `PKCS11 <https://en.wikipedia.org/wiki/PKCS_11>`_ device. Default is to use the free software HSM emulator called SOFTHSM.
@@ -28,7 +29,7 @@ PKCS11 CA implements the server side of ACME.
    It was designed by the Internet Security Research Group (ISRG) for their Let's Encrypt service.
    The protocol, based on passing JSON-formatted messages over HTTPS has been published as an Internet Standard in RFC 8555 by its own chartered IETF working group
 
-Here is a `guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_ to use the PKCS11 CA with your ACME client.
+Here is a `guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#using-an-acme-client-with-the-pkcs11-ca>`_ to use the PKCS11 CA with your ACME client.
 
 CMC
 ---
