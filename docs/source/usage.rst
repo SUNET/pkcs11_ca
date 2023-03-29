@@ -285,3 +285,37 @@ Using the management API
 
    # Under construction
 
+Logging
+-----------------------------
+
+.. code-block:: bash
+
+   # View the log for the PKCS11 CA
+   docker logs pkcs11_ca_ca_1
+
+   # View the logs for the PKCS11 CA postgres database
+   docker logs pkcs11_ca_postgres_1
+
+
+Start / Stop / Restart the system
+-----------------------------
+
+.. code-block:: bash
+
+   # Stop the system/containers
+   docker-compose down
+
+   # Start the system/containers
+   docker-compose up -d
+
+
+Completely reset the system
+-----------------------------
+
+.. code-block:: bash
+
+   # Stop the system/containers
+   docker-compose down
+
+   # Delete the HSM keys and database data # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example
+   rm -rf data/db_data/ data/hsm_tokens/
