@@ -45,7 +45,7 @@ CMC
    It is defined in RFC 5272, its transport mechanisms in RFC 5273.
    Similarly to the Certificate Management Protocol (CMP), it can be used for obtaining X.509 digital certificates in a public key infrastructure (PKI).
 
-| Here is the `CMC guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_ to use the PKCS11 CA with your CMC client.
+| Here is the `CMC guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#cmc-requests>`_ to use the PKCS11 CA with your CMC client.
 
 Elegant management API
 -----------------------
@@ -56,4 +56,4 @@ Elegant management API
 .. note::
    This is under active development and might be functionally changed in the future.
 
-| Here is the `API management guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html>`_ for the PKCS11 CA.
+| Here is the `API management guide <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#using-the-management-api>`_ for the PKCS11 CA.

@@ -254,18 +254,22 @@ This can be used to send an OCSP request to check if the certificate has been re
    # Send an OCSP request to the PKCS11 CA to verify the certificate, '-text' for extra info
    openssl ocsp -issuer issuer.pem -cert cert.pem -text -url $OCSP
 
-CMC requests with PKCS11 CA
+CMC requests
 ----------------------------
 
 | PKCS11 CA supports CMC requests
 | This is defined in `RFC 5272 <https://www.rfc-editor.org/rfc/rfc5272>`_
 
-This can be used to send an CMC request and receiving CMC responses from the PKCS11 CA
+| Under construction
+| This can be used to send an CMC request and receiving CMC responses from the PKCS11 CA
+| Look at the unittest `test_cmc.py <https://github.com/SUNET/pkcs11_ca/blob/main/tests/test_cmc.py>`_
 
 .. code-block:: python
 
    # Under construction
-   # Look at the unittest `test_cmc.py <https://github.com/SUNET/pkcs11_ca/blob/main/tests/test_cmc.py>`_
+   from python_cmc import cmc as asn1_cmc
+   from asn1crypto import cms as asn1_cms
+
 
 
 Using the management API
@@ -274,8 +278,10 @@ Using the management API
 | PKCS11 CA has a simple but elegant management API.
 | Used to inspect or edit PKCS11 CA's database. Typically not needed in day to day operations.
 
+| Under construction
+| Look at the unittest `test_certificate.py <https://github.com/SUNET/pkcs11_ca/blob/main/tests/test_certificate.py>`_
+
 .. code-block:: python
 
    # Under construction
-   # Look at the unittest `test_certificate.py <https://github.com/SUNET/pkcs11_ca/blob/main/tests/test_certificate.py>`_
 
