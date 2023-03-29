@@ -302,6 +302,8 @@ Start / Stop / Restart the system
 
 .. code-block:: bash
 
+   # This assumes the PKCS11 has been installed successfully started before.
+
    # Stop the system/containers
    docker-compose down
 
@@ -319,3 +321,5 @@ Completely reset the system
 
    # Delete the HSM keys and database data # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example
    rm -rf data/db_data/ data/hsm_tokens/
+
+   bash deploy.sh

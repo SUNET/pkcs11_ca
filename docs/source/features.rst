@@ -8,6 +8,15 @@ Features
 | `Management API <https://pkcs11-ca.readthedocs.io/en/latest/features.html#elegant-management-api>`_
 
 
+Design philosophy
+------------------------
+* Keys in a PKCS11 device
+* *All* certificates (and CA's) should have working CRL, OCSP, and CA Issuers fields.
+* Full ACME support
+* CMC Support
+* Elegant and simple fully automatic management API
+* Handle 10 requests per second. For example receiving an CSR and signing it with the PKCS11 device into a certificate returned to the client.
+
 PKCS11 key storage
 ------------------------
 
