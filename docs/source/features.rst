@@ -50,7 +50,7 @@ CMC
 Elegant management API
 -----------------------
 
-| The PKCS11 CA's management API is designed to not be needed in day to day operations. Typically only used in special cases to inspect or edit the PKCS11 database.
+| The PKCS11 CA's management API is designed to not be needed in day to day operations. Typically only used in special cases to inspect or edit PKCS11 CA's database.
 | It is a simple but elegant JWT scheme.
 
 .. note::

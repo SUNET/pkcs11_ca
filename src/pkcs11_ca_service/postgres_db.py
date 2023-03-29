@@ -165,7 +165,7 @@ class PostgresDB(DataBaseObject):
                     query = "SELECT "
                     for field in fields:
                         query += field + ","
-                    query = query[:-1] + " FROM " + table_name + " ORDER BY serial DESC LIMIT 10"
+                    query = query[:-1] + " FROM " + table_name + " ORDER BY serial DESC LIMIT 20"
                     rows = await conn.fetch(query)
                     fields_list += cls._rows_to_class_objects(rows, fields)
 

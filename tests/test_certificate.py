@@ -72,7 +72,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
         )
         self.assertTrue(req.status_code == 200)
 
-        # All certificates
+        # Get ALL certificates, currently the database limits this to the last 20 issued by the PKCS11 CA
         request_headers = {
             "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
         }
@@ -82,6 +82,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
         self.assertTrue(isinstance(certs, list))
+        self.assertTrue(len(certs) > 0)
 
         # Search for certificates
         request_headers = {
