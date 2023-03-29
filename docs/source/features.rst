@@ -4,7 +4,7 @@ Features
 | `PKCS11 (HSM) key storage <https://pkcs11-ca.readthedocs.io/en/latest/features.html#pkcs11-key-storage>`_
 | `ACME <https://pkcs11-ca.readthedocs.io/en/latest/features.html#id1>`_
 | `CMC <https://pkcs11-ca.readthedocs.io/en/latest/features.html#id2>`_
-| `Automatic OCSP, CRL, and CA Issuers <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#retrieving-the-issuer-for a-certificate>`_
+| `Automatic OCSP, CRL, and CA Issuers <https://pkcs11-ca.readthedocs.io/en/latest/usage.html#retrieving-the-issuer-for-a-certificate>`_
 | `Management API <https://pkcs11-ca.readthedocs.io/en/latest/features.html#elegant-management-api>`_
 
 
