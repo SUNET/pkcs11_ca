@@ -319,7 +319,12 @@ Completely reset the system
    # Stop the system/containers
    docker-compose down
 
-   # Delete the HSM keys and database data # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example
+   # Delete the HSM keys and database data
    sudo rm -rf data/db_data/ data/hsm_tokens/
 
+   # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example but this might help
+   pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y privkey
+   pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y pubkey
+
+   # deploy a fresh PKCS11 CA
    bash deploy.sh
