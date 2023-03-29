@@ -320,6 +320,6 @@ Completely reset the system
    docker-compose down
 
    # Delete the HSM keys and database data # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example
-   rm -rf data/db_data/ data/hsm_tokens/
+   sudo rm -rf data/db_data/ data/hsm_tokens/
 
    bash deploy.sh
