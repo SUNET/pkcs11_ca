@@ -1,17 +1,17 @@
 """
 Test our pkcs11_sign
 """
-import unittest
-import os
-import json
 import base64
-import requests
+import json
+import os
+import unittest
 
+import requests
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
 from cryptography.hazmat.primitives.hashes import SHA256
 
-from src.pkcs11_ca_service.config import ROOT_URL, PKCS11_SIGN_API_TOKEN
+from src.pkcs11_ca_service.config import PKCS11_SIGN_API_TOKEN, ROOT_URL
 
 
 class TestPKCS11Sign(unittest.TestCase):

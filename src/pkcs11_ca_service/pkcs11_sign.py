@@ -1,13 +1,13 @@
 """Module to handle /pkcs11_sign endpoint"""
 import base64
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
+import jsonschema
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
-import jsonschema
+from openapi_schema_validator import validate as openapi_validate
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from openapi_schema_validator import validate as openapi_validate
 
 request_schema = {
     "$id": "https://localhost/request.schema.json",

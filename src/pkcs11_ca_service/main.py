@@ -1,48 +1,56 @@
 """Main module, FastAPI runs from here"""
-from typing import Union, Dict
 import asyncio
-import hashlib
 import base64
+import hashlib
 import os
 from secrets import token_bytes
-
-from cryptography.exceptions import InvalidSignature
-from fastapi import FastAPI, Request, Response, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.background import BackgroundTasks
+from typing import Dict, Union
 
 from asn1crypto import x509 as asn1_x509
-from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from python_x509_pkcs11.crl import create as create_crl
-from python_x509_pkcs11.ca import create as create_ca
+from cryptography.exceptions import InvalidSignature
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.background import BackgroundTasks
+from fastapi.responses import JSONResponse
 from pkcs11.exceptions import MultipleObjectsReturned
-
-from .base import db_load_data_class, InputObject
-from .ocsp import ocsp_response
-from .csr import Csr, CsrInput, search as csr_search
-from .certificate import Certificate, CertificateInput, search as certificate_search
-from .crl import Crl, CrlInput, search as crl_search
-from .ca import Ca, CaInput, search as ca_search
-from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
-from .public_key import PublicKey, PublicKeyInput, search as public_key_search
-from .startup import startup
-from .asn1 import (
-    public_key_pem_from_csr,
-    pem_cert_to_name_dict,
-    aia_and_cdp_exts,
-    cert_as_der,
-    crl_as_der,
-    cert_pem_serial_number,
-)
+from python_x509_pkcs11.ca import create as create_ca
+from python_x509_pkcs11.crl import create as create_crl
+from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 from .acme_lib import NoSuchKID, handle_acme_routes
-from .pkcs11_sign import pkcs11_sign
-from .cmc import cmc_handle_request
-from .nonce import nonce_response
+from .asn1 import (
+    aia_and_cdp_exts,
+    cert_as_der,
+    cert_pem_serial_number,
+    crl_as_der,
+    pem_cert_to_name_dict,
+    public_key_pem_from_csr,
+)
 from .auth import authorized_by
-from .route_functions import crl_request, ca_request, pkcs11_key_request, healthcheck, sign_csr
-from .config import KEY_TYPES, ACME_ROOT, ROOT_URL, PKCS11_SIGN_API_TOKEN
-
+from .base import InputObject, db_load_data_class
+from .ca import Ca, CaInput
+from .ca import search as ca_search
+from .certificate import Certificate, CertificateInput
+from .certificate import search as certificate_search
+from .cmc import cmc_handle_request
+from .config import ACME_ROOT, KEY_TYPES, PKCS11_SIGN_API_TOKEN, ROOT_URL
+from .crl import Crl, CrlInput
+from .crl import search as crl_search
+from .csr import Csr, CsrInput
+from .csr import search as csr_search
+from .nonce import nonce_response
+from .ocsp import ocsp_response
+from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
+from .pkcs11_sign import pkcs11_sign
+from .public_key import PublicKey, PublicKeyInput
+from .public_key import search as public_key_search
+from .route_functions import (
+    ca_request,
+    crl_request,
+    healthcheck,
+    pkcs11_key_request,
+    sign_csr,
+)
+from .startup import startup
 
 if "_" in os.environ and "sphinx-build" in os.environ["_"]:
     pass

@@ -1,17 +1,16 @@
 """Module  which handle the authorization"""
 
-from typing import Tuple
 import json
+from typing import Tuple
 
-from fastapi import HTTPException
-from fastapi import Request
 import jwt
+from fastapi import HTTPException, Request
 
-from .public_key import PublicKey, PublicKeyInput
+from .asn1 import from_base64url, jwk_key_to_pem
 from .base import db_load_data_class
-from .asn1 import jwk_key_to_pem, from_base64url
 from .config import JWT_ALGOS
 from .nonce import verify_nonce
+from .public_key import PublicKey, PublicKeyInput
 
 
 async def _pub_key_from_db(pem: str) -> Tuple[str, int]:

@@ -1,21 +1,27 @@
 """
 Test our revocation
 """
-import unittest
 import json
 import os
+import unittest
 
 import requests
-
-from asn1crypto import pem as asn1_pem
 from asn1crypto import crl as asn1_crl
+from asn1crypto import pem as asn1_pem
+
+from src.pkcs11_ca_service.asn1 import (
+    cert_pem_serial_number,
+    cert_revoked,
+    create_jwt_header_str,
+    crl_expired,
+)
+from src.pkcs11_ca_service.config import ROOT_URL
+
+from .lib import cdp_url, create_i_ca
 
 # from asn1crypto import crl as asn1_crl
 # from asn1crypto import pem as asn1_pem
 
-from src.pkcs11_ca_service.asn1 import create_jwt_header_str, cert_revoked, crl_expired, cert_pem_serial_number
-from src.pkcs11_ca_service.config import ROOT_URL
-from .lib import cdp_url, create_i_ca
 
 TEST_CSR1 = """-----BEGIN CERTIFICATE REQUEST-----
 MIIC2DCCAcACAQAwgZIxCzAJBgNVBAYTAlNFMRMwEQYDVQQIDApTb21lLVN0YXRl

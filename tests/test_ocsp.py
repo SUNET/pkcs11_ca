@@ -1,21 +1,21 @@
 """
 Test our ca
 """
-import unittest
-from typing import Union
-import json
 import asyncio
-import os
-from secrets import token_bytes
 import datetime
+import json
+import os
+import unittest
+from secrets import token_bytes
+from typing import Union
 
 import requests
 from asn1crypto import ocsp as asn1_ocsp
-
 from python_x509_pkcs11.ocsp import certificate_ocsp_data, request
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, ocsp_encode
 from src.pkcs11_ca_service.config import ROOT_URL
+
 from .lib import create_i_ca
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:

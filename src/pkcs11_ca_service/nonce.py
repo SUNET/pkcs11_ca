@@ -1,11 +1,11 @@
 """Module which handle nonces"""
-from typing import List
-from secrets import token_bytes
 import hashlib
+from secrets import token_bytes
+from typing import List
 
 from fastapi import Response
 
-from .asn1 import to_base64url, from_base64url
+from .asn1 import from_base64url, to_base64url
 
 # https://docs.python.org/3/library/secrets.html
 # https://datatracker.ietf.org/doc/html/rfc8555#section-6.5.1

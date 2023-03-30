@@ -1,19 +1,20 @@
 """Module to handle public keys"""
 
-from typing import Union, Dict, List
+from typing import Dict, List, Union
+
 from fastapi.responses import JSONResponse
 
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
 from .asn1 import public_key_pem_to_sha1_fingerprint
+from .base import DataBaseObject, DataClassObject, InputObject, db_load_data_class
 from .error import WrongDataType
 
 
 class PublicKeyInput(InputObject):
     """Class to represent public key matching from HTTP post data"""
 
-    pem: Union[str, None]
-    fingerprint: Union[str, None]
-    admin: Union[int, None]
+    pem: Union[str, None] = None
+    fingerprint: Union[str, None] = None
+    admin: Union[int, None] = None
 
 
 class PublicKey(DataClassObject):

@@ -1,27 +1,32 @@
 """Module to handle certificate authorities"""
-from typing import Dict, Union, List
 import hashlib
 from secrets import token_bytes
+from typing import Dict, List, Union
 
-from fastapi.responses import JSONResponse
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 from python_x509_pkcs11.crl import create as create_crl
 
+from .asn1 import (
+    cert_pem_serial_number,
+    cert_revoked,
+    not_before_not_after_from_cert,
+    pem_cert_to_name_dict,
+    pem_to_sha256_fingerprint,
+)
+from .base import DataBaseObject, DataClassObject, InputObject, db_load_data_class
 from .crl import Crl
-from .asn1 import pem_cert_to_name_dict
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
-from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert, cert_pem_serial_number, cert_revoked
 from .error import WrongDataType
 
 
 class CaInput(InputObject):
     """Class to represent ca matching from HTTP post data"""
 
-    name_dict: Union[Dict[str, str], None]
-    pem: Union[str, None]
-    key_label: Union[str, None]
+    name_dict: Union[Dict[str, str], None] = None
+    pem: Union[str, None] = None
+    key_label: Union[str, None] = None
     key_type: Union[str, None] = None
-    issuer_pem: Union[str, None]
+    issuer_pem: Union[str, None] = None
     path: Union[str, None] = None
     pkcs11_key: Union[int, None] = None
     serial_number: Union[str, None] = None

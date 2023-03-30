@@ -1,16 +1,16 @@
 """ACME authorization module"""
-from typing import Dict, Union, List, Any
 import json
+from typing import Any, Dict, List, Union
 
-from .base import DataClassObject, DataBaseObject, InputObject
-from .asn1 import to_base64url, from_base64url
+from .asn1 import from_base64url, to_base64url
+from .base import DataBaseObject, DataClassObject, InputObject
 
 
 class AcmeAuthorizationInput(InputObject):
     """Class to represent an acme authorization matching from HTTP post data"""
 
-    account: Union[int, None]
-    id: Union[str, None]
+    account: Union[int, None] = None
+    id: Union[str, None] = None
 
 
 class AcmeAuthorization(DataClassObject):

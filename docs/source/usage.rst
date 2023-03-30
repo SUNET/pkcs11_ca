@@ -316,7 +316,7 @@ Postgres backup
    docker exec -it pkcs11_ca_postgres_1 /bin/bash
 
    # Inside the shell run pg_dump
-   pg_dump -U pkcs11_testuser1 --format=c pkcs11_testdb1 > pg_dump.dump
+   pg_dump -U ${POSTGRES_USER} --format=c pkcs11_testdb1 > pg_dump.dump
 
    # This backup file can be used to restore the database with
    pg_restore -d pkcs11_testdb1 pg_dump.dump

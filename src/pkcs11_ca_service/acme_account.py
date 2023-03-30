@@ -1,17 +1,18 @@
 """ACME account module"""
-from typing import Dict, Union, Any, List
 import json
+from typing import Any, Dict, List, Union
 
-from .base import DataClassObject, DataBaseObject, InputObject
 from .asn1 import from_base64url, to_base64url
-from .config import ROOT_URL, ACME_ROOT
+from .base import DataBaseObject, DataClassObject, InputObject
+from .config import ACME_ROOT, ROOT_URL
 
 
 class AcmeAccountInput(InputObject):
     """Class to represent an acme account matching from HTTP post data"""
 
-    id: Union[str, None]
-    public_key_pem: Union[str, None]
+    serial: Union[int, None] = None
+    id: Union[str, None] = None
+    public_key_pem: Union[str, None] = None
 
 
 class AcmeAccount(DataClassObject):

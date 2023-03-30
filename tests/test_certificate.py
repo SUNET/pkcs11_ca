@@ -1,18 +1,17 @@
 """
 Test our certificates
 """
-import unittest
 import json
 import os
+import unittest
 
 import requests
-
-
-from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
+from asn1crypto import x509 as asn1_x509
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
+
 from .lib import create_i_ca
 
 

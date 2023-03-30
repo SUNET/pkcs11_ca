@@ -1,13 +1,13 @@
 """
 Test our ca
 """
-import unittest
 import os
+import unittest
 
 import requests
 
-from src.pkcs11_ca_service.config import ROOT_URL
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from src.pkcs11_ca_service.config import ROOT_URL
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()

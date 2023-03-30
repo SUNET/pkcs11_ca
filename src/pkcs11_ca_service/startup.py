@@ -1,15 +1,21 @@
 """Startup module"""
-from typing import Dict, List, Union, Type
-from importlib import import_module
 import os
-import sys
 import subprocess
+import sys
+from importlib import import_module
+from typing import Dict, List, Type, Union
 
 from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .base import DataClassObject, DataBaseObject
-from .config import DB_TABLE_MODULES, DB_MODULE, ROOT_CA_KEY_LABEL, ROOT_CA_KEY_TYPE, PKCS11_BACKEND
+from .base import DataBaseObject, DataClassObject
+from .config import (
+    DB_MODULE,
+    DB_TABLE_MODULES,
+    PKCS11_BACKEND,
+    ROOT_CA_KEY_LABEL,
+    ROOT_CA_KEY_TYPE,
+)
 
 
 def _load_db_data_classes() -> List[DataClassObject]:

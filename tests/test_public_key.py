@@ -2,22 +2,21 @@
 Test our public key creation
 """
 
-from typing import Tuple
-import unittest
 import json
 import os
+import unittest
+from typing import Tuple
 
 import requests
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
-from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PrivateKey
-
-from asn1crypto.keys import PublicKeyInfo
 from asn1crypto import pem as asn1_pem
+from asn1crypto.keys import PublicKeyInfo
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PrivateKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 
-from src.pkcs11_ca_service.config import ROOT_URL
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
+from src.pkcs11_ca_service.config import ROOT_URL
 
 
 def generate_keypair_secp521r1() -> Tuple[str, str]:

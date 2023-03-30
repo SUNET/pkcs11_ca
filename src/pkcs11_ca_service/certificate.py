@@ -1,13 +1,18 @@
 """Module to handle certificates"""
-from typing import Union, Dict, List
-from fastapi.responses import JSONResponse
+from typing import Dict, List, Union
+
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 from python_x509_pkcs11.crl import create as create_crl
 
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
-from .asn1 import pem_to_sha256_fingerprint, not_before_not_after_from_cert
-from .asn1 import pem_cert_to_name_dict, cert_pem_serial_number
-from .asn1 import cert_revoked
+from .asn1 import (
+    cert_pem_serial_number,
+    cert_revoked,
+    not_before_not_after_from_cert,
+    pem_cert_to_name_dict,
+    pem_to_sha256_fingerprint,
+)
+from .base import DataBaseObject, DataClassObject, InputObject, db_load_data_class
 from .crl import Crl
 from .error import WrongDataType
 
@@ -15,9 +20,9 @@ from .error import WrongDataType
 class CertificateInput(InputObject):
     """Class to represent certificate matching from HTTP post data"""
 
-    pem: Union[str, None]
-    fingerprint: Union[str, None]
-    serial_number: Union[str, None]
+    pem: Union[str, None] = None
+    fingerprint: Union[str, None] = None
+    serial_number: Union[str, None] = None
 
 
 class Certificate(DataClassObject):

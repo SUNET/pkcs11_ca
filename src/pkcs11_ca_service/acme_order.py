@@ -1,20 +1,20 @@
 """ACME order module"""
 import json
-from typing import Dict, Union, List, Any
+from typing import Any, Dict, List, Union
 
 from fastapi import HTTPException
 
-from .base import DataClassObject, DataBaseObject, InputObject
-from .asn1 import to_base64url, from_base64url
+from .asn1 import from_base64url, to_base64url
+from .base import DataBaseObject, DataClassObject, InputObject
 from .config import ACME_IDENTIFIER_TYPES
 
 
 class AcmeOrderInput(InputObject):
     """Class to represent an acme order matching from HTTP post data"""
 
-    id: Union[str, None]
-    account: Union[int, None]
-    issued_certificate: Union[str, None]
+    id: Union[str, None] = None
+    account: Union[int, None] = None
+    issued_certificate: Union[str, None] = None
 
 
 class AcmeOrder(DataClassObject):

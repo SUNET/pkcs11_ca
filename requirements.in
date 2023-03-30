@@ -1,10 +1,10 @@
 uvicorn[standard]
-python-x509-pkcs11>=0.6.3
-python_cmc>=1.22
+python-x509-pkcs11
+python_cmc
 pyjwt
 fastapi
 asyncpg
-cryptography>=40.0.0
+cryptography
 requests
 openapi_schema_validator
 pkgutil-resolve-name

@@ -1,14 +1,15 @@
 """Global functions"""
 
-from typing import Dict
 import json
 import os
 import subprocess
 from hashlib import sha256
+from typing import Dict
 
 import requests
-from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
+from asn1crypto import x509 as asn1_x509
+
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 

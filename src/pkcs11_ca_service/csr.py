@@ -1,15 +1,17 @@
 """Module to handle csrs"""
-from typing import Union, Dict, List
+from typing import Dict, List, Union
+
 from fastapi.responses import JSONResponse
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
+
+from .base import DataBaseObject, DataClassObject, InputObject, db_load_data_class
 from .error import WrongDataType
 
 
 class CsrInput(InputObject):
     """Class to represent csr matching from HTTP post data"""
 
-    pem: Union[str, None]
-    ca_pem: Union[str, None]
+    pem: Union[str, None] = None
+    ca_pem: Union[str, None] = None
 
 
 class Csr(DataClassObject):

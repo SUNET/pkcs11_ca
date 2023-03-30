@@ -1,41 +1,43 @@
 """
 Test our acme
 """
-from typing import Dict, Any, Union
-import unittest
-import os
-import json
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
-import subprocess
-import datetime
 import base64
+import datetime
+import json
+import os
 import secrets
+import subprocess
+import threading
 import time
+import unittest
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from typing import Any, Dict, Union
 
 import requests
-
 from asn1crypto import csr as asn1_csr
-from asn1crypto import x509 as asn1_x509
 from asn1crypto import pem as asn1_pem
-
-from python_x509_pkcs11.crypto import convert_asn1_ec_signature
-
+from asn1crypto import x509 as asn1_x509
+from cryptography import x509
+from cryptography.hazmat.primitives.asymmetric.ec import (
+    ECDSA,
+    SECP256R1,
+    EllipticCurvePrivateKey,
+    generate_private_key,
+)
+from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.serialization import (
     Encoding,
-    PublicFormat,
-    PrivateFormat,
     NoEncryption,
+    PrivateFormat,
+    PublicFormat,
     load_der_private_key,
     load_pem_public_key,
 )
-from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePrivateKey, generate_private_key, SECP256R1
-from cryptography.hazmat.primitives.hashes import SHA256
-from cryptography import x509
 from cryptography.x509.oid import NameOID
+from python_x509_pkcs11.crypto import convert_asn1_ec_signature
 
-from src.pkcs11_ca_service.asn1 import pem_key_to_jwk, to_base64url, jwk_thumbprint
-from src.pkcs11_ca_service.config import ROOT_URL, ACME_ROOT
+from src.pkcs11_ca_service.asn1 import jwk_thumbprint, pem_key_to_jwk, to_base64url
+from src.pkcs11_ca_service.config import ACME_ROOT, ROOT_URL
 
 
 class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):

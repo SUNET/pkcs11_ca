@@ -1,21 +1,21 @@
 """
 Test our ca
 """
+import json
+import os
 import unittest
 from typing import List
-import os
-import json
 
 import requests
-from asn1crypto import x509 as asn1_x509
-from asn1crypto import pem as asn1_pem
 from asn1crypto import crl as asn1_crl
-
+from asn1crypto import pem as asn1_pem
+from asn1crypto import x509 as asn1_x509
 from python_x509_pkcs11.ocsp import certificate_ocsp_data
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
-from .lib import create_i_ca, cdp_url, verify_cert
+
+from .lib import cdp_url, create_i_ca, verify_cert
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()

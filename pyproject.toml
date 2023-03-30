@@ -1,5 +1,5 @@
 description = "Python async library for signing x509 using keys in an pkcs11 device such as a HSM"
-version = "1.02"
+version = "0.91"
 
 [build-system]
 requires = [
@@ -10,16 +10,16 @@ requires = [
 module = "pkcs11_ca_service"
 
 description-file = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.8"
 
 keywords = "x509,pkcs11,CA,HSM"
 license = "MIT"
 author = "Victor Näslund"
 author-email = "victor@sunet.se"
-# home-page = "https://github.com/SUNET/pkcs11_ca"
+home-page = "https://github.com/SUNET/pkcs11_ca"
 
 requires = [
-    "python_x509_pkcs11>=0.4.41",
+    "python_x509_pkcs11",
     "asn1crypto>=1.5.1",
     "pyjwt>=2.5.1",
     "uvicorn[standard]",
@@ -30,3 +30,36 @@ requires = [
     "requests",
     "openapi_schema_validator"
 ]
+
+
+[tool.mypy]
+strict = true
+mypy_path = "src"
+packages = "pkcs11_ca_service"
+
+[[tool.mypy.overrides]]
+module = [
+    "asn1crypto",
+    "asn1crypto.keys",
+    "asyncpg",
+    "asyncpg.pool",
+    "asyncpg.exceptions",
+    "pkcs11.exceptions",
+]
+ignore_missing_imports = true
+
+[tool.isort]
+profile = "black"
+src_paths = ["src", "tests"]
+
+[tool.black]
+line-length = 120
+
+[tool.pylint.'FORMAT']
+max-line-length = 120
+
+[tool.pylint.'MASTER']
+extension-pkg-whitelist = "pydantic"
+
+[tool.pylint.'MESSAGES CONTROL']
+disable = "duplicate-code,too-many-lines"

@@ -199,17 +199,24 @@ echo "Checking code package"
 which mypy > /dev/null
 if [ $? -eq 0 ]
 then
-    echo ""
-    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/tmp src/pkcs11_ca_service/*.py
+    mypy
 else
     echo "mypy is not installed, skipping..."
-    echo "Dont forget to install types-requests"
+    echo "Dont forget to install types-requests types-jsonschema"
+fi
+
+which isort > /dev/null
+if [ $? -eq 0 ]
+then
+    isort src
+else
+    echo "isort is not installed, skipping..."
 fi
 
 which black > /dev/null
 if [ $? -eq 0 ]
 then
-    black --line-length 120 src/pkcs11_ca_service/*.py
+    black src
 else
     echo "black is not installed, skipping..."
 fi
@@ -217,30 +224,34 @@ fi
 which pylint > /dev/null
 if [ $? -eq 0 ]
 then
-    echo ""
-    pylint --max-line-length 120 src/pkcs11_ca_service/*.py
+    pylint src
 else
     echo "pylint is not installed, skipping..."
 fi
 
+# For tests
 which mypy > /dev/null
 if [ $? -eq 0 ]
 then
-    echo ""
-    mypy  --strict --namespace-packages --ignore-missing-imports --cache-dir=/tmp tests/*.py
+    mypy --strict --namespace-packages --ignore-missing-imports tests
+fi
+
+which isort > /dev/null
+if [ $? -eq 0 ]
+then
+    isort tests
 fi
 
 which black > /dev/null
 if [ $? -eq 0 ]
 then
-    black --line-length 120 tests/*.py
+    black tests
 fi
 
 which pylint > /dev/null
 if [ $? -eq 0 ]
 then
-    echo ""
-    pylint --max-line-length 120 tests/*.py
+    pylint tests
 fi
 
 echo "Using 'sudo' to set correct directory ownership"

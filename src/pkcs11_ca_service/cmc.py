@@ -1,49 +1,45 @@
 """CMC functions"""
-from typing import Dict, Union, List
 import datetime
 import hashlib
 from random import randint
+from typing import Dict, List, Union
 
-from fastapi import HTTPException
-
-from cryptography.exceptions import InvalidSignature
-
+from asn1crypto import algos as asn1_algos
+from asn1crypto import cms as asn1_cms
+from asn1crypto import core as asn1_core
 from asn1crypto import csr as asn1_csr
 from asn1crypto import pem as asn1_pem
-from asn1crypto import core as asn1_core
 from asn1crypto import x509 as asn1_x509
-from asn1crypto import cms as asn1_cms
-from asn1crypto import algos as asn1_algos
-
-from python_x509_pkcs11.pkcs11_handle import PKCS11Session
-from python_x509_pkcs11.lib import signed_digest_algo
-from python_x509_pkcs11.csr import sign_csr
-
+from cryptography.exceptions import InvalidSignature
+from fastapi import HTTPException
 from python_cmc import cmc as asn1_cmc
+from python_x509_pkcs11.csr import sign_csr
+from python_x509_pkcs11.lib import signed_digest_algo
+from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .route_functions import ca_request, pkcs11_key_request
-from .ca import Ca, CaInput
-from .pkcs11_key import Pkcs11KeyInput
-from .public_key import PublicKey
-from .certificate import Certificate, CertificateInput
-from .csr import Csr
 from .asn1 import (
     aia_and_cdp_exts,
-    public_key_pem_from_csr,
     cert_is_ca,
-    pem_cert_to_key_hash,
     cert_pem_serial_number,
+    pem_cert_to_key_hash,
     pem_cert_to_name_dict,
     pem_cert_verify_signature,
+    public_key_pem_from_csr,
 )
 from .base import db_load_data_class
+from .ca import Ca, CaInput
+from .certificate import Certificate, CertificateInput
 from .config import (
     CMC_CERT_ISSUING_KEY_LABEL,
-    CMC_KEYS_TYPE,
     CMC_CERT_ISSUING_NAME_DICT,
-    CMC_SIGNING_KEY_LABEL,
+    CMC_KEYS_TYPE,
     CMC_REQUEST_CERTS,
+    CMC_SIGNING_KEY_LABEL,
 )
+from .csr import Csr
+from .pkcs11_key import Pkcs11KeyInput
+from .public_key import PublicKey
+from .route_functions import ca_request, pkcs11_key_request
 
 
 async def cmc_revoke(revoke_data: bytes) -> None:

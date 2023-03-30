@@ -1,17 +1,18 @@
 """Module to handle crls"""
-from typing import Union, Dict, List
-from fastapi.responses import JSONResponse
-from .base import DataClassObject, DataBaseObject, InputObject, db_load_data_class
-from .asn1 import this_update_next_update_from_crl
+from typing import Dict, List, Union
 
+from fastapi.responses import JSONResponse
+
+from .asn1 import this_update_next_update_from_crl
+from .base import DataBaseObject, DataClassObject, InputObject, db_load_data_class
 from .error import WrongDataType
 
 
 class CrlInput(InputObject):
     """Class to represent crl matching from HTTP post data"""
 
-    pem: Union[str, None]
-    ca_pem: Union[str, None]
+    pem: Union[str, None] = None
+    ca_pem: Union[str, None] = None
 
 
 class Crl(DataClassObject):

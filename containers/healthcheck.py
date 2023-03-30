@@ -1,8 +1,11 @@
 """
 Send a healthcheck request to the CA server
 """
+
 import sys
+
 import requests
+
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
 

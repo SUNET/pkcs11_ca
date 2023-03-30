@@ -1,11 +1,11 @@
 """
 Test our auth
 """
-import unittest
 import os
+import unittest
 
-import requests
 import jwt
+import requests
 
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, pem_key_to_jwk
 from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL

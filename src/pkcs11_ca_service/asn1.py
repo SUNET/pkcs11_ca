@@ -1,38 +1,38 @@
 """ASN1 module, mostly using asn1crypto"""
-import json
-from typing import Tuple, Dict, Union
-from base64 import urlsafe_b64encode, urlsafe_b64decode, b64decode, b64encode
-import hashlib
 import datetime
+import hashlib
+import json
 import urllib.parse
-
-from cryptography.hazmat.primitives.serialization import load_der_public_key
-from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
-from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
-from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
-from cryptography.hazmat.primitives.asymmetric.rsa import RSAPublicKey as cryptoRSAPublicKey
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
-from cryptography import x509 as cryptography_x509
-
-from python_x509_pkcs11.crypto import convert_rs_ec_signature
+from base64 import b64decode, b64encode, urlsafe_b64decode, urlsafe_b64encode
+from typing import Dict, Tuple, Union
 
 import jwt
 import requests
-from asn1crypto import pem as asn1_pem
-from asn1crypto import csr as asn1_csr
 from asn1crypto import crl as asn1_crl
+from asn1crypto import csr as asn1_csr
+from asn1crypto import pem as asn1_pem
 from asn1crypto import x509 as asn1_x509
 from asn1crypto.keys import (
-    PublicKeyInfo,
-    RSAPublicKey,
-    PublicKeyAlgorithm,
-    PublicKeyAlgorithmId,
-    NamedCurve,
     ECDomainParameters,
     ECPointBitString,
+    NamedCurve,
+    PublicKeyAlgorithm,
+    PublicKeyAlgorithmId,
+    PublicKeyInfo,
+    RSAPublicKey,
 )
+from cryptography import x509 as cryptography_x509
+from cryptography.exceptions import InvalidSignature
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, EllipticCurvePublicKey
+from cryptography.hazmat.primitives.asymmetric.ed448 import Ed448PublicKey
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives.asymmetric.rsa import (
+    RSAPublicKey as cryptoRSAPublicKey,
+)
+from cryptography.hazmat.primitives.hashes import SHA256, SHA384, SHA512
+from cryptography.hazmat.primitives.serialization import load_der_public_key
+from python_x509_pkcs11.crypto import convert_rs_ec_signature
 
 from .config import ROOT_URL
 from .error import UnsupportedJWTAlgorithm

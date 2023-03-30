@@ -4,64 +4,68 @@ Handle the ACME requests
 
 FIXME: handle and check for expired acme objects
 """
-from typing import Any, Dict, Union, List
-from secrets import token_bytes
+import base64
 import datetime
 import json
 import time
-import base64
-
-from asn1crypto import csr as asn1_csr
-from asn1crypto import x509 as asn1_x509
-from asn1crypto import pem as asn1_pem
-
-from cryptography.exceptions import InvalidSignature
-
-from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
-
-from fastapi.responses import JSONResponse
-from fastapi import HTTPException, Response, Request
-from fastapi.background import BackgroundTasks
+from secrets import token_bytes
+from typing import Any, Dict, List, Union
 
 import requests
-from requests.exceptions import (
-    ConnectionError as requestsConnectionError,
-    ConnectTimeout as requestsConnectTimeout,
-)
-from .base import db_load_data_class
-from .acme_authorization import AcmeAuthorization, AcmeAuthorizationInput, challenges_from_list
+from asn1crypto import csr as asn1_csr
+from asn1crypto import pem as asn1_pem
+from asn1crypto import x509 as asn1_x509
+from cryptography.exceptions import InvalidSignature
+from fastapi import HTTPException, Request, Response
+from fastapi.background import BackgroundTasks
+from fastapi.responses import JSONResponse
+from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
+from requests.exceptions import ConnectionError as requestsConnectionError
+from requests.exceptions import ConnectTimeout as requestsConnectTimeout
+
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
-from .acme_order import AcmeOrder, AcmeOrderInput, authorizations_from_list, identifiers_from_payload
-from .nonce import generate_nonce, verify_nonce
-from .public_key import PublicKey
-from .pkcs11_key import Pkcs11KeyInput, Pkcs11Key
-from .ca import CaInput
-from .csr import Csr
-from .certificate import Certificate, CertificateInput
-from .route_functions import ca_request
+from .acme_authorization import (
+    AcmeAuthorization,
+    AcmeAuthorizationInput,
+    challenges_from_list,
+)
+from .acme_order import (
+    AcmeOrder,
+    AcmeOrderInput,
+    authorizations_from_list,
+    identifiers_from_payload,
+)
 from .asn1 import (
-    to_base64url,
-    from_base64url,
-    jwk_key_to_pem,
-    public_key_pem_from_csr,
-    cert_pem_serial_number,
     aia_and_cdp_exts,
-    pem_cert_verify_signature,
-    jwk_thumbprint,
-    pem_key_to_jwk,
     cert_from_der,
     cert_issued_by_ca,
+    cert_pem_serial_number,
+    from_base64url,
+    jwk_key_to_pem,
+    jwk_thumbprint,
+    pem_cert_verify_signature,
+    pem_key_to_jwk,
+    public_key_pem_from_csr,
     public_key_verify_signature,
+    to_base64url,
 )
+from .base import db_load_data_class
+from .ca import CaInput
+from .certificate import Certificate, CertificateInput
 from .config import (
-    ACME_ROOT,
-    ROOT_URL,
     ACME_IDENTIFIER_TYPES,
+    ACME_ROOT,
+    ACME_SIGNER_KEY_LABEL,
     ACME_SIGNER_KEY_TYPE,
     ACME_SIGNER_NAME_DICT,
-    ACME_SIGNER_KEY_LABEL,
     ACME_SUNET_TRUSTED_SIGNERS,
+    ROOT_URL,
 )
+from .csr import Csr
+from .nonce import generate_nonce, verify_nonce
+from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
+from .public_key import PublicKey
+from .route_functions import ca_request
 
 
 class NoSuchKID(Exception):

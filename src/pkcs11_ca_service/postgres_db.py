@@ -2,56 +2,55 @@
 Module which handles database queries
 """
 
-from __future__ import annotations
-from typing import Dict, Union, List, Tuple, Type
 import datetime
 import hashlib
-from secrets import token_bytes
 import os
-import time
 import sys
+import time
+from secrets import token_bytes
+from typing import Dict, List, Tuple, Type, Union
 
-from asyncpg.exceptions import UndefinedTableError
 from asyncpg import create_pool
+from asyncpg.exceptions import UndefinedTableError
 from asyncpg.pool import Pool
-from python_x509_pkcs11.pkcs11_handle import PKCS11Session
+from pkcs11.exceptions import MultipleObjectsReturned
 from python_x509_pkcs11.ca import create as create_ca
 from python_x509_pkcs11.crl import create as create_crl
-from pkcs11.exceptions import MultipleObjectsReturned
+from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .asn1 import this_update_next_update_from_crl, cert_pem_serial_number
+from .asn1 import (
+    aia_and_cdp_exts,
+    cert_pem_serial_number,
+    pem_to_sha256_fingerprint,
+    public_key_pem_to_sha1_fingerprint,
+    this_update_next_update_from_crl,
+)
+from .base import DataBaseObject
+from .config import (
+    ACME_SIGNER_EXPIRE,
+    ACME_SIGNER_KEY_LABEL,
+    ACME_SIGNER_KEY_TYPE,
+    ACME_SIGNER_NAME_DICT,
+    CMC_CERT_ISSUING_KEY_LABEL,
+    CMC_CERT_ISSUING_NAME_DICT,
+    CMC_EXPIRE,
+    CMC_KEYS_TYPE,
+    CMC_ROOT_KEY_LABEL,
+    CMC_ROOT_NAME_DICT,
+    CMC_SIGNING_KEY_LABEL,
+    CMC_SIGNING_NAME_DICT,
+    HEALTHCHECK_KEY_LABEL,
+    HEALTHCHECK_KEY_TYPE,
+    ROOT_ADMIN_KEYS_FOLDER,
+    ROOT_CA_EXPIRE,
+    ROOT_CA_KEY_LABEL,
+    ROOT_CA_KEY_TYPE,
+    ROOT_CA_NAME_DICT,
+)
+from .error import WrongDataType
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
-
-from .config import (
-    HEALTHCHECK_KEY_LABEL,
-    HEALTHCHECK_KEY_TYPE,
-    ROOT_CA_NAME_DICT,
-    ROOT_CA_KEY_LABEL,
-    ROOT_CA_KEY_TYPE,
-    ROOT_CA_EXPIRE,
-    ROOT_ADMIN_KEYS_FOLDER,
-    CMC_ROOT_KEY_LABEL,
-    CMC_SIGNING_KEY_LABEL,
-    CMC_CERT_ISSUING_KEY_LABEL,
-    CMC_KEYS_TYPE,
-    CMC_ROOT_NAME_DICT,
-    CMC_CERT_ISSUING_NAME_DICT,
-    CMC_SIGNING_NAME_DICT,
-    CMC_EXPIRE,
-    ACME_SIGNER_KEY_LABEL,
-    ACME_SIGNER_NAME_DICT,
-    ACME_SIGNER_KEY_TYPE,
-    ACME_SIGNER_EXPIRE,
-)
-from .error import WrongDataType
-from .asn1 import (
-    public_key_pem_to_sha1_fingerprint,
-    pem_to_sha256_fingerprint,
-    aia_and_cdp_exts,
-)
-from .base import DataBaseObject
 
 
 class PostgresDB(DataBaseObject):
