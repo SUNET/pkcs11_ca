@@ -804,6 +804,8 @@ class TestAcme(unittest.TestCase):
         response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
         authz = response_data["authorizations"][0]
 
+        time.sleep(2)
+
         # List orders
         acme_req = get_orders_jws(kid, priv_key2, orders)
         response_data, _ = send_request(f"{orders}", acme_req, 200)
