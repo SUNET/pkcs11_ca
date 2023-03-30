@@ -112,7 +112,7 @@ which runs dehydrated and also responds to the CA's ACME challenge
    # Create ACME challenge folder
    mkdir -p /var/www/dehydrated
 
-Copy paste this script as **acme_setup.py**
+Copy paste this script as **acme_setup.sh**
 which sets up dehydrated and creates a CSR for the CA to sign using our ACME client
 
 

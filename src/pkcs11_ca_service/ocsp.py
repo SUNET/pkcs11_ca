@@ -17,7 +17,6 @@ from .asn1 import (
     pem_cert_to_key_hash,
 )
 from .ca import CaInput
-
 from .pkcs11_key import Pkcs11KeyInput
 from .public_key import PublicKeyInput
 from .route_functions import (

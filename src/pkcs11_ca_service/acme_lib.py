@@ -890,9 +890,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         _request_not_before = datetime.datetime.fromisoformat(not_before)
         if _request_not_before.tzinfo is None:
             request_not_before = (
-                datetime.datetime.fromisoformat(not_before)
-                .astimezone(datetime.timezone.utc)
-                .strftime(DATE_STRING)
+                datetime.datetime.fromisoformat(not_before).astimezone(datetime.timezone.utc).strftime(DATE_STRING)
             )
         else:
             request_not_before = _request_not_before.strftime(DATE_STRING)
@@ -904,9 +902,7 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         _request_not_after = datetime.datetime.fromisoformat(not_after)
         if _request_not_after.tzinfo is None:
             request_not_after = (
-                datetime.datetime.fromisoformat(not_after)
-                .astimezone(datetime.timezone.utc)
-                .strftime(DATE_STRING)
+                datetime.datetime.fromisoformat(not_after).astimezone(datetime.timezone.utc).strftime(DATE_STRING)
             )
         else:
             request_not_after = _request_not_after.strftime(DATE_STRING)

@@ -803,4 +803,3 @@ async def head_acme_new_nonce() -> Response:
     """
 
     return nonce_response(200)
-

@@ -88,4 +88,3 @@ async def search(input_object: InputObject) -> JSONResponse:
         public_key_pems.append(public_key.pem)
 
     return JSONResponse(status_code=200, content={"public_keys": public_key_pems})
-
