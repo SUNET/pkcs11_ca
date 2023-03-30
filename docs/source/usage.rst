@@ -296,6 +296,41 @@ Logging
    # View the logs for the PKCS11 CA postgres database
    docker logs pkcs11_ca_postgres_1
 
+Backups
+-----------------------------
+
+The PKCS11 CA contains two data storages.
+
+* The postgres database
+* The PKCS11 device storage
+* Note that the postgres database and the PKCS11 device *MUST* be consistent with each-other for the PKCS11 CA to operate correctly.
+
+
+Postgres backup
+
+.. code-block:: bash
+
+   # Backup the PKCS11 CA postgres database
+
+   # Get a shell inside the postgres container
+   docker exec -it pkcs11_ca_postgres_1 /bin/bash
+
+   # Inside the shell run pg_dump
+   pg_dump -U pkcs11_testuser1 --format=c pkcs11_testdb1 > pg_dump.dump
+
+   # This backup file can be used to restore the database with
+   pg_restore -d pkcs11_testdb1 pg_dump.dump
+
+
+PKCS11 device backup
+
+.. code-block:: bash
+
+   # if you are using softhsm then you can simply backup the entire softhsm token folder at
+   # /var/lib/softhsm/tokens
+
+   # Note that the above is for softhsm, if you use a real HSM (PKCS11 device) then consult the HSM manufacturer.
+
 
 Start / Stop / Restart the system
 -----------------------------
@@ -322,7 +357,7 @@ Completely reset the system
    # Delete the HSM keys and database data
    sudo rm -rf data/db_data/ data/hsm_tokens/
 
-   # Note that this is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example but this might help
+   # Note that the above is for softhsm, if you use a real HSM then deleting the HSM keys are out of scope for this example but this might help
    pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y privkey
    pkcs11-tool -b --login --so-pin $PKCS11PIN --pin $PKCS11PIN --token $PKCS11_TOKEN --module $PKCS11_MODULE --label my_label_here -y pubkey
 
