@@ -67,6 +67,8 @@ from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .public_key import PublicKey
 from .route_functions import ca_request
 
+DATE_STRING = "%Y-%m-%dT%H:%M:%SZ"
+
 
 class NoSuchKID(Exception):
     """Class to handle no such kid"""
@@ -97,7 +99,7 @@ def is_expired(expiry_date: str) -> bool:
     """
 
     curr_datetime = datetime.datetime.now(datetime.timezone.utc)
-    expire_datetime = datetime.datetime.strptime(expiry_date, "%Y-%m-%dT%H:%M:%SZ").astimezone(tz=datetime.timezone.utc)
+    expire_datetime = datetime.datetime.strptime(expiry_date, DATE_STRING).astimezone(tz=datetime.timezone.utc)
 
     if curr_datetime >= expire_datetime:
         return True
@@ -171,7 +173,7 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
     for _ in range(3):
         try:
             req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", timeout=3)
-            if req is None or req.status_code != 200:
+            if req.status_code != 200:
                 return False
 
             data = req.text
@@ -179,8 +181,8 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
                 return True
             return False
 
-        except (requestsConnectionError, requestsConnectTimeout):
-            print(f"(1) Failed to connect to ACME challenge at " f"http://{url}/.well-known/acme-challenge/{token}")
+        except requestsConnectionError:
+            print(f"(1) Failed to connect to ACME challenge at http://{url}/.well-known/acme-challenge/{token}")
 
         time.sleep(3)
 
@@ -217,7 +219,7 @@ async def execute_challenge(
     for chall in challenges:
         if chall["token"] == challenge["token"]:
             chall["status"] = "valid"
-            chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+            chall["validated"] = datetime.datetime.now(datetime.timezone.utc).strftime(DATE_STRING)
 
     authz.challenges = challenges_from_list(challenges)
     authz.status = "valid"
@@ -513,7 +515,6 @@ async def finalize_order_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONRe
         status_code=200,
         headers={"Replay-Nonce": generate_nonce()},
         content=order.response_data(),
-        media_type="application/json",
     )
 
 
@@ -580,7 +581,6 @@ async def chall_response(  # pylint: disable=too-many-branches
                             status_code=200,
                             headers={"Replay-Nonce": generate_nonce()},
                             content=challenge,
-                            media_type="application/json",
                         )
 
     raise HTTPException(status_code=401, detail="Non valid challenge")
@@ -620,7 +620,6 @@ async def authz_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONResponse:
         status_code=200,
         headers=headers,
         content=authzs[0].response_data(),
-        media_type="application/json",
     )
 
 
@@ -712,7 +711,7 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
                 "type": "http-01",  # FIXME change this to x-sunet-01
                 "url": f"{ROOT_URL}{ACME_ROOT}/chall/{random_string()}",
                 "status": "valid",
-                "validated": datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+                "validated": datetime.datetime.now(datetime.timezone.utc).strftime(DATE_STRING),
             }
         ]
 
@@ -722,7 +721,7 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
                 "id": curr_auth_id,
                 "status": "valid",
                 "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
-                    "%Y-%m-%dT%H:%M:%SZ"
+                    DATE_STRING
                 ),
                 "identifier": to_base64url(json.dumps({"type": "signature", "value": name}).encode("utf-8")),
                 "challenges": challenges_from_list(challenges),
@@ -744,7 +743,6 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
         status_code=201,
         headers=headers,
         content=first_authorization.response_data(),
-        media_type="application/json",
     )
 
 
@@ -807,7 +805,7 @@ async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "id": auth_id,
             "status": "pending",
             "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
+                DATE_STRING
             ),
             "identifier": to_base64url(
                 json.dumps({"type": identifier_type, "value": identifier_value}).encode("utf-8")
@@ -825,7 +823,6 @@ async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         status_code=201,
         headers=headers,
         content=new_authorization.response_data(),
-        media_type="application/json",
     )
 
 
@@ -862,7 +859,6 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
             status_code=200,
             headers={"Replay-Nonce": generate_nonce()},
             content=order.response_data(),
-            media_type="application/json",
         )
     raise HTTPException(status_code=401, detail="Non valid order")
 
@@ -892,10 +888,10 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             request_not_before = (
                 datetime.datetime.fromisoformat(not_before)
                 .astimezone(datetime.timezone.utc)
-                .strftime("%Y-%m-%dT%H:%M:%SZ")
+                .strftime(DATE_STRING)
             )
         else:
-            request_not_before = _request_not_before.strftime("%Y-%m-%dT%H:%M:%SZ")
+            request_not_before = _request_not_before.strftime(DATE_STRING)
 
     if "notAfter" in payload:
         not_after = payload["notAfter"]
@@ -906,10 +902,10 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             request_not_after = (
                 datetime.datetime.fromisoformat(not_after)
                 .astimezone(datetime.timezone.utc)
-                .strftime("%Y-%m-%dT%H:%M:%SZ")
+                .strftime(DATE_STRING)
             )
         else:
-            request_not_after = _request_not_after.strftime("%Y-%m-%dT%H:%M:%SZ")
+            request_not_after = _request_not_after.strftime(DATE_STRING)
 
     new_order = AcmeOrder(
         {
@@ -917,18 +913,18 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
             "id": random_string(),
             "status": "ready",  # Changed to pending below if pending challenges exists for the order
             "expires": (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=30)).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
+                DATE_STRING
             ),
             "identifiers": identifiers_from_payload(payload),
             "not_before": request_not_before
             if request_not_before is not None
             else (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365 * 3)).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
+                DATE_STRING
             ),
             "not_after": request_not_after
             if request_not_after is not None
             else (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365 * 3)).strftime(
-                "%Y-%m-%dT%H:%M:%SZ"
+                DATE_STRING
             ),
             "authorizations": "",
             "finalize": "",
@@ -1019,7 +1015,6 @@ async def new_order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         status_code=201,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/order/{new_order.id}"},
         content=new_order.response_data(),
-        media_type="application/json",
     )
 
 
@@ -1052,7 +1047,6 @@ async def orders_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONResp
         status_code=200,
         headers={"Replay-Nonce": generate_nonce()},
         content={"orders": orders},
-        media_type="application/json",
     )
 
 
@@ -1124,7 +1118,6 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": protected["url"]},
         content=account.response_data(),
-        media_type="application/json",
     )
 
 
@@ -1157,7 +1150,6 @@ async def update_account_response(account: AcmeAccount, jws: Dict[str, Any]) -> 
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": protected["url"]},
         content=account.response_data(),
-        media_type="application/json",
     )
 
 
@@ -1175,7 +1167,6 @@ async def existing_account_response(account: AcmeAccount) -> JSONResponse:
         status_code=200,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/acct/{account.id}"},
         content=account.response_data(),
-        media_type="application/json",
     )
 
 
@@ -1232,7 +1223,6 @@ async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONRes
         status_code=201,
         headers={"Replay-Nonce": generate_nonce(), "Location": f"{ROOT_URL}{ACME_ROOT}/acct/{account_id}"},
         content=acme_account_obj.response_data(),
-        media_type="application/json",
     )
 
 
@@ -1402,11 +1392,11 @@ async def handle_acme_routes(  # pylint: disable=too-many-return-statements,too-
     protected = json.loads(from_base64url(input_data["protected"]).decode("utf-8"))
     account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
     if account is None:
-        return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+        return JSONResponse(status_code=401, content="Unauthorized")  # fixme
 
     # Check if the acme account is deactivated
     if account.status == "deactivated":
-        return JSONResponse(status_code=401, content="Unauthorized", media_type="application/json")  # fixme
+        return JSONResponse(status_code=401, content="Unauthorized")  # fixme
 
     if request_url.startswith(f"{ROOT_URL}{ACME_ROOT}/acct/"):
         return await update_account_response(account, input_data)
