@@ -89,26 +89,3 @@ async def search(input_object: InputObject) -> JSONResponse:
 
     return JSONResponse(status_code=200, content={"public_keys": public_key_pems})
 
-
-# @abstractmethod
-
-# async def search_all() -> JSONResponse:
-#     public_key_objs: List[PublicKey] = []
-#     public_key_pems: List[str] = []
-
-#     db_public_key_objs = await db_load_data_class(PublicKey, PublicKeyInput())
-#     for obj in db_public_key_objs:
-#         if isinstance(obj, PublicKey):
-#             public_key_objs.append(obj)
-
-#     for public_key in public_key_objs:
-#         public_key_pems.append(public_key.pem)
-
-#     return JSONResponse(status_code=200, content={"public_keys": public_key_pems})
-
-
-# pass
-
-# @abstractmethod
-# async def post(self, input_object: InputObject) -> JSONResponse:
-#   pass

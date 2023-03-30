@@ -18,9 +18,6 @@ from .asn1 import (
 )
 from .ca import CaInput
 
-# from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
-# from .public_key import PublicKey, PublicKeyInput
-# from .ca import CaInput, Ca
 from .pkcs11_key import Pkcs11KeyInput
 from .public_key import PublicKeyInput
 from .route_functions import (

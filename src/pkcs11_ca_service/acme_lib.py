@@ -68,6 +68,12 @@ from .public_key import PublicKey
 from .route_functions import ca_request
 
 DATE_STRING = "%Y-%m-%dT%H:%M:%SZ"
+ERROR_NON_VALID_CSR = "Non valid CSR"
+ERROR_NON_VALID_CERT_TO_REVOKE = "Non valid cert to revoke"
+ERROR_NO_SUCH_ACCOUNT = "No such account"
+ERROR_NON_VALID_ORDER = "NON valid order"
+ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN = "Invalid token for SUNET ACME authz"
+ERROR_NON_VALID_JWS = "Non valid JWS"
 
 
 class NoSuchKID(Exception):
@@ -332,18 +338,18 @@ async def _check_revoke_jwk(signature: str, signed_data: str, cert_pem: str) -> 
     pem_cert_verify_signature(cert_pem, from_base64url(signature), signed_data.encode("utf-8"))
     order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
     if not isinstance(order, AcmeOrder):
-        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_CERT_TO_REVOKE)
 
     # Check if the acme account is deactivated
     account = await account_exists(AcmeAccountInput(serial=order.account))
     if account is None:
-        raise HTTPException(status_code=401, detail="No such account")
+        raise HTTPException(status_code=401, detail=ERROR_NO_SUCH_ACCOUNT)
 
     if account.status == "deactivated":
         raise HTTPException(status_code=401, detail="Unauthorized")
 
     if order.issued_certificate != cert_pem:
-        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_CERT_TO_REVOKE)
 
 
 async def _check_revoke_kid(jws: Dict[str, Any], request_url: str, protected: Dict[str, Any], cert_pem: str) -> None:
@@ -351,7 +357,7 @@ async def _check_revoke_kid(jws: Dict[str, Any], request_url: str, protected: Di
     await validate_jws(jws, request_url)
     account = await account_exists(AcmeAccountInput(id=account_id_from_kid(protected["kid"])))
     if account is None:
-        raise HTTPException(status_code=401, detail="No such account")
+        raise HTTPException(status_code=401, detail=ERROR_NO_SUCH_ACCOUNT)
 
     # Check if the acme account is deactivated
     if account.status == "deactivated":
@@ -359,10 +365,10 @@ async def _check_revoke_kid(jws: Dict[str, Any], request_url: str, protected: Di
 
     order = (await db_load_data_class(AcmeOrder, AcmeOrderInput(issued_certificate=cert_pem)))[0]
     if not isinstance(order, AcmeOrder):
-        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_CERT_TO_REVOKE)
 
     if order.issued_certificate != cert_pem or order.account != account.serial:
-        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_CERT_TO_REVOKE)
 
 
 async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Response:
@@ -412,12 +418,12 @@ async def revoke_cert_response(jws: Dict[str, Any], request_url: str) -> Respons
     elif "jwk" in protected:
         await _check_revoke_jwk(signature, signed_data, cert_pem)
     else:
-        raise HTTPException(status_code=401, detail="No such account")
+        raise HTTPException(status_code=401, detail=ERROR_NO_SUCH_ACCOUNT)
 
     # Get cert from DB
     cert = (await db_load_data_class(Certificate, CertificateInput(pem=cert_pem)))[0]
     if not isinstance(cert, Certificate):
-        raise HTTPException(status_code=401, detail="Non valid cert to revoke")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_CERT_TO_REVOKE)
 
     # Revoke cert
     await cert.revoke(1, reason)
@@ -444,13 +450,13 @@ async def cert_response(account: AcmeAccount, jws: Dict[str, Any]) -> Response:
     db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
     for obj in db_acme_order_objs:
         if not isinstance(obj, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid order")
+            raise HTTPException(status_code=401, detail=ERROR_NON_VALID_ORDER)
 
         if obj.certificate == cert_id and obj.status == "valid":
             order = obj
             break
     else:
-        raise HTTPException(status_code=401, detail="Non valid order")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_ORDER)
 
     return Response(content=f"{order.issued_certificate}", media_type="application/pem-certificate-chain")
 
@@ -477,13 +483,13 @@ async def finalize_order_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONRe
     db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(id=order_id))
     for obj in db_acme_order_objs:
         if not isinstance(obj, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid order")
+            raise HTTPException(status_code=401, detail=ERROR_NON_VALID_ORDER)
 
         if obj.id == order_id:
             order = obj
             break
     else:
-        raise HTTPException(status_code=401, detail="Non valid order")
+        raise HTTPException(status_code=401, detail=ERROR_NON_VALID_ORDER)
 
     if is_expired(order.expires):
         order.status = "invalid"
@@ -494,11 +500,11 @@ async def finalize_order_response(_: AcmeAccount, jws: Dict[str, Any]) -> JSONRe
         raise HTTPException(status_code=403, detail="orderNotReady")  # Fixme handle error better see rfc
 
     if "csr" not in payload:
-        raise HTTPException(status_code=400, detail="Non valid csr")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_CSR)
 
     csr = payload["csr"]
     if not isinstance(csr, str):
-        raise HTTPException(status_code=400, detail="Non valid csr")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_CSR)
 
     csr_req = asn1_csr.CertificationRequest().load(from_base64url(csr))
     _ = csr_req.native  # Ensure valid csr format
@@ -634,14 +640,12 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
     fastapi.responses.JSONResponse
     """
 
-    response_data: Dict[str, Any] = {}
     token_parts = token.split(".")
     if len(token_parts) != 3:
-        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+        raise HTTPException(status_code=400, detail=ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN)
 
     header = json.loads(from_base64url(token_parts[0]))
     payload = json.loads(from_base64url(token_parts[1]))
-    signature = token_parts[2]
 
     if (
         "x5c" not in header
@@ -651,7 +655,7 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
         or "names" not in payload
         or "nonce" not in payload
     ):
-        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+        raise HTTPException(status_code=400, detail=ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN)
 
     x5c = header["x5c"]
     alg = header["alg"]
@@ -668,11 +672,11 @@ async def sunet_acme_authz(account: AcmeAccount, token: str) -> JSONResponse:
         or not isinstance(names, list)
         or not isinstance(nonce, str)
     ):
-        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+        raise HTTPException(status_code=400, detail=ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN)
 
     encoded_cert = x5c[0]
     if not isinstance(encoded_cert, str):
-        raise HTTPException(status_code=400, detail="Invalid token for sunet acme authz")
+        raise HTTPException(status_code=400, detail=ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN)
 
     cert_pem = cert_from_der(base64.b64decode(encoded_cert.encode("utf-8")))
 
@@ -763,7 +767,7 @@ async def new_authz_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONR
         token = payload["token"]
         if isinstance(token, str):
             return await sunet_acme_authz(account, token)
-        raise HTTPException(status_code=400, detail="Missing valid token for sunet acme authz")
+        raise HTTPException(status_code=400, detail=ERROR_INVALID_SUNET_ACME_AUTHZ_TOKEN)
 
     if "identifier" not in payload:
         raise HTTPException(status_code=400, detail="Missing identifier")
@@ -845,7 +849,7 @@ async def order_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSONRespo
     db_acme_order_objs = await db_load_data_class(AcmeOrder, AcmeOrderInput(account=account.serial))
     for order in db_acme_order_objs:
         if not isinstance(order, AcmeOrder):
-            raise HTTPException(status_code=401, detail="Non valid order")
+            raise HTTPException(status_code=401, detail=ERROR_NON_VALID_ORDER)
 
         if order.id != order_id:
             continue
@@ -1096,10 +1100,10 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
         or not isinstance(inner_alg, str)
         or not isinstance(inner_url, str)
     ):
-        raise HTTPException(status_code=400, detail="Non valid inner jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     if inner_url != protected["url"]:
-        raise HTTPException(status_code=400, detail="Non valid inner jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     inner_old_public_key_pem = jwk_key_to_pem(inner_old_key)
     if account.public_key_pem != inner_old_public_key_pem:
@@ -1109,7 +1113,7 @@ async def key_change_response(account: AcmeAccount, jws: Dict[str, Any]) -> JSON
         raise HTTPException(status_code=400, detail="kid and account payload are not matching")
 
     if inner_alg != inner_jwk_alg:
-        raise HTTPException(status_code=400, detail="Non valid inner jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     account.public_key_pem = inner_signer_public_key_data
     await account.update()
@@ -1201,7 +1205,7 @@ async def new_account_response(jws: Dict[str, Any], request_url: str) -> JSONRes
         return JSONResponse(
             status_code=400,
             headers={"Replay-Nonce": generate_nonce()},
-            content={"type": "urn:ietf:params:acme:error:accountDoesNotExist", "detail": "No such account"},
+            content={"type": "urn:ietf:params:acme:error:accountDoesNotExist", "detail": ERROR_NO_SUCH_ACCOUNT},
         )
 
     # Generate account_id
@@ -1322,7 +1326,7 @@ async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:  #
     url = protected["url"]
 
     if not isinstance(alg, str) or not isinstance(nonce, str) or not isinstance(url, str):
-        raise HTTPException(status_code=400, detail="Non valid jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     if url != request_url:
         raise HTTPException(status_code=400, detail="Client request url did not match jws url")
@@ -1333,7 +1337,7 @@ async def validate_jws(input_data: Dict[str, Any], request_url: str) -> None:  #
 
     # Cant have both jwk and kid
     if "jwk" in protected and "kid" in protected:
-        raise HTTPException(status_code=400, detail="Non valid jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     if url == f"{ROOT_URL}{ACME_ROOT}/new-account":
         if "jwk" not in protected:
@@ -1378,7 +1382,7 @@ async def handle_acme_routes(  # pylint: disable=too-many-return-statements,too-
         raise HTTPException(status_code=400, detail="invalid json") from exc
 
     if not isinstance(input_data, dict):
-        raise HTTPException(status_code=400, detail="Non valid jws")
+        raise HTTPException(status_code=400, detail=ERROR_NON_VALID_JWS)
 
     if request_url == f"{ROOT_URL}{ACME_ROOT}/new-account":
         return await new_account_response(input_data, request_url)

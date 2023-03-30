@@ -53,7 +53,7 @@ from .route_functions import (
 from .startup import startup
 
 if "_" in os.environ and "sphinx-build" in os.environ["_"]:
-    pass
+    print("Running sphinx build")
 else:
     loop = asyncio.get_running_loop()
     startup_task = loop.create_task(startup())
@@ -355,8 +355,6 @@ async def post_ocsp(request: Request) -> Response:
     fastapi.Response
     """
 
-    # _ = await authorized_by(request)
-
     # WORK ON BETTER ERROR HANDLING
     ocsp_request = await request.body()
     try:
@@ -379,8 +377,6 @@ async def get_ocsp(ocsp_path: str) -> Response:
     fastapi.Response
     """
 
-    # _ = await authorized_by(request)
-
     # WORK ON BETTER ERROR HANDLING
     path = ocsp_path.replace("/ocsp/", "").encode("utf-8")
     try:
@@ -402,8 +398,6 @@ async def get_crl(crl_path: str) -> Response:
     Returns:
     fastapi.Response
     """
-
-    # auth_by = await authorized_by(request)
 
     path = crl_path.replace("/crl/", "")
     try:
@@ -429,8 +423,6 @@ async def get_ca(ca_path: str) -> Response:
     Returns:
     fastapi.Response
     """
-
-    # _ = await authorized_by(request)
 
     path = ca_path.replace("/ca/", "")
     try:
@@ -616,9 +608,6 @@ class RevokeInput(InputObject):
 
     pem: str
     reason: Union[int, None]
-    # pem: Union[str, None]
-    # fingerprint: Union[str, None]
-    # serial: Union[int, None]
 
 
 @app.post("/is_revoked")
@@ -721,10 +710,6 @@ async def post_pkcs11_sign(request: Request) -> JSONResponse:
 @app.post("/cmc01")
 async def post_cmc(request: Request) -> Response:
     """fixme"""
-
-    # auth_by = await authorized_by(request)
-
-    # check header media type is "application/pkcs7-mime for cmc request
 
     content_type = request.headers.get("Content-type")
     if content_type is None or content_type != "application/pkcs7-mime":

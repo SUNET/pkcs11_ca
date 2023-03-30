@@ -90,8 +90,6 @@ async def create_cert_from_csr(csr_data: asn1_csr.CertificationRequest) -> asn1_
         ignore_auth_exts=True,
         key_type="secp256r1",
     )
-    # print("signed_cert_in_cmc_response")
-    # print(signed_cert)
 
     # Get public key from csr
     public_key_obj = PublicKey({"pem": public_key_pem_from_csr(csr_pem.decode("utf-8")), "authorized_by": 1})  # FIXME
@@ -210,19 +208,13 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     created_certs: Dict[int, asn1_x509.Certificate],
     failed: bool,
 ) -> bytes:
-    """Create a CMS responce containing a CMC package"""
+    """Create a CMS response containing a CMC package"""
 
-    # issuer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label="cmc_issuer_test3"))
-    # issuer = await ca_request(CaInput(pkcs11_key=issuer_pkcs11_key.serial))
     signer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=CMC_SIGNING_KEY_LABEL))
     signer = await ca_request(CaInput(pkcs11_key=signer_pkcs11_key.serial))
 
-    # root_pem = await issuer.issuer_pem()
-    # root = asn1_x509.Certificate.load(asn1_pem.unarmor(root_pem.encode("utf-8"))[2])
-    # chain = [root, asn1_x509.Certificate.load(asn1_pem.unarmor(issuer.pem.encode("utf-8"))[2]), created_cert]
-
     # FIXME make this into a recursive chain instead of assuming next is root and
-    # dont issue all certs are issued by the same issuer
+    # Dont issue all certs are issued by the same issuer
     chain: List[asn1_x509.Certificate] = [asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2])]
 
     for req_id in created_certs:
@@ -327,7 +319,6 @@ def create_csr_from_crmf(cert_req: asn1_cmc.CertReqMsg) -> asn1_csr.Certificatio
     attrs = asn1_csr.CRIAttributes()
 
     cert_req_info = asn1_csr.CertificationRequestInfo()
-    # cert_req_info["version"] = dummy_cert_req["version"]
     cert_req_info["version"] = 0
     cert_req_info["subject"] = cert_req["subject"]
     cert_req_info["subject_pk_info"] = cert_req["publicKey"]
