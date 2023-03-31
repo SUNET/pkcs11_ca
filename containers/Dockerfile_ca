@@ -28,7 +28,7 @@ RUN apt-get update \
     libz-dev \
     dnsutils \
     mercurial \
-    && pip3 install -r requirements.txt \
+    && pip3 install --require-hashes -r requirements.txt \
     && apt-get remove -y \
     wget \
     curl \
