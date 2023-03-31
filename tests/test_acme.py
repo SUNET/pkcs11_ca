@@ -139,8 +139,7 @@ def create_payload(
 def get_orders_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     """Create ACME orders JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": url}
     payload: Dict[str, str] = {}
     return create_payload(protected, payload, priv_key)
 
@@ -150,8 +149,7 @@ def revoke_cert_jws(
 ) -> Dict[str, Any]:
     """Create ACME revoke cert JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": url}
     payload: Dict[str, Union[str, int]] = {"certificate": to_base64url(cert.dump()), "reason": 4}
     return create_payload(protected, payload, priv_key)
 
@@ -159,8 +157,7 @@ def revoke_cert_jws(
 def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     """Create ACME send CSR JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": url}
 
     cmd = [
         "bash",
@@ -189,8 +186,7 @@ def send_csr_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[
 def new_authz_sunet_token_jws(kid: str, priv_key: EllipticCurvePrivateKey, cert_der: bytes) -> Dict[str, Any]:
     """Create sunet ACME challenge JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
     payload = {
         "token": create_sunet_token(priv_key, cert_der)
         # {"type": "dns", "value": "www.test1"},
@@ -201,8 +197,7 @@ def new_authz_sunet_token_jws(kid: str, priv_key: EllipticCurvePrivateKey, cert_
 def new_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
     """Create ACME new authz JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": f"{ROOT_URL}{ACME_ROOT}/new-authz"}
     payload = {
         "identifier": {"type": "dns", "value": os.environ["HOSTNAME"]},
         # {"type": "dns", "value": "www.test1"},
@@ -213,8 +208,7 @@ def new_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]
 def get_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict[str, Any]:
     """Create ACME authz JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": url}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": url}
     payload: Dict[str, str] = {}
     return create_payload(protected, payload, priv_key)
 
@@ -222,8 +216,7 @@ def get_authz_jws(kid: str, priv_key: EllipticCurvePrivateKey, url: str) -> Dict
 def new_order_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
     """Create ACME new order JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-order"}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": f"{ROOT_URL}{ACME_ROOT}/new-order"}
     payload = {
         "identifiers": [
             {"type": "dns", "value": os.environ["HOSTNAME"]},
@@ -244,7 +237,6 @@ def create_key_change_jws(
 ) -> Dict[str, Any]:
     """Create ACME key-change JWS"""
 
-    nonce = acme_nonce()
     inner_protected = {"alg": "ES256", "jwk": inner_jwk, "url": f"{ROOT_URL}{ACME_ROOT}/key-change"}
     inner_payload = {"account": kid, "oldKey": old_jwk}
 
@@ -256,7 +248,7 @@ def create_key_change_jws(
 
     inner_signature = to_base64url(priv_key2.sign(inner_signed_data.encode("utf-8"), ECDSA(SHA256())))
 
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/key-change"}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": f"{ROOT_URL}{ACME_ROOT}/key-change"}
     payload = {
         "protected": to_base64url(json.dumps(inner_protected, separators=(",", ":")).encode("utf-8")),
         "payload": to_base64url(json.dumps(inner_payload, separators=(",", ":")).encode("utf-8")),
@@ -268,8 +260,7 @@ def create_key_change_jws(
 def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
     """Create ACME update account JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "kid": kid, "nonce": nonce, "url": kid}
+    protected = {"alg": "ES256", "kid": kid, "nonce": acme_nonce(), "url": kid}
     payload = {
         "termsOfServiceAgreed": True,
         "contact": ["mailto:updated@example.org", "mailto:updated2@example.org"],
@@ -280,8 +271,7 @@ def create_update_account_jws(kid: str, priv_key: EllipticCurvePrivateKey) -> Di
 def create_new_account_jws(jwk: Dict[str, Any], priv_key: EllipticCurvePrivateKey) -> Dict[str, Any]:
     """Create ACME new account JWS"""
 
-    nonce = acme_nonce()
-    protected = {"alg": "ES256", "jwk": jwk, "nonce": nonce, "url": f"{ROOT_URL}{ACME_ROOT}/new-account"}
+    protected = {"alg": "ES256", "jwk": jwk, "nonce": acme_nonce(), "url": f"{ROOT_URL}{ACME_ROOT}/new-account"}
     payload = {
         "termsOfServiceAgreed": True,
         "contact": ["mailto:cert-admin@example.org", "mailto:cert-admin2@example.org"],
@@ -299,7 +289,7 @@ def send_request(url: str, data: Dict[str, Any], status_code: int) -> Tuple[Dict
         timeout=5,
         verify="./tls_certificate.pem",
     )
-    if not req.status_code == status_code:
+    if req.status_code != status_code:
         raise ValueError(f"HTTP status code was not {status_code}")
 
     response_data = json.loads(req.text)
@@ -315,6 +305,62 @@ class TestAcme(unittest.TestCase):
         ca_url = os.environ["CA_URL"]
     else:
         ca_url = ROOT_URL
+
+    def after_ok_challenge(self, kid: str, priv_key: EllipticCurvePrivateKey, order: str) -> None:
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key, order)
+        response_data, _ = send_request(f"{order}", acme_req, 200)
+        self.assertTrue(response_data["status"] == "ready")
+        finalize_url = response_data["finalize"]
+
+        # Send csr
+        acme_req = send_csr_jws(kid, priv_key, finalize_url)
+        response_data, _ = send_request(f"{finalize_url}", acme_req, 200)
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key, order)
+        response_data, _ = send_request(f"{order}", acme_req, 200)
+        self.assertTrue(response_data["status"] == "valid")
+        cert_url = response_data["certificate"]
+
+        # get cert
+        issued_cert_asn1 = asn1_x509.Certificate()
+        acme_req = get_authz_jws(kid, priv_key, cert_url)
+        req = requests.post(
+            cert_url,
+            headers={"Content-Type": "application/jose+json"},
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
+        certs = req.text.split("-----BEGIN CERTIFICATE-----")
+        self.assertTrue(len(certs) > 1)
+
+        for index, resp_cert in enumerate(certs):
+            if len(resp_cert) < 3:
+                continue
+
+            data = ("-----BEGIN CERTIFICATE-----" + resp_cert).encode("utf-8")
+            if asn1_pem.detect(data):
+                _, _, data = asn1_pem.unarmor(data)
+
+            cert_asn1 = asn1_x509.Certificate().load(data)
+            _ = cert_asn1.native
+
+            if index == 1:  # First cert in chain - the leaf
+                issued_cert_asn1 = asn1_x509.Certificate().load(data)
+
+        # Revoke cert
+        acme_req = revoke_cert_jws(kid, priv_key, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
+        req = requests.post(
+            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
+            headers={"Content-Type": "application/jose+json"},
+            json=acme_req,
+            timeout=10,
+            verify="./tls_certificate.pem",
+        )
+        self.assertTrue(req.status_code == 200)
 
     def test_acme_directory(self) -> None:
         """Test ACME directory"""
@@ -465,7 +511,6 @@ class TestAcme(unittest.TestCase):
 
         # New account
         jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
-        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
         acme_req = create_new_account_jws(jwk, priv_key)
         response_data, response_headers = send_request(f"{ROOT_URL}{ACME_ROOT}/new-account", acme_req, 201)
         kid = response_headers["Location"]
@@ -535,60 +580,7 @@ class TestAcme(unittest.TestCase):
         response_data, _ = send_request(f"{authz}", acme_req, 200)
         self.assertTrue(response_data["status"] == "valid")
 
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "ready")
-        finalize_url = response_data["finalize"]
-
-        # Send csr
-        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
-        response_data, _ = send_request(f"{finalize_url}", acme_req, 200)
-
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "valid")
-        cert_url = response_data["certificate"]
-
-        # get cert
-        issued_cert_asn1 = asn1_x509.Certificate()
-        acme_req = get_authz_jws(kid, priv_key2, cert_url)
-        req = requests.post(
-            cert_url,
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
-        certs = req.text.split("-----BEGIN CERTIFICATE-----")
-        self.assertTrue(len(certs) > 1)
-
-        for index, cert in enumerate(certs):
-            if len(cert) < 3:
-                continue
-
-            data = ("-----BEGIN CERTIFICATE-----" + cert).encode("utf-8")
-            if asn1_pem.detect(data):
-                _, _, data = asn1_pem.unarmor(data)
-
-            cert_asn1 = asn1_x509.Certificate().load(data)
-            _ = cert_asn1.native
-
-            if index == 1:  # First cert in chain - the leaf
-                issued_cert_asn1 = asn1_x509.Certificate().load(data)
-
-        # Revoke cert
-        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
-        req = requests.post(
-            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
+        self.after_ok_challenge(kid, priv_key2, order)
 
     def test_acme_pre_auth(self) -> None:
         """
@@ -599,7 +591,6 @@ class TestAcme(unittest.TestCase):
         public_key2 = priv_key2.public_key()
 
         jwk = pem_key_to_jwk(public_key2.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
-        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
         acme_req = create_new_account_jws(jwk, priv_key2)
         response_data, response_headers = send_request(f"{ROOT_URL}{ACME_ROOT}/new-account", acme_req, 201)
         kid = response_headers["Location"]
@@ -646,60 +637,7 @@ class TestAcme(unittest.TestCase):
         response_data, _ = send_request(f"{authz}", acme_req, 200)
         self.assertTrue(response_data["status"] == "valid")
 
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "ready")
-        finalize_url = response_data["finalize"]
-
-        # Send csr
-        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
-        response_data, _ = send_request(f"{finalize_url}", acme_req, 200)
-
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "valid")
-        cert_url = response_data["certificate"]
-
-        # get cert
-        issued_cert_asn1 = asn1_x509.Certificate()
-        acme_req = get_authz_jws(kid, priv_key2, cert_url)
-        req = requests.post(
-            cert_url,
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
-        certs = req.text.split("-----BEGIN CERTIFICATE-----")
-        self.assertTrue(len(certs) > 1)
-
-        for index, cert in enumerate(certs):
-            if len(cert) < 3:
-                continue
-
-            data = ("-----BEGIN CERTIFICATE-----" + cert).encode("utf-8")
-            if asn1_pem.detect(data):
-                _, _, data = asn1_pem.unarmor(data)
-
-            cert_asn1 = asn1_x509.Certificate().load(data)
-            _ = cert_asn1.native
-
-            if index == 1:  # First cert in chain - the leaf
-                issued_cert_asn1 = asn1_x509.Certificate().load(data)
-
-        # Revoke cert
-        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
-        req = requests.post(
-            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
+        self.after_ok_challenge(kid, priv_key2, order)
 
     def test_acme_pre_auth_sunet_token(self) -> None:
         """
@@ -811,60 +749,7 @@ class TestAcme(unittest.TestCase):
         response_data, _ = send_request(f"{orders}", acme_req, 200)
         order = response_data["orders"][0]
 
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "ready")
-        finalize_url = response_data["finalize"]
-
-        # Send csr
-        acme_req = send_csr_jws(kid, priv_key2, finalize_url)
-        response_data, _ = send_request(f"{finalize_url}", acme_req, 200)
-
-        # Get order after challenge
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "valid")
-        cert_url = response_data["certificate"]
-
-        # get cert
-        issued_cert_asn1 = asn1_x509.Certificate()
-        acme_req = get_authz_jws(kid, priv_key2, cert_url)
-        req = requests.post(
-            cert_url,
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
-        certs = req.text.split("-----BEGIN CERTIFICATE-----")
-        self.assertTrue(len(certs) > 1)
-
-        for index, resp_cert in enumerate(certs):
-            if len(resp_cert) < 3:
-                continue
-
-            data = ("-----BEGIN CERTIFICATE-----" + resp_cert).encode("utf-8")
-            if asn1_pem.detect(data):
-                _, _, data = asn1_pem.unarmor(data)
-
-            cert_asn1 = asn1_x509.Certificate().load(data)
-            _ = cert_asn1.native
-
-            if index == 1:  # First cert in chain - the leaf
-                issued_cert_asn1 = asn1_x509.Certificate().load(data)
-
-        # Revoke cert
-        acme_req = revoke_cert_jws(kid, priv_key2, f"{ROOT_URL}{ACME_ROOT}/revoke-cert", issued_cert_asn1)
-        req = requests.post(
-            f"{ROOT_URL}{ACME_ROOT}/revoke-cert",
-            headers={"Content-Type": "application/jose+json"},
-            json=acme_req,
-            timeout=10,
-            verify="./tls_certificate.pem",
-        )
-        self.assertTrue(req.status_code == 200)
+        self.after_ok_challenge(kid, priv_key2, order)
 
     def test_acme_challenge_fail(self) -> None:
         """
@@ -875,7 +760,6 @@ class TestAcme(unittest.TestCase):
         public_key = priv_key.public_key()
 
         jwk = pem_key_to_jwk(public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
-        # pub_key_pem1 = public_key.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8")
 
         # New account
         acme_req = create_new_account_jws(jwk, priv_key)
