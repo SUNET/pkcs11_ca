@@ -5,7 +5,7 @@ Test our public key creation
 import json
 import os
 import unittest
-from typing import Tuple
+from typing import Tuple, Union
 
 import requests
 from asn1crypto import pem as asn1_pem
@@ -19,21 +19,27 @@ from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
 
 
-def generate_keypair_secp521r1() -> Tuple[str, str]:
-    """Generate a secp521r1 keypair"""
-
-    # Generate new key
-    new_private_key = ec.generate_private_key(ec.SECP521R1())
-    new_private_key_pem = new_private_key.private_bytes(
+def keypair_data_from_private_key(
+    private_key: Union[ec.EllipticCurvePrivateKey, rsa.RSAPrivateKey, Ed25519PrivateKey, Ed448PrivateKey]
+) -> Tuple[str, str]:
+    new_private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
         encryption_algorithm=serialization.NoEncryption(),
     )
 
-    new_public_key_pem = new_private_key.public_key().public_bytes(
+    new_public_key_pem = private_key.public_key().public_bytes(
         encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
     )
     return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+
+
+def generate_keypair_secp521r1() -> Tuple[str, str]:
+    """Generate a secp521r1 keypair"""
+
+    # Generate new key
+    new_private_key = ec.generate_private_key(ec.SECP521R1())
+    return keypair_data_from_private_key(new_private_key)
 
 
 def generate_keypair_secp384r1() -> Tuple[str, str]:
@@ -41,16 +47,7 @@ def generate_keypair_secp384r1() -> Tuple[str, str]:
 
     # Generate new key
     new_private_key = ec.generate_private_key(ec.SECP384R1())
-    new_private_key_pem = new_private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+    return keypair_data_from_private_key(new_private_key)
 
 
 def generate_keypair_secp256r1() -> Tuple[str, str]:
@@ -58,16 +55,7 @@ def generate_keypair_secp256r1() -> Tuple[str, str]:
 
     # Generate new key
     new_private_key = ec.generate_private_key(ec.SECP256R1())
-    new_private_key_pem = new_private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+    return keypair_data_from_private_key(new_private_key)
 
 
 def generate_keypair_ed448() -> Tuple[str, str]:
@@ -75,16 +63,7 @@ def generate_keypair_ed448() -> Tuple[str, str]:
 
     # Generate new key
     new_private_key = Ed448PrivateKey.generate()
-    new_private_key_pem = new_private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+    return keypair_data_from_private_key(new_private_key)
 
 
 def generate_keypair_ed25519() -> Tuple[str, str]:
@@ -92,16 +71,7 @@ def generate_keypair_ed25519() -> Tuple[str, str]:
 
     # Generate new key
     new_private_key = Ed25519PrivateKey.generate()
-    new_private_key_pem = new_private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.PKCS8,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+    return keypair_data_from_private_key(new_private_key)
 
 
 def generate_keypair_rsa() -> Tuple[str, str]:
@@ -112,16 +82,7 @@ def generate_keypair_rsa() -> Tuple[str, str]:
         key_size=2048,
         public_exponent=65537,
     )
-    new_private_key_pem = new_private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    )
-
-    new_public_key_pem = new_private_key.public_key().public_bytes(
-        encoding=serialization.Encoding.PEM, format=serialization.PublicFormat.SubjectPublicKeyInfo
-    )
-    return new_private_key_pem.decode("utf-8"), new_public_key_pem.decode("utf-8")
+    return keypair_data_from_private_key(new_private_key)
 
 
 class TestPublicKey(unittest.TestCase):

@@ -306,7 +306,11 @@ class TestAcme(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
-    def create_new_order(self, kid: str, priv_key: EllipticCurvePrivateKey, orders: str) -> Tuple[str, str, str]:
+    def create_new_order(
+        self, kid: str, priv_key: EllipticCurvePrivateKey, orders: str
+    ) -> Tuple[str, str, Dict[str, str]]:
+        """Create and verify new order"""
+
         # Create new order
         acme_req = new_order_jws(kid, priv_key)
         response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
@@ -325,11 +329,14 @@ class TestAcme(unittest.TestCase):
         # Get authz
         acme_req = get_authz_jws(kid, priv_key, authz)
         response_data, _ = send_request(f"{authz}", acme_req, 200)
+        self.assertTrue("challenges" in response_data)
+        self.assertTrue(len(response_data["challenges"]) > 0)
         challenge = response_data["challenges"][0]
 
         return order, authz, challenge
 
     def after_ok_challenge(self, kid: str, priv_key: EllipticCurvePrivateKey, order: str) -> None:
+        """Verify order, submit a CSR, check the received cert and then revoke the cert"""
         # Get order after challenge
         acme_req = get_authz_jws(kid, priv_key, order)
         response_data, _ = send_request(f"{order}", acme_req, 200)
