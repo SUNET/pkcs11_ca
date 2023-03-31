@@ -5,7 +5,7 @@ Test our public key creation
 import json
 import os
 import unittest
-from typing import Tuple, Union
+from typing import Dict, Tuple, Union
 
 import requests
 from asn1crypto import pem as asn1_pem
@@ -22,6 +22,8 @@ from src.pkcs11_ca_service.config import ROOT_URL
 def keypair_data_from_private_key(
     private_key: Union[ec.EllipticCurvePrivateKey, rsa.RSAPrivateKey, Ed25519PrivateKey, Ed448PrivateKey]
 ) -> Tuple[str, str]:
+    """Keypair data from private key"""
+
     new_private_key_pem = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.PKCS8,
@@ -95,6 +97,22 @@ class TestPublicKey(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    def create_public_key(self, public_key_pem: str, request_headers: Dict[str, str]) -> PublicKeyInfo:
+        data = json.loads('{"pem": ' + '"' + public_key_pem.replace("\n", "\\n") + '"' + "}")
+        req = requests.post(
+            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        )
+        self.assertTrue(req.status_code == 200)
+
+        data = json.loads(req.text)["public_key"].encode("utf-8")
+        if asn1_pem.detect(data):
+            _, _, data = asn1_pem.unarmor(data)
+
+        test_key = PublicKeyInfo.load(data)
+        self.assertTrue(isinstance(test_key, PublicKeyInfo))
+        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        return test_key
+
     def public_key_load(self, pub_key: bytes, priv_key: bytes) -> None:
         """
         Test public keys loading
@@ -152,19 +170,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_ed25519()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "ed25519")
 
     def test_public_ed448(self) -> None:
@@ -183,19 +189,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_ed448()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "ed448")
 
     def test_public_secp256r1(self) -> None:
@@ -214,19 +208,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_secp256r1()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "ec")
         self.assertTrue(test_key["algorithm"]["parameters"].native == "secp256r1")
 
@@ -246,19 +228,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_secp384r1()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "ec")
         self.assertTrue(test_key["algorithm"]["parameters"].native == "secp384r1")
 
@@ -278,19 +248,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_secp521r1()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "ec")
         self.assertTrue(test_key["algorithm"]["parameters"].native == "secp521r1")
 
@@ -310,19 +268,7 @@ class TestPublicKey(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
 
         _, new_public_key = generate_keypair_rsa()
-        data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
-        req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
-
-        data = json.loads(req.text)["public_key"].encode("utf-8")
-        if asn1_pem.detect(data):
-            _, _, data = asn1_pem.unarmor(data)
-
-        test_key = PublicKeyInfo.load(data)
-        self.assertTrue(isinstance(test_key, PublicKeyInfo))
-        self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+        test_key = self.create_public_key(new_public_key, request_headers)
         self.assertTrue(isinstance(test_key["public_key"].native["modulus"], int))
         self.assertTrue(test_key["algorithm"]["algorithm"].native == "rsa")
 
