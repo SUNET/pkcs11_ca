@@ -26,7 +26,7 @@ RUN apt-get update \
     emacs-nox \
     bsdmainutils \
     curl \
-    && pip3 install -r /app/requirements.txt \
+    && pip3 install --require-hashes -r /app/requirements.txt \
     && apt-get autoremove -y
     
 
