@@ -5,7 +5,7 @@ Test our public key creation
 import json
 import os
 import unittest
-from typing import Dict, Tuple, Union
+from typing import Tuple, Union
 
 import requests
 from asn1crypto import pem as asn1_pem
@@ -88,6 +88,8 @@ def generate_keypair_rsa() -> Tuple[str, str]:
 
 
 def load_pub_key_priv_key() -> Tuple[bytes, bytes]:
+    """Load an authorized key"""
+
     with open("data/trusted_keys/privkey1.key", "rb") as f_data:
         priv_key = f_data.read()
     with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
@@ -106,7 +108,7 @@ class TestPublicKey(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
-    def create_public_key(self, pub_key: bytes, priv_key: bytes, public_key_pem: str, request_headers: Dict[str, str]) -> PublicKeyInfo:
+    def create_public_key(self, pub_key: bytes, priv_key: bytes, public_key_pem: str) -> PublicKeyInfo:
         """Create the public key"""
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
@@ -242,8 +244,6 @@ class TestPublicKey(unittest.TestCase):
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-
         _, new_public_key = generate_keypair_rsa()
         test_key = self.create_public_key(pub_key, priv_key, new_public_key)
         self.assertTrue(isinstance(test_key["public_key"].native["modulus"], int))
