@@ -306,6 +306,29 @@ class TestAcme(unittest.TestCase):
     else:
         ca_url = ROOT_URL
 
+    def create_new_order(self, kid: str, priv_key: EllipticCurvePrivateKey, orders: str) -> Tuple[str, str, str]:
+        # Create new order
+        acme_req = new_order_jws(kid, priv_key)
+        response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
+        authz = response_data["authorizations"][0]
+
+        # List orders
+        acme_req = get_orders_jws(kid, priv_key, orders)
+        response_data, _ = send_request(f"{orders}", acme_req, 200)
+        order = response_data["orders"][0]
+
+        # Get order
+        acme_req = get_authz_jws(kid, priv_key, order)
+        response_data, _ = send_request(f"{order}", acme_req, 200)
+        self.assertTrue(response_data["status"] == "pending")
+
+        # Get authz
+        acme_req = get_authz_jws(kid, priv_key, authz)
+        response_data, _ = send_request(f"{authz}", acme_req, 200)
+        challenge = response_data["challenges"][0]
+
+        return order, authz, challenge
+
     def after_ok_challenge(self, kid: str, priv_key: EllipticCurvePrivateKey, order: str) -> None:
         # Get order after challenge
         acme_req = get_authz_jws(kid, priv_key, order)
@@ -543,25 +566,7 @@ class TestAcme(unittest.TestCase):
         acme_req = create_update_account_jws(kid, priv_key2)
         response_data, _ = send_request(f"{kid}", acme_req, 200)
 
-        # Create new order
-        acme_req = new_order_jws(kid, priv_key2)
-        response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
-        authz = response_data["authorizations"][0]
-
-        # List orders
-        acme_req = get_orders_jws(kid, priv_key2, orders)
-        response_data, _ = send_request(f"{orders}", acme_req, 200)
-        order = response_data["orders"][0]
-
-        # Get order
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "pending")
-
-        # Get authz
-        acme_req = get_authz_jws(kid, priv_key2, authz)
-        response_data, _ = send_request(f"{authz}", acme_req, 200)
-        challenge = response_data["challenges"][0]
+        order, authz, challenge = self.create_new_order(kid, priv_key2, orders)
 
         # Handle acme challenge in background http server
         key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk2))}"
@@ -590,6 +595,7 @@ class TestAcme(unittest.TestCase):
         priv_key2 = generate_private_key(SECP256R1())
         public_key2 = priv_key2.public_key()
 
+        # New account
         jwk = pem_key_to_jwk(public_key2.public_bytes(Encoding.PEM, PublicFormat.SubjectPublicKeyInfo).decode("utf-8"))
         acme_req = create_new_account_jws(jwk, priv_key2)
         response_data, response_headers = send_request(f"{ROOT_URL}{ACME_ROOT}/new-account", acme_req, 201)
@@ -600,25 +606,7 @@ class TestAcme(unittest.TestCase):
         acme_req = new_authz_jws(kid, priv_key2)
         response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-authz", acme_req, 201)
 
-        # Create new order
-        acme_req = new_order_jws(kid, priv_key2)
-        response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
-        authz = response_data["authorizations"][0]
-
-        # List orders
-        acme_req = get_orders_jws(kid, priv_key2, orders)
-        response_data, _ = send_request(f"{orders}", acme_req, 200)
-        order = response_data["orders"][0]
-
-        # Get order
-        acme_req = get_authz_jws(kid, priv_key2, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "pending")
-
-        # Get authz
-        acme_req = get_authz_jws(kid, priv_key2, authz)
-        response_data, _ = send_request(f"{authz}", acme_req, 200)
-        challenge = response_data["challenges"][0]
+        order, authz, challenge = self.create_new_order(kid, priv_key2, orders)
 
         # Handle acme challenge in background http server
         key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk))}"
@@ -767,25 +755,7 @@ class TestAcme(unittest.TestCase):
         kid = response_headers["Location"]
         orders = response_data["orders"]
 
-        # Create new order
-        acme_req = new_order_jws(kid, priv_key)
-        response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
-        authz = response_data["authorizations"][0]
-
-        # List orders
-        acme_req = get_orders_jws(kid, priv_key, orders)
-        response_data, _ = send_request(f"{orders}", acme_req, 200)
-        order = response_data["orders"][0]
-
-        # Get order
-        acme_req = get_authz_jws(kid, priv_key, order)
-        response_data, _ = send_request(f"{order}", acme_req, 200)
-        self.assertTrue(response_data["status"] == "pending")
-
-        # Get authz
-        acme_req = get_authz_jws(kid, priv_key, authz)
-        response_data, _ = send_request(f"{authz}", acme_req, 200)
-        challenge = response_data["challenges"][0]
+        order, authz, challenge = self.create_new_order(kid, priv_key, orders)
 
         # Handle acme challenge in background http server with an invalid key_authorization
         key_authorization = f"{challenge['token']}.{to_base64url(jwk_thumbprint(jwk))[:-2]}"
