@@ -131,6 +131,29 @@ def pem_cert_to_name_dict(pem: str) -> Dict[str, str]:
     return ret
 
 
+def _public_key_verify_ecdsa_signature(pub_key: EllipticCurvePublicKey, signature: bytes, signed_data: bytes) -> None:
+    if pub_key.curve.name == "secp256r1":
+        try:
+            pub_key.verify(signature, signed_data, ECDSA(SHA256()))
+        except InvalidSignature:
+            converted_signature = convert_rs_ec_signature(signature, "secp256r1")
+            pub_key.verify(converted_signature, signed_data, ECDSA(SHA256()))
+    elif pub_key.curve.name == "secp384r1":
+        try:
+            pub_key.verify(signature, signed_data, ECDSA(SHA384()))
+        except InvalidSignature:
+            converted_signature = convert_rs_ec_signature(signature, "secp384r1")
+            pub_key.verify(converted_signature, signed_data, ECDSA(SHA384()))
+    elif pub_key.curve.name == "secp521r1":
+        try:
+            pub_key.verify(signature, signed_data, ECDSA(SHA512()))
+        except InvalidSignature:
+            converted_signature = convert_rs_ec_signature(signature, "secp521r1")
+            pub_key.verify(converted_signature, signed_data, ECDSA(SHA512()))
+    else:
+        raise ValueError("Unsupported EC curve")
+
+
 def public_key_verify_signature(  # pylint: disable=too-many-branches
     public_key_info_pem: str, signature: bytes, signed_data: bytes
 ) -> None:
@@ -159,26 +182,7 @@ def public_key_verify_signature(  # pylint: disable=too-many-branches
             pub_key.verify(signature, signed_data, PKCS1v15(), SHA512())
 
     elif isinstance(pub_key, EllipticCurvePublicKey):
-        if pub_key.curve.name == "secp256r1":
-            try:
-                pub_key.verify(signature, signed_data, ECDSA(SHA256()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(signature, "secp256r1")
-                pub_key.verify(converted_signature, signed_data, ECDSA(SHA256()))
-        elif pub_key.curve.name == "secp384r1":
-            try:
-                pub_key.verify(signature, signed_data, ECDSA(SHA384()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(signature, "secp384r1")
-                pub_key.verify(converted_signature, signed_data, ECDSA(SHA384()))
-        elif pub_key.curve.name == "secp521r1":
-            try:
-                pub_key.verify(signature, signed_data, ECDSA(SHA512()))
-            except InvalidSignature:
-                converted_signature = convert_rs_ec_signature(signature, "secp521r1")
-                pub_key.verify(converted_signature, signed_data, ECDSA(SHA512()))
-        else:
-            raise ValueError("Unsupported EC curve")
+        _public_key_verify_ecdsa_signature(pub_key, signature, signed_data)
 
     elif isinstance(pub_key, (Ed25519PublicKey, Ed448PublicKey)):
         pub_key.verify(signature, signed_data)
@@ -608,12 +612,15 @@ def cert_revoked_time(serial_number: int, pem: str) -> Tuple[datetime.datetime, 
         _, _, data = asn1_pem.unarmor(data)
     crl = asn1_crl.CertificateList().load(data)
 
-    if len(crl["tbs_cert_list"]["revoked_certificates"]) != 0:
-        for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
-            if serial_number == revoked["user_certificate"].native:
-                for _, ext in enumerate(revoked["crl_entry_extensions"]):
-                    if ext["extn_id"].dotted == "2.5.29.21":
-                        return revoked["revocation_date"].native, asn1_crl.CRLReason(ext["extn_value"].native)
+    if len(crl["tbs_cert_list"]["revoked_certificates"]) == 0:
+        raise ValueError
+
+    for _, revoked in enumerate(crl["tbs_cert_list"]["revoked_certificates"]):
+        if serial_number == revoked["user_certificate"].native:
+            for _, ext in enumerate(revoked["crl_entry_extensions"]):
+                if ext["extn_id"].dotted == "2.5.29.21":
+                    return revoked["revocation_date"].native, asn1_crl.CRLReason(ext["extn_value"].native)
+
     raise ValueError
 
 
