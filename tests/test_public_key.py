@@ -87,6 +87,15 @@ def generate_keypair_rsa() -> Tuple[str, str]:
     return keypair_data_from_private_key(new_private_key)
 
 
+def load_pub_key_priv_key() -> Tuple[bytes, bytes]:
+    with open("data/trusted_keys/privkey1.key", "rb") as f_data:
+        priv_key = f_data.read()
+    with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
+        pub_key = f_data.read()
+
+    return pub_key, priv_key
+
+
 class TestPublicKey(unittest.TestCase):
     """
     Test our public keys
@@ -158,12 +167,7 @@ class TestPublicKey(unittest.TestCase):
         """
         Test public keys
         """
-
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -177,12 +181,7 @@ class TestPublicKey(unittest.TestCase):
         """
         Test public keys
         """
-
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -197,11 +196,7 @@ class TestPublicKey(unittest.TestCase):
         Test public keys
         """
 
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -217,11 +212,7 @@ class TestPublicKey(unittest.TestCase):
         Test public keys
         """
 
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -237,11 +228,7 @@ class TestPublicKey(unittest.TestCase):
         Test public keys
         """
 
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -257,11 +244,7 @@ class TestPublicKey(unittest.TestCase):
         Test public keys
         """
 
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
-
+        pub_key, priv_key = load_pub_key_priv_key()
         self.public_key_load(pub_key, priv_key)
 
         # Create and post a key
@@ -277,10 +260,7 @@ class TestPublicKey(unittest.TestCase):
         Test public keys admin setting
         """
 
-        with open("data/trusted_keys/privkey1.key", "rb") as f_data:
-            priv_key = f_data.read()
-        with open("data/trusted_keys/pubkey1.pem", "rb") as f_data:
-            pub_key = f_data.read()
+        pub_key, priv_key = load_pub_key_priv_key()
 
         # Create and post a non admin key
         new_private_key, new_public_key = generate_keypair_rsa()
