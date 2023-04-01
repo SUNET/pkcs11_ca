@@ -54,7 +54,7 @@ class TestAuth(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 401)
 
-        # Wrong nonce, non valid base64 encoding
+        # Wrong nonce, non-valid base64 encoding
         jwt_headers = {
             "nonce": "AJCmF5Qw-7Dhp93FWDFY1jyQ506UNSz7brPG35bx6sR-3s8pyMhjgEqbXQqN2CQOr_kyZKcyWfyDiGRaK9Hasd!!Qgg",
             "url": self.ca_url + "/ca",
@@ -127,31 +127,25 @@ class TestAuth(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 401)
 
-        # Correct auth, HEAD nonce
-        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
-        nonce = req.headers["Replay-Nonce"]
-        self.assertTrue(req.status_code == 200)
-        jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
-        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
-        request_headers = {"Authorization": "Bearer " + encoded}
-        req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
+        # Correct auth, HEAD AND GET nonce
+        for method in ["GET", "HEAD"]:
+            if method == "GET":
+                req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+            elif method == "HEAD":
+                req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+            else:
+                raise ValueError("Only supports ['HEAD', 'GET']")
 
-        # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
-        nonce = req.headers["Replay-Nonce"]
-        self.assertTrue(req.status_code == 200)
-        jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
-        jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
-        encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
-        request_headers = {"Authorization": "Bearer " + encoded}
-        req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
-        )
-        self.assertTrue(req.status_code == 200)
+            nonce = req.headers["Replay-Nonce"]
+            self.assertTrue(req.status_code == 200)
+            jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
+            jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
+            encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
+            request_headers = {"Authorization": "Bearer " + encoded}
+            req = requests.get(
+                self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            )
+            self.assertTrue(req.status_code == 200)
 
         # Test lib auth
         request_headers = {"Authorization": create_jwt_header_str(pub_key1, priv_key1, self.ca_url + "/search/ca")}
@@ -162,7 +156,7 @@ class TestAuth(unittest.TestCase):
 
     def test_aia_cdp_auth(self) -> None:
         """
-        No auth for these but 404 when non existing url
+        No auth for these but 404 when non-existing url
         """
 
         req = requests.get(self.ca_url + "/ca/acac22352343423", timeout=10, verify="./tls_certificate.pem")
@@ -326,6 +320,7 @@ class TestAuth(unittest.TestCase):
         req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
+
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
         jwk_key_data = pem_key_to_jwk(pub_key8.decode("utf-8"))
         encoded = jwt.encode(jwk_key_data, priv_key10.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
