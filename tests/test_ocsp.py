@@ -148,10 +148,8 @@ class TestOCSP(unittest.TestCase):
 
         if post is None:
             _, ocsp_response_rev = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-            print("gg")
         else:
             _, ocsp_response_rev = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
-            print("yy")
 
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_rev)
         self.assertTrue(
@@ -228,8 +226,8 @@ class TestOCSP(unittest.TestCase):
         i_n_h, i_n_k, serial, _ = certificate_ocsp_data(new_ca_ok)
         request_certs_data.append((i_n_h, i_n_k, serial))
 
-        ocsp_request_bytes = asyncio.run(request(request_certs_data))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
+        ocsp_request_bytes_a = asyncio.run(request(request_certs_data))
+        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes_a)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
@@ -247,9 +245,9 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(req.status_code == 200)
 
         if post is None:
-            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes_a)}")
         else:
-            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes_a)
 
             self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_mix)
             self.assertTrue(
@@ -299,10 +297,8 @@ class TestOCSP(unittest.TestCase):
 
         if post is None:
             _, ocsp_response_ext = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-            print("gg")
         else:
             _, ocsp_response_ext = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
-            print("yy")
 
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_ext)
         self.assertTrue(
