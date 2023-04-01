@@ -21,7 +21,6 @@ from fastapi.background import BackgroundTasks
 from fastapi.responses import JSONResponse
 from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
 from requests.exceptions import ConnectionError as requestsConnectionError
-from requests.exceptions import ConnectTimeout as requestsConnectTimeout
 
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
 from .acme_authorization import (

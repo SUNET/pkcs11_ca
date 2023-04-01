@@ -7,7 +7,7 @@ import json
 import os
 import unittest
 from secrets import token_bytes
-from typing import Union
+from typing import Tuple, Union
 
 import requests
 from asn1crypto import ocsp as asn1_ocsp
@@ -43,6 +43,19 @@ class TestOCSP(unittest.TestCase):
         "common_name": "ca-test-ocsp-45.sunet.se",
     }
 
+    def _ocsp_request(
+        self, url: str, ocsp_request_bytes: Union[bytes, None] = None
+    ) -> Tuple[bytes, asn1_ocsp.OCSPResponse]:
+        if ocsp_request_bytes is None:
+            data = self._submit_req("GET", url)
+        else:
+            data = self._submit_req("POST", url, ocsp_request_bytes)
+
+        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
+        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        _ = ocsp_response.native
+        return data, ocsp_response
+
     def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp: asn1_ocsp.OCSPResponse) -> None:
         self.assertTrue(
             len(resp["response_bytes"]["response"].native["tbs_response_data"]["responses"])
@@ -73,9 +86,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # GET
-        data = self._submit_req("GET", ocsp_url + ocsp_encode(ocsp_request_bytes))
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -91,9 +102,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(found)
 
         # POST
-        data = self._submit_req("POST", ocsp_url, ocsp_request_bytes)
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -137,45 +146,29 @@ class TestOCSP(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        # GET
-        data = self._submit_req("GET", ocsp_url + ocsp_encode(ocsp_request_bytes))
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
-                "revocation_reason"
-            ]
-            == "cessation_of_operation"
-        )
-        self.assertTrue(
-            isinstance(
+        # GET and POST
+        for method in ["GET", "POST"]:
+            if method == "GET":
+                _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
+            elif method == "POST":
+                _, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
+            else:
+                raise ValueError("Must be in ['GET', 'POST']")
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self.assertTrue(
                 ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
-                    "revocation_time"
-                ],
-                datetime.datetime,
+                    "revocation_reason"
+                ]
+                == "cessation_of_operation"
             )
-        )
-
-        # POST
-        data = self._submit_req("POST", ocsp_url, ocsp_request_bytes)
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
-                "revocation_reason"
-            ]
-            == "cessation_of_operation"
-        )
-        self.assertTrue(
-            isinstance(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
-                    "revocation_time"
-                ],
-                datetime.datetime,
+            self.assertTrue(
+                isinstance(
+                    ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0][
+                        "cert_status"
+                    ]["revocation_time"],
+                    datetime.datetime,
+                )
             )
-        )
 
     def test_ocsp_fail(self) -> None:
         """
@@ -192,9 +185,7 @@ class TestOCSP(unittest.TestCase):
         ocsp_request_bytes = asyncio.run(request(request_certs_data))
 
         # GET
-        data = self._submit_req("GET", self.ca_url + "/ocsp/" + ocsp_encode(ocsp_request_bytes))
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # POST
@@ -250,9 +241,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(req.status_code == 200)
 
         # GET
-        data = self._submit_req("GET", self.ca_url + "/ocsp/" + ocsp_encode(ocsp_request_bytes))
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -271,9 +260,7 @@ class TestOCSP(unittest.TestCase):
         )
 
         # POST
-        data = self._submit_req("POST", self.ca_url + "/ocsp/", ocsp_request_bytes)
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/", ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -312,9 +299,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # GET
-        data = self._submit_req("GET", ocsp_url + ocsp_encode(ocsp_request_bytes))
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
@@ -329,9 +314,7 @@ class TestOCSP(unittest.TestCase):
         )
 
         # POST
-        data = self._submit_req("POST", ocsp_url, ocsp_request_bytes)
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
