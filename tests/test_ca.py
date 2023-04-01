@@ -17,6 +17,8 @@ from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
 
 from .lib import cdp_url, create_i_ca, verify_cert, verify_pkcs11_ca_tls_cert
 
+ORGANIZATIONAL_UNIT_NAME = "SUNET Infrastructure"
+
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
 with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
@@ -39,7 +41,7 @@ class TestCa(unittest.TestCase):
         # Get a ca
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/ca")}
 
-        data = json.loads('{"pem": ' + '"' + cas[-1].replace("\n", "\\n") + '"' + "}")
+        data = {"pem": cas[-1]}
         req = requests.post(
             self.ca_url + "/search/ca",
             headers=request_headers,
@@ -60,7 +62,7 @@ class TestCa(unittest.TestCase):
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm",
             "organization_name": "SUNET",
-            "organizational_unit_name": "SUNET Infrastructure",
+            "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
             "common_name": "ca-test-create-13.sunet.se",
         }
 
@@ -88,7 +90,7 @@ class TestCa(unittest.TestCase):
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET",
-            "organizational_unit_name": "SUNET Infrastructure",
+            "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
             "common_name": "ca-test-create-17.sunet.se",
         }
 
@@ -97,8 +99,7 @@ class TestCa(unittest.TestCase):
         # Create a root ca
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
-        data = json.loads('{"key_label": ' + '"' + new_key_label[:-2] + '"' + "}")
-        data["name_dict"] = name_dict
+        data = {"key_label": new_key_label[:-2], "name_dict": name_dict}
 
         req = requests.post(
             self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
@@ -131,7 +132,7 @@ class TestCa(unittest.TestCase):
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET_ca",
-            "organizational_unit_name": "SUNET Infrastructure",
+            "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
             "common_name": "ca-test-create-20.sunet.se",
         }
 
@@ -186,7 +187,7 @@ class TestCa(unittest.TestCase):
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET_ca",
-            "organizational_unit_name": "SUNET Infrastructure",
+            "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
             "common_name": "ca-test-create-21.sunet.se",
         }
 
@@ -195,16 +196,18 @@ class TestCa(unittest.TestCase):
             "state_or_province_name": "Stockholm",
             "locality_name": "Stockholm_test",
             "organization_name": "SUNET_ca",
-            "organizational_unit_name": "SUNET Infrastructure",
+            "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
             "common_name": "ca-test-create-31.sunet.se",
         }
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data["name_dict"] = name_dict
-        data["issuer_pem"] = create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict)
-        data["key_type"] = "dummy_not_exist"
+        data = {
+            "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+            "name_dict": name_dict,
+            "issuer_pem": create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict),
+            "key_type": "dummy_not_exist",
+        }
 
         req = requests.post(
             self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
@@ -222,7 +225,7 @@ class TestCa(unittest.TestCase):
                 "state_or_province_name": "Stockholm",
                 "locality_name": "Stockholm_test",
                 "organization_name": "SUNET_ca",
-                "organizational_unit_name": "SUNET Infrastructure",
+                "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
                 "common_name": "ca-test-create-22-" + key_type + ".sunet.se",
             }
             issuer_name_dict = {
@@ -230,16 +233,18 @@ class TestCa(unittest.TestCase):
                 "state_or_province_name": "Stockholm",
                 "locality_name": "Stockholm_test",
                 "organization_name": "SUNET_ca",
-                "organizational_unit_name": "SUNET Infrastructure",
+                "organizational_unit_name": ORGANIZATIONAL_UNIT_NAME,
                 "common_name": "ca-test-create-32-" + key_type + ".sunet.se",
             }
 
             request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
-            data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-            data["name_dict"] = name_dict
-            data["issuer_pem"] = create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict)
-            data["key_type"] = key_type
+            data = {
+                "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+                "name_dict": name_dict,
+                "issuer_pem": create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict),
+                "key_type": key_type,
+            }
 
             req = requests.post(
                 self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()

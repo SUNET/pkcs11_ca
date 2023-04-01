@@ -12,6 +12,8 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import verify_pkcs11_ca_tls_cert
 
+PUBLIC_KEY_ENDPOINT = "/public_key"
+
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
 with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
@@ -43,27 +45,30 @@ class TestValidate(unittest.TestCase):
         }
 
         # Test @ and key_label
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-        data = json.loads('{"key_label": ' + '"' + "dummy_string@" + '"' + "}")
-        data["name_dict"] = name_dict
-        data["issuer_pem"] = "dummyhere"
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
+        data = {
+            "key_label": "dummy_string@",
+            "name_dict": name_dict,
+            "issuer_pem": "dummyhere",
+        }
         req = requests.post(
             self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 400)
 
         # Test char ;
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data[
-            "pem"
-        ] = """-----BEGIN PUBLIC KEY-----
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
+        data = {
+            "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+            "pem": """-----BEGIN PUBLIC KEY-----
 MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE;ZB6raA
 -----END PUBLIC KEY-----
-"""
+""",
+        }
+
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
@@ -72,19 +77,20 @@ Tj5zjeJiywSdOZnFPloeE;ZB6raA
         self.assertTrue(req.status_code == 400)
 
         # Test char "
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data["pem"] = (
-            """-----BEGIN PUBLIC KEY-----
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
+
+        data = {
+            "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+            "pem": """-----BEGIN PUBLIC KEY-----
 MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE"""
             + '"'
             + """ZB6raA
 -----END PUBLIC KEY-----
-"""
-        )
+""",
+        }
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
@@ -93,17 +99,17 @@ Tj5zjeJiywSdOZnFPloeE"""
         self.assertTrue(req.status_code == 400)
 
         # Test char '
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data[
-            "pem"
-        ] = """-----BEGIN PUBLIC KEY-----
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
+        data = {
+            "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+            "pem": """-----BEGIN PUBLIC KEY-----
 MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeE'ZB6raA
 -----END PUBLIC KEY-----
-"""
+""",
+        }
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
@@ -112,17 +118,17 @@ Tj5zjeJiywSdOZnFPloeE'ZB6raA
         self.assertTrue(req.status_code == 400)
 
         # Test ok chars
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
-        data = json.loads('{"key_label": ' + '"' + hex(int.from_bytes(os.urandom(20), "big") >> 1) + '"' + "}")
-        data[
-            "pem"
-        ] = """-----BEGIN PUBLIC KEY-----
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
+        data = {
+            "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
+            "pem": """-----BEGIN PUBLIC KEY-----
 MEMwBQYDK2VxAzoAV8X2UCh13YJ94P2qZ2cdo6B8RHF9N9nzqdf40Chr+99aAIAn
 Tj5zjeJiywSdOZnFPloeEMZB6raA
 -----END PUBLIC KEY-----
-"""
+""",
+        }
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,

@@ -14,6 +14,8 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
+SEARCH_CERTIFICATE_ENDPOINT = "/search/certificate"
+
 
 class TestCertificate(unittest.TestCase):
     """
@@ -77,10 +79,13 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 
         # Get ALL certificates, currently the database limits this to the last 20 issued by the PKCS11 CA
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + SEARCH_CERTIFICATE_ENDPOINT)
         }
         req = requests.get(
-            self.ca_url + "/search/certificate", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_CERTIFICATE_ENDPOINT,
+            headers=request_headers,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
@@ -89,11 +94,11 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 
         # Search for certificates
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + SEARCH_CERTIFICATE_ENDPOINT)
         }
         data = json.loads('{"pem": ' + '"' + certs[0].replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/search/certificate",
+            self.ca_url + SEARCH_CERTIFICATE_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
