@@ -29,6 +29,16 @@ with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
     pub_key = file_data.read()
 
 
+def load_ocsp_request(ocsp_request_bytes: bytes) -> asn1_ocsp.OCSPRequest:
+    """Load and check ocsp request"""
+
+    ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
+    if not isinstance(ocsp_request, asn1_ocsp.OCSPRequest):
+        raise ValueError("Problem with ocsp request data")
+    _ = ocsp_request.native
+    return ocsp_request
+
+
 class TestOCSP(unittest.TestCase):
     """
     Test our OCSP
@@ -59,15 +69,15 @@ class TestOCSP(unittest.TestCase):
         _ = ocsp_response.native
         return data, ocsp_response
 
-    def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp_check: asn1_ocsp.OCSPResponse) -> None:
+    def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp: asn1_ocsp.OCSPResponse) -> None:
         self.assertTrue(
-            len(resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"])
+            len(resp["response_bytes"]["response"].native["tbs_response_data"]["responses"])
             == len(req["tbs_request"]["request_list"])
         )
 
-        for index, _ in enumerate(resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"]):
+        for index, _ in enumerate(resp["response_bytes"]["response"].native["tbs_response_data"]["responses"]):
             self.assertTrue(
-                resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"][index]["cert_id"]
+                resp["response_bytes"]["response"].native["tbs_response_data"]["responses"][index]["cert_id"]
                 == req["tbs_request"]["request_list"][index]["req_cert"].native
             )
 
@@ -85,8 +95,7 @@ class TestOCSP(unittest.TestCase):
         i_n_h, i_n_k, serial, ocsp_url = certificate_ocsp_data(cert_pem)
 
         ocsp_request_bytes = asyncio.run(request([(i_n_h, i_n_k, serial)]))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
-        self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
+        ocsp_request = load_ocsp_request(ocsp_request_bytes)
 
         _, ocsp_response = self._ocsp_request(post, f"{ocsp_url}", ocsp_request_bytes)
 
@@ -124,8 +133,7 @@ class TestOCSP(unittest.TestCase):
         new_ca = create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)
         i_n_h, i_n_k, serial, ocsp_url = certificate_ocsp_data(new_ca)
         ocsp_request_bytes = asyncio.run(request([(i_n_h, i_n_k, serial)]))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
-        self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
+        ocsp_request = load_ocsp_request(ocsp_request_bytes)
 
         # Revoke cert
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + REVOKE_ENDPOINT)}
@@ -219,8 +227,7 @@ class TestOCSP(unittest.TestCase):
         request_certs_data.append((i_n_h, i_n_k, serial))
 
         ocsp_request_bytes = asyncio.run(request(request_certs_data))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
-        self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
+        ocsp_request = load_ocsp_request(ocsp_request_bytes)
 
         # Revoke cert
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + REVOKE_ENDPOINT)}
@@ -277,8 +284,7 @@ class TestOCSP(unittest.TestCase):
         extra_extensions.append(nonce_ext)
 
         ocsp_request_bytes = asyncio.run(request([(i_n_h, i_n_k, serial)], extra_extensions=extra_extensions))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
-        self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
+        ocsp_request = load_ocsp_request(ocsp_request_bytes)
 
         _, ocsp_response_ext = self._ocsp_request(post, f"{ocsp_url}", ocsp_request_bytes)
 
