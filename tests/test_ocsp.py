@@ -90,37 +90,28 @@ class TestOCSP(unittest.TestCase):
         ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
-        # GET
-        _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "good"
-        )
-        # Ensure we support extended_revoke
-        found = False
-        for _, ext in enumerate(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"]
-        ):
-            if ext["extn_id"] == "extended_revoke":
-                found = True
-        self.assertTrue(found)
+        for method in ["GET", "POST"]:
+            if method == "GET":
+                _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
+            elif method == "POST":
+                _, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
+            else:
+                raise ValueError("Must be in ['GET', 'POST']")
 
-        # POST
-        _, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "good"
-        )
-        # Ensure we support extended_revoke
-        found = False
-        for _, ext in enumerate(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"]
-        ):
-            if ext["extn_id"] == "extended_revoke":
-                found = True
-        self.assertTrue(found)
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+                == "good"
+            )
+
+            # Ensure we support extended_revoke
+            found = False
+            for _, ext in enumerate(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"]
+            ):
+                if ext["extn_id"] == "extended_revoke":
+                    found = True
+            self.assertTrue(found)
 
     def test_ocsp(self) -> None:
         """
@@ -198,9 +189,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # POST
-        data = self._submit_req("POST", self.ca_url + OCSP_ENDPOINT, ocsp_request_bytes)
-        ocsp_response = asn1_ocsp.OCSPResponse().load(data)
-        self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # GET
@@ -251,44 +240,29 @@ class TestOCSP(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        # GET
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "unknown"
-        )
+        for method in ["GET", "POST"]:
+            if method == "GET":
+                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+            elif method == "POST":
+                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+            else:
+                raise ValueError("Must be in ['GET', 'POST']")
 
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
-                "revocation_reason"
-            ]
-            == "cessation_of_operation"
-        )
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
-            == "good"
-        )
-
-        # POST
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "unknown"
-        )
-
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
-                "revocation_reason"
-            ]
-            == "cessation_of_operation"
-        )
-
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
-            == "good"
-        )
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+                == "unknown"
+            )
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
+                    "revocation_reason"
+                ]
+                == "cessation_of_operation"
+            )
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
+                == "good"
+            )
 
     def test_ocsp_extensions(self) -> None:
         """
@@ -309,35 +283,26 @@ class TestOCSP(unittest.TestCase):
         ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
-        # GET
-        _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
-                "extn_value"
-            ]
-            == nonce_val
-        )
+        for method in ["GET", "POST"]:
+            if method == "GET":
+                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+            elif method == "POST":
+                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+            else:
+                raise ValueError("Must be in ['GET', 'POST']")
 
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "good"
-        )
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
+                    "extn_value"
+                ]
+                == nonce_val
+            )
 
-        # POST
-        _, ocsp_response = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
-        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
-                "extn_value"
-            ]
-            == nonce_val
-        )
-
-        self.assertTrue(
-            ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
-            == "good"
-        )
+            self.assertTrue(
+                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+                == "good"
+            )
 
     def test_ocsp_cert(self) -> None:
         """
