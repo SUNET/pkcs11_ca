@@ -4,7 +4,7 @@ import json
 import os
 import subprocess
 from hashlib import sha256
-from typing import Dict
+from typing import Any, Dict, OrderedDict, Union
 
 import requests
 from asn1crypto import pem as asn1_pem
@@ -15,6 +15,7 @@ from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 def verify_pkcs11_ca_tls_cert() -> str:
     """Verify the PKCS11 CA TLS connection with this certificate"""
+
     return "./tls_certificate.pem"
 
 
@@ -39,7 +40,7 @@ def create_root_ca(root_url: str, pub_key: bytes, priv_key: bytes) -> str:
     data["name_dict"] = name_dict
 
     req = requests.post(
-        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
     )
     if req.status_code != 200:
         raise ValueError("Could not create root CA")
@@ -63,7 +64,7 @@ def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[
     data["issuer_pem"] = root_ca_pem
 
     req = requests.post(
-        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+        root_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
     )
     if req.status_code != 200:
         raise ValueError("NOT OK posting a new CA")
@@ -71,6 +72,13 @@ def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[
     if len(new_ca) < 10 or not isinstance(new_ca, str):
         raise ValueError("Problem with new CA")
     return new_ca
+
+
+def cdp_url_point(point: OrderedDict[str, Any]) -> Union[str, None]:
+    for _, name in enumerate(point["distribution_point"]):
+        if "/crl/" in name:
+            ret: str = name
+            return ret
 
 
 def cdp_url(pem: str) -> str:
@@ -84,17 +92,33 @@ def cdp_url(pem: str) -> str:
     for _, extension in enumerate(tbs["extensions"]):
         if extension["extn_id"].dotted == "2.5.29.31":
             for _, point in enumerate(extension["extn_value"].native):
-                for _, name in enumerate(point["distribution_point"]):
-                    if "/crl/" in name:
-                        ret: str = name
-                        return ret
+                ret = cdp_url_point(point)
+                if isinstance(ret, str):
+                    return ret
 
     raise ValueError
 
 
+def ca_url_from_cert(cert: asn1_x509.Certificate) -> Union[str, None]:
+    """CA URL from AIA extension CA Issuers field"""
+
+    tbs = cert["tbs_certificate"]
+
+    for _, extension in enumerate(tbs["extensions"]):
+        if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
+            for _, descr in enumerate(extension["extn_value"].native):
+                if descr["access_method"] == "ca_issuers":
+                    url_ca: str = descr["access_location"]
+                    return url_ca
+
+    return
+
+
 def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
     """Get CA for cert, recursive function"""
+
     curr_chain = b""
+
     if not leaf and os.path.isfile(path):
         with open(path, "rb") as f_data:
             curr_chain = f_data.read()
@@ -110,18 +134,11 @@ def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
             if len(curr_chain) > 3:
                 f_data.write(curr_chain)
 
-    tbs = cert["tbs_certificate"]
-    url_ca = ""
-    for _, extension in enumerate(tbs["extensions"]):
-        if extension["extn_id"].dotted == "1.3.6.1.5.5.7.1.1":
-            for _, descr in enumerate(extension["extn_value"].native):
-                if descr["access_method"] == "ca_issuers":
-                    url_ca = descr["access_location"]
-
-    if len(url_ca) < 3:
+    ca_url = ca_url_from_cert(cert)
+    if ca_url is None or len(ca_url) < 3:
         return
 
-    resp = requests.get(url_ca, timeout=10, verify="./tls_certificate.pem")
+    resp = requests.get(ca_url, timeout=10, verify=verify_pkcs11_ca_tls_cert())
     if resp.status_code != 200:
         raise ValueError("Could not download ca from ca_issuers")
 
