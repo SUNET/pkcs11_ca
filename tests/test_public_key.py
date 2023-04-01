@@ -20,6 +20,9 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import verify_pkcs11_ca_tls_cert
 
+PUBLIC_KEY_ENDPOINT = "/public_key"
+SEARCH_PUBLIC_KEY_ENDPOINT = "/search/public_key"
+
 
 def keypair_data_from_private_key(
     private_key: Union[ec.EllipticCurvePrivateKey, rsa.RSAPrivateKey, Ed25519PrivateKey, Ed448PrivateKey]
@@ -113,7 +116,7 @@ class TestPublicKey(unittest.TestCase):
     def create_public_key(self, pub_key: bytes, priv_key: bytes, public_key_pem: str, admin: bool) -> PublicKeyInfo:
         """Create the public key"""
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
 
         data = json.loads('{"pem": ' + '"' + public_key_pem.replace("\n", "\\n") + '"' + "}")
 
@@ -121,7 +124,7 @@ class TestPublicKey(unittest.TestCase):
             data["admin"] = 1
 
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
@@ -145,11 +148,11 @@ class TestPublicKey(unittest.TestCase):
 
         # Test loading public keys
         request_headers = {
-            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/public_key")
+            "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT)
         }
 
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -163,18 +166,13 @@ class TestPublicKey(unittest.TestCase):
                 _, _, pem_key = asn1_pem.unarmor(pem_key)
 
             test_key = PublicKeyInfo.load(pem_key)
+            self.assertTrue(isinstance(test_key, PublicKeyInfo))
+            self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
+
             if test_key["algorithm"]["algorithm"].native == "rsa":
-                self.assertTrue(isinstance(test_key, PublicKeyInfo))
                 self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
                 self.assertTrue(isinstance(test_key["public_key"].native["modulus"], int))
-            elif test_key["algorithm"]["algorithm"].native == "ed25519":
-                self.assertTrue(isinstance(test_key, PublicKeyInfo))
-                self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
-            elif test_key["algorithm"]["algorithm"].native == "ed448":
-                self.assertTrue(isinstance(test_key, PublicKeyInfo))
-                self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
-            elif test_key["algorithm"]["algorithm"].native == "ec":
-                self.assertTrue(isinstance(test_key, PublicKeyInfo))
+            elif test_key["algorithm"]["algorithm"].native in ["ed25519", "ed448", "ec"]:
                 self.assertTrue(isinstance(test_key["public_key"].dump(), bytes))
             else:
                 raise ValueError("Key type " + test_key["algorithm"]["algorithm"].native + " is not implemented")
@@ -269,11 +267,11 @@ class TestPublicKey(unittest.TestCase):
         # Create and post a non admin key
         new_private_key, new_public_key = generate_keypair_rsa()
 
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/public_key")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + PUBLIC_KEY_ENDPOINT)}
 
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/public_key",
+            self.ca_url + PUBLIC_KEY_ENDPOINT,
             headers=request_headers,
             json=data,
             timeout=10,
@@ -281,7 +279,7 @@ class TestPublicKey(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        # Test to ensure the create non admin key is truly not an admin key
+        # Test to ensure the created non admin key is truly not an admin key
         request_headers = {
             "Authorization": create_jwt_header_str(
                 new_public_key.encode("utf-8"),
@@ -290,7 +288,7 @@ class TestPublicKey(unittest.TestCase):
             )
         }
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -304,10 +302,10 @@ class TestPublicKey(unittest.TestCase):
             "Authorization": create_jwt_header_str(
                 new_public_key.encode("utf-8"),
                 new_private_key.encode("utf-8"),
-                self.ca_url + "/search/public_key",
+                self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT,
             )
         }
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
