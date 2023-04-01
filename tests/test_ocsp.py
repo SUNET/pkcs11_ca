@@ -18,7 +18,7 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
-OCSP_ENDPOINT = "/ocsp"
+OCSP_ENDPOINT = "/ocsp/"
 REVOKE_ENDPOINT = "/revoke"
 
 OCSP_DUMMY_DATA = b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b"
@@ -48,11 +48,9 @@ class TestOCSP(unittest.TestCase):
         "common_name": "ca-test-ocsp-45.sunet.se",
     }
 
-    def _ocsp_request(
-        self, url: str, ocsp_request_bytes: Union[bytes, None] = None
-    ) -> Tuple[bytes, asn1_ocsp.OCSPResponse]:
-        if ocsp_request_bytes is None:
-            data = self._submit_req("GET", url)
+    def _ocsp_request(self, post: bool, url: str, ocsp_request_bytes: bytes) -> Tuple[bytes, asn1_ocsp.OCSPResponse]:
+        if post is False:
+            data = self._submit_req("GET", f"{url}{ocsp_encode(ocsp_request_bytes)}")
         else:
             data = self._submit_req("POST", url, ocsp_request_bytes)
 
@@ -83,17 +81,14 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue("content-type" in req.headers and req.headers["content-type"] == "application/ocsp-response")
         return req.content
 
-    def _check_ok_cert(self, cert_pem: str, post: Union[bool, None] = None) -> None:
+    def _check_ok_cert(self, cert_pem: str, post: bool = False) -> None:
         i_n_h, i_n_k, serial, ocsp_url = certificate_ocsp_data(cert_pem)
 
         ocsp_request_bytes = asyncio.run(request([(i_n_h, i_n_k, serial)]))
         ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
-        if post is None:
-            _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-        else:
-            _, ocsp_response = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
+        _, ocsp_response = self._ocsp_request(post, f"{ocsp_url}", ocsp_request_bytes)
 
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
@@ -121,7 +116,7 @@ class TestOCSP(unittest.TestCase):
         ca_pem = create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)
         self._check_ok_cert(ca_pem, True)
 
-    def test_revoked_get(self, post: Union[bool, None] = None) -> None:
+    def test_revoked_get(self, post: bool = False) -> None:
         """
         Test OCSP revoked
         """
@@ -146,10 +141,7 @@ class TestOCSP(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        if post is None:
-            _, ocsp_response_rev = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-        else:
-            _, ocsp_response_rev = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
+        _, ocsp_response_rev = self._ocsp_request(post, f"{ocsp_url}", ocsp_request_bytes)
 
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_rev)
         self.assertTrue(
@@ -189,11 +181,11 @@ class TestOCSP(unittest.TestCase):
         ocsp_request_bytes = asyncio.run(request(request_certs_data))
 
         # GET
-        data, _ = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+        data, _ = self._ocsp_request(False, f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # POST
-        data, _ = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+        data, _ = self._ocsp_request(True, f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # GET
@@ -206,7 +198,7 @@ class TestOCSP(unittest.TestCase):
         data = self._submit_req("POST", self.ca_url + OCSP_ENDPOINT, OCSP_DUMMY_DATA)
         self.assertTrue(data == b"0")
 
-    def test_ocsp_mixed_get(self, post: Union[bool, None] = None) -> None:
+    def test_ocsp_mixed_get(self, post: bool = False) -> None:
         """
         Test OCSP mixed get
         """
@@ -226,8 +218,8 @@ class TestOCSP(unittest.TestCase):
         i_n_h, i_n_k, serial, _ = certificate_ocsp_data(new_ca_ok)
         request_certs_data.append((i_n_h, i_n_k, serial))
 
-        ocsp_request_bytes_a = asyncio.run(request(request_certs_data))
-        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes_a)
+        ocsp_request_bytes = asyncio.run(request(request_certs_data))
+        ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
@@ -244,30 +236,23 @@ class TestOCSP(unittest.TestCase):
         )
         self.assertTrue(req.status_code == 200)
 
-        if post is None:
-            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes_a)}")
-        else:
-            _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes_a)
+        _, ocsp_response_mix = self._ocsp_request(post, f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
 
-            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_mix)
-            self.assertTrue(
-                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][0][
-                    "cert_status"
-                ]
-                == "unknown"
-            )
-            self.assertTrue(
-                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][1][
-                    "cert_status"
-                ]["revocation_reason"]
-                == "cessation_of_operation"
-            )
-            self.assertTrue(
-                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][2][
-                    "cert_status"
-                ]
-                == "good"
-            )
+        self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_mix)
+        self.assertTrue(
+            ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+            == "unknown"
+        )
+        self.assertTrue(
+            ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
+                "revocation_reason"
+            ]
+            == "cessation_of_operation"
+        )
+        self.assertTrue(
+            ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
+            == "good"
+        )
 
     def test_ocsp_mixed_post(self) -> None:
         """
@@ -276,7 +261,7 @@ class TestOCSP(unittest.TestCase):
 
         self.test_ocsp_mixed_get(True)
 
-    def test_ocsp_extensions_get(self, post: Union[bool, None] = None) -> None:
+    def test_ocsp_extensions_get(self, post: bool = False) -> None:
         """
         Test OCSP extensions get
         """
@@ -295,10 +280,7 @@ class TestOCSP(unittest.TestCase):
         ocsp_request = asn1_ocsp.OCSPRequest().load(ocsp_request_bytes)
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
-        if post is None:
-            _, ocsp_response_ext = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
-        else:
-            _, ocsp_response_ext = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
+        _, ocsp_response_ext = self._ocsp_request(post, f"{ocsp_url}", ocsp_request_bytes)
 
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_ext)
         self.assertTrue(
