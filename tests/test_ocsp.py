@@ -149,21 +149,21 @@ class TestOCSP(unittest.TestCase):
         # GET and POST
         for method in ["GET", "POST"]:
             if method == "GET":
-                _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
+                _, ocsp_response_rev = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
             elif method == "POST":
-                _, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
+                _, ocsp_response_rev = self._ocsp_request(ocsp_url, ocsp_request_bytes)
             else:
                 raise ValueError("Must be in ['GET', 'POST']")
-            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_rev)
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
+                ocsp_response_rev["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"][
                     "revocation_reason"
                 ]
                 == "cessation_of_operation"
             )
             self.assertTrue(
                 isinstance(
-                    ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0][
+                    ocsp_response_rev["response_bytes"]["response"].native["tbs_response_data"]["responses"][0][
                         "cert_status"
                     ]["revocation_time"],
                     datetime.datetime,
@@ -242,25 +242,25 @@ class TestOCSP(unittest.TestCase):
 
         for method in ["GET", "POST"]:
             if method == "GET":
-                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+                _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
             elif method == "POST":
-                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+                _, ocsp_response_mix = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
             else:
                 raise ValueError("Must be in ['GET', 'POST']")
 
-            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_mix)
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
                 == "unknown"
             )
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
+                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][1]["cert_status"][
                     "revocation_reason"
                 ]
                 == "cessation_of_operation"
             )
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
+                ocsp_response_mix["response_bytes"]["response"].native["tbs_response_data"]["responses"][2]["cert_status"]
                 == "good"
             )
 
@@ -285,22 +285,22 @@ class TestOCSP(unittest.TestCase):
 
         for method in ["GET", "POST"]:
             if method == "GET":
-                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
+                _, ocsp_response_ext = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
             elif method == "POST":
-                _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
+                _, ocsp_response_ext = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
             else:
                 raise ValueError("Must be in ['GET', 'POST']")
 
-            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
+            self._check_certs_in_req_and_resp(ocsp_request, ocsp_response_ext)
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
+                ocsp_response_ext["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
                     "extn_value"
                 ]
                 == nonce_val
             )
 
             self.assertTrue(
-                ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
+                ocsp_response_ext["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
                 == "good"
             )
 
