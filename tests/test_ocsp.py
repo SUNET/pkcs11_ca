@@ -59,15 +59,15 @@ class TestOCSP(unittest.TestCase):
         _ = ocsp_response.native
         return data, ocsp_response
 
-    def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp: asn1_ocsp.OCSPResponse) -> None:
+    def _check_certs_in_req_and_resp(self, req: asn1_ocsp.OCSPRequest, resp_check: asn1_ocsp.OCSPResponse) -> None:
         self.assertTrue(
-            len(resp["response_bytes"]["response"].native["tbs_response_data"]["responses"])
+            len(resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"])
             == len(req["tbs_request"]["request_list"])
         )
 
-        for index, _ in enumerate(resp["response_bytes"]["response"].native["tbs_response_data"]["responses"]):
+        for index, _ in enumerate(resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"]):
             self.assertTrue(
-                resp["response_bytes"]["response"].native["tbs_response_data"]["responses"][index]["cert_id"]
+                resp_check["response_bytes"]["response"].native["tbs_response_data"]["responses"][index]["cert_id"]
                 == req["tbs_request"]["request_list"][index]["req_cert"].native
             )
 
