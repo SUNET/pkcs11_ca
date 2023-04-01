@@ -12,7 +12,7 @@ from asn1crypto import pem as asn1_pem
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, crl_expired
 from src.pkcs11_ca_service.config import ROOT_URL
 
-from .lib import create_i_ca
+from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
 
 class TestCrl(unittest.TestCase):
@@ -49,7 +49,7 @@ class TestCrl(unittest.TestCase):
 
         data = {"ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
         req = requests.post(
-            self.ca_url + "/crl", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/crl", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -66,7 +66,11 @@ class TestCrl(unittest.TestCase):
 
         data = json.loads('{"pem": ' + '"' + crl1.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/search/crl", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/crl",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["crls"]) == 1)

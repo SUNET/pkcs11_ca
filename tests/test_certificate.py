@@ -12,7 +12,7 @@ from asn1crypto import x509 as asn1_x509
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
 
-from .lib import create_i_ca
+from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
 
 class TestCertificate(unittest.TestCase):
@@ -67,7 +67,11 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
 
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
         req = requests.post(
-            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/sign_csr",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -76,7 +80,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
             "Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/search/certificate")
         }
         req = requests.get(
-            self.ca_url + "/search/certificate", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/certificate", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]
@@ -93,7 +97,7 @@ IHuEGEoo1BdVvQEq/Jd6jpjjix68mxHQXc3tQBRRMoZVtf8izoNJRMJrqokT4x54
             headers=request_headers,
             json=data,
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         certs = json.loads(req.text)["certificates"]

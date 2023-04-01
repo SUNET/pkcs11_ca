@@ -13,6 +13,11 @@ from asn1crypto import x509 as asn1_x509
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 
 
+def verify_pkcs11_ca_tls_cert() -> str:
+    """Verify the PKCS11 CA TLS connection with this certificate"""
+    return "./tls_certificate.pem"
+
+
 def create_root_ca(root_url: str, pub_key: bytes, priv_key: bytes) -> str:
     """Create a root CA"""
 

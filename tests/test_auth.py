@@ -10,6 +10,8 @@ import requests
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, pem_key_to_jwk
 from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
 
+from .lib import verify_pkcs11_ca_tls_cert
+
 
 class TestAuth(unittest.TestCase):
     """
@@ -37,7 +39,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -50,7 +52,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -63,7 +65,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -78,7 +80,7 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # No url in token
-        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce}
@@ -86,12 +88,12 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
         # Wrong url in token
-        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca_wrong_url"}
@@ -99,7 +101,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -116,23 +118,23 @@ class TestAuth(unittest.TestCase):
             pub_key1 = f_data.read()
 
         # Sign with key2 but send key1 as public key
-        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/ca"}
         jwk_key_data = pem_key_to_jwk(pub_key1.decode("utf-8"))
         encoded = jwt.encode(jwk_key_data, priv_key2.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
         # Correct auth, HEAD AND GET nonce
         for method in ["GET", "HEAD"]:
             if method == "GET":
-                req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+                req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
             elif method == "HEAD":
-                req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+                req = requests.head(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
             else:
                 raise ValueError("Only supports ['HEAD', 'GET']")
 
@@ -143,14 +145,14 @@ class TestAuth(unittest.TestCase):
             encoded = jwt.encode(jwk_key_data, priv_key1.decode("utf-8"), algorithm="PS256", headers=jwt_headers)
             request_headers = {"Authorization": "Bearer " + encoded}
             req = requests.get(
-                self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+                self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
             )
             self.assertTrue(req.status_code == 200)
 
         # Test lib auth
         request_headers = {"Authorization": create_jwt_header_str(pub_key1, priv_key1, self.ca_url + "/search/ca")}
         req = requests.get(
-            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -159,9 +161,9 @@ class TestAuth(unittest.TestCase):
         No auth for these but 404 when non-existing url
         """
 
-        req = requests.get(self.ca_url + "/ca/acac22352343423", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/ca/acac22352343423", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 404)
-        req = requests.get(self.ca_url + "/crl/acac22352343423", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/crl/acac22352343423", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 404)
 
     def test_auth_secp256r1(self) -> None:
@@ -179,7 +181,7 @@ class TestAuth(unittest.TestCase):
             pub_key4 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -187,7 +189,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key4.decode("utf-8"), algorithm="ES256", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -206,7 +208,7 @@ class TestAuth(unittest.TestCase):
             pub_key5 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -214,7 +216,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key5.decode("utf-8"), algorithm="ES384", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -232,7 +234,7 @@ class TestAuth(unittest.TestCase):
             pub_key6 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -243,7 +245,7 @@ class TestAuth(unittest.TestCase):
 
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
 
         self.assertTrue(req.status_code == 200)
@@ -264,7 +266,7 @@ class TestAuth(unittest.TestCase):
             pub_key7 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -272,11 +274,11 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key7.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
 
@@ -285,7 +287,7 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key9.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -305,7 +307,7 @@ class TestAuth(unittest.TestCase):
             pub_key8 = f_data.read()
 
         # Correct auth, GET nonce
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
         jwt_headers = {"nonce": nonce, "url": self.ca_url + "/search/public_key"}
@@ -313,11 +315,11 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key8.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
-        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(self.ca_url + "/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
         nonce = req.headers["Replay-Nonce"]
         self.assertTrue(req.status_code == 200)
 
@@ -326,6 +328,6 @@ class TestAuth(unittest.TestCase):
         encoded = jwt.encode(jwk_key_data, priv_key10.decode("utf-8"), algorithm="EdDSA", headers=jwt_headers)
         request_headers = {"Authorization": "Bearer " + encoded}
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)

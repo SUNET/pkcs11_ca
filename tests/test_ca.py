@@ -15,7 +15,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import KEY_TYPES, ROOT_URL
 
-from .lib import cdp_url, create_i_ca, verify_cert
+from .lib import cdp_url, create_i_ca, verify_cert, verify_pkcs11_ca_tls_cert
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -41,7 +41,11 @@ class TestCa(unittest.TestCase):
 
         data = json.loads('{"pem": ' + '"' + cas[-1].replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/search/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/ca",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(json.loads(req.text)["cas"]) == 1)
@@ -97,7 +101,7 @@ class TestCa(unittest.TestCase):
         data["name_dict"] = name_dict
 
         req = requests.post(
-            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -153,7 +157,7 @@ class TestCa(unittest.TestCase):
         self.assertTrue(found_ocsp)
 
         # Get AIA
-        req = requests.get(url_ca, timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(url_ca, timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -165,7 +169,7 @@ class TestCa(unittest.TestCase):
 
         # Get CDP
         url = cdp_url(new_ca)
-        req = requests.get(url, timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(url, timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 200)
         data = req.content
         if asn1_pem.detect(data):
@@ -203,7 +207,7 @@ class TestCa(unittest.TestCase):
         data["key_type"] = "dummy_not_exist"
 
         req = requests.post(
-            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code != 200)
 
@@ -238,7 +242,7 @@ class TestCa(unittest.TestCase):
             data["key_type"] = key_type
 
             req = requests.post(
-                self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+                self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
             )
             self.assertTrue(req.status_code == 200)
             new_ca: str = json.loads(req.text)["certificate"]

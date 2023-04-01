@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives.hashes import SHA256
 
 from src.pkcs11_ca_service.config import PKCS11_SIGN_API_TOKEN, ROOT_URL
 
+from .lib import verify_pkcs11_ca_tls_cert
+
 
 class TestPKCS11Sign(unittest.TestCase):
     """
@@ -55,7 +57,7 @@ class TestPKCS11Sign(unittest.TestCase):
             headers=request_headers,
             json=self.request_data,
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         response_data = json.loads(req.text)

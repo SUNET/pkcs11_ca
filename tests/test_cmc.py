@@ -9,6 +9,8 @@ import requests
 
 from src.pkcs11_ca_service.config import ROOT_URL
 
+from .lib import verify_pkcs11_ca_tls_cert
+
 
 class TestCMC(unittest.TestCase):
     """
@@ -60,7 +62,7 @@ class TestCMC(unittest.TestCase):
             data=decoded,
             headers={"Content-Type": "application/pkcs7-mime"},
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -72,7 +74,7 @@ class TestCMC(unittest.TestCase):
             data=decoded,
             headers={"Content-Type": "application/pkcs7-mime"},
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -85,6 +87,6 @@ class TestCMC(unittest.TestCase):
             data=decoded,
             headers={"Content-Type": "application/pkcs7-mime"},
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 401)

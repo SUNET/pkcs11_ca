@@ -17,11 +17,7 @@ from src.pkcs11_ca_service.asn1 import (
 )
 from src.pkcs11_ca_service.config import ROOT_URL
 
-from .lib import cdp_url, create_i_ca
-
-# from asn1crypto import crl as asn1_crl
-# from asn1crypto import pem as asn1_pem
-
+from .lib import cdp_url, create_i_ca, verify_pkcs11_ca_tls_cert
 
 TEST_CSR1 = """-----BEGIN CERTIFICATE REQUEST-----
 MIIC2DCCAcACAQAwgZIxCzAJBgNVBAYTAlNFMRMwEQYDVQQIDApTb21lLVN0YXRl
@@ -79,7 +75,11 @@ class TestRevoke(unittest.TestCase):
         data = {"pem": TEST_CSR1, "ca_pem": create_i_ca(self.ca_url, pub_key, priv_key, self.name_dict)}
 
         req = requests.post(
-            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/sign_csr",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -90,7 +90,7 @@ class TestRevoke(unittest.TestCase):
 
         data = json.loads('{"pem": "' + cert.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
         self.assertTrue(cert == json.loads(req.text)["revoked"])
@@ -98,7 +98,7 @@ class TestRevoke(unittest.TestCase):
         # Check CRL
         # Get CDP
         url = cdp_url(cert)
-        req = requests.get(url, headers=request_headers, timeout=10, verify="./tls_certificate.pem")
+        req = requests.get(url, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 200)
         resp_data = req.content
         if asn1_pem.detect(resp_data):
@@ -136,7 +136,7 @@ class TestRevoke(unittest.TestCase):
         data["name_dict"] = name_dict
 
         req = requests.post(
-            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
         old_ca = json.loads(req.text)["certificate"]
@@ -159,7 +159,7 @@ class TestRevoke(unittest.TestCase):
         data["issuer_pem"] = old_ca
 
         req = requests.post(
-            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
         curr_ca = json.loads(req.text)["certificate"]
@@ -168,7 +168,11 @@ class TestRevoke(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/is_revoked")}
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/is_revoked", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/is_revoked",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]
@@ -179,7 +183,7 @@ class TestRevoke(unittest.TestCase):
 
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -187,7 +191,11 @@ class TestRevoke(unittest.TestCase):
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/is_revoked")}
         data = json.loads('{"pem": "' + curr_ca.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/is_revoked", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/is_revoked",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         revoked = json.loads(req.text)["is_revoked"]

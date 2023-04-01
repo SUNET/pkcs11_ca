@@ -18,6 +18,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str
 from src.pkcs11_ca_service.config import ROOT_URL
 
+from .lib import verify_pkcs11_ca_tls_cert
+
 
 def keypair_data_from_private_key(
     private_key: Union[ec.EllipticCurvePrivateKey, rsa.RSAPrivateKey, Ed25519PrivateKey, Ed448PrivateKey]
@@ -119,7 +121,11 @@ class TestPublicKey(unittest.TestCase):
             data["admin"] = 1
 
         req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/public_key",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -143,7 +149,7 @@ class TestPublicKey(unittest.TestCase):
         }
 
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -267,7 +273,11 @@ class TestPublicKey(unittest.TestCase):
 
         data = json.loads('{"pem": ' + '"' + new_public_key.replace("\n", "\\n") + '"' + "}")
         req = requests.post(
-            self.ca_url + "/public_key", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/public_key",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -280,7 +290,7 @@ class TestPublicKey(unittest.TestCase):
             )
         }
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 401)
 
@@ -298,6 +308,6 @@ class TestPublicKey(unittest.TestCase):
             )
         }
         req = requests.get(
-            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/search/public_key", headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)

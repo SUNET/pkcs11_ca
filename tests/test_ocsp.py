@@ -16,7 +16,7 @@ from python_x509_pkcs11.ocsp import certificate_ocsp_data, request
 from src.pkcs11_ca_service.asn1 import create_jwt_header_str, ocsp_encode
 from src.pkcs11_ca_service.config import ROOT_URL
 
-from .lib import create_i_ca
+from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
@@ -70,9 +70,9 @@ class TestOCSP(unittest.TestCase):
 
     def _submit_req(self, method: str, url: str, data: Union[bytes, None] = None) -> bytes:
         if method == "GET":
-            req = requests.get(url, timeout=10, verify="./tls_certificate.pem")
+            req = requests.get(url, timeout=10, verify=verify_pkcs11_ca_tls_cert())
         else:
-            req = requests.post(url, data=data, timeout=10, verify="./tls_certificate.pem")
+            req = requests.post(url, data=data, timeout=10, verify=verify_pkcs11_ca_tls_cert())
         self.assertTrue(req.status_code == 200)
         self.assertTrue(len(req.content) > 0)
         self.assertTrue("content-type" in req.headers and req.headers["content-type"] == "application/ocsp-response")
@@ -86,7 +86,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # GET
-        data, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
+        _, ocsp_response = self._ocsp_request(f"{ocsp_url}{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -102,7 +102,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(found)
 
         # POST
-        data, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
+        _, ocsp_response = self._ocsp_request(ocsp_url, ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -142,7 +142,7 @@ class TestOCSP(unittest.TestCase):
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
         data["reason"] = 5
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -236,7 +236,7 @@ class TestOCSP(unittest.TestCase):
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
         data["reason"] = 5
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
         )
         self.assertTrue(req.status_code == 200)
 
@@ -299,7 +299,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # GET
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
+        _, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
@@ -314,7 +314,7 @@ class TestOCSP(unittest.TestCase):
         )
 
         # POST
-        data, ocsp_response = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
+        _, ocsp_response = self._ocsp_request(f"{ocsp_url}", ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][
@@ -358,7 +358,11 @@ zu/HPacJI420g3IC4vMVHeZznEM=
         request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/sign_csr")}
 
         req = requests.post(
-            self.ca_url + "/sign_csr", headers=request_headers, json=data, timeout=10, verify="./tls_certificate.pem"
+            self.ca_url + "/sign_csr",
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         new_cert = json.loads(req.text)["certificate"]

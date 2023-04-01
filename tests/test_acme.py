@@ -40,6 +40,8 @@ from requests.structures import CaseInsensitiveDict
 from src.pkcs11_ca_service.asn1 import jwk_thumbprint, pem_key_to_jwk, to_base64url
 from src.pkcs11_ca_service.config import ACME_ROOT, ROOT_URL
 
+from .lib import verify_pkcs11_ca_tls_cert
+
 
 class AcmeChallengeHTTPRequestHandler(BaseHTTPRequestHandler):
     """HTTP request handler for ACME challenge"""
@@ -84,7 +86,7 @@ def run_http_server(token: str, key_authorization: str) -> None:
 def acme_nonce() -> str:
     """Get a nonce for ACME"""
 
-    req = requests.head(f"{ROOT_URL}{ACME_ROOT}/new-nonce", timeout=10, verify="./tls_certificate.pem")
+    req = requests.head(f"{ROOT_URL}{ACME_ROOT}/new-nonce", timeout=10, verify=verify_pkcs11_ca_tls_cert())
     return req.headers["Replay-Nonce"]
 
 
@@ -287,7 +289,7 @@ def send_request(url: str, data: Dict[str, Any], status_code: int) -> Tuple[Dict
         headers=request_headers,
         json=data,
         timeout=5,
-        verify="./tls_certificate.pem",
+        verify=verify_pkcs11_ca_tls_cert(),
     )
     if req.status_code != status_code:
         raise ValueError(f"HTTP status code was not {status_code}")
@@ -361,7 +363,7 @@ class TestAcme(unittest.TestCase):
             headers={"Content-Type": "application/jose+json"},
             json=acme_req,
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         certs = req.text.split("-----BEGIN CERTIFICATE-----")
@@ -388,7 +390,7 @@ class TestAcme(unittest.TestCase):
             headers={"Content-Type": "application/jose+json"},
             json=acme_req,
             timeout=10,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -400,7 +402,7 @@ class TestAcme(unittest.TestCase):
         req = requests.get(
             f"{ROOT_URL}{ACME_ROOT}/directory",
             timeout=5,
-            verify="./tls_certificate.pem",
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
         response_data = json.loads(req.text)
@@ -411,7 +413,7 @@ class TestAcme(unittest.TestCase):
             req = requests.post(
                 response_data[acme_url],
                 timeout=5,
-                verify="./tls_certificate.pem",
+                verify=verify_pkcs11_ca_tls_cert(),
             )
             self.assertTrue(req.status_code not in (200, 404))
 
@@ -735,7 +737,7 @@ class TestAcme(unittest.TestCase):
         # Create new order
         acme_req = new_order_jws(kid, priv_key2)
         response_data, _ = send_request(f"{ROOT_URL}{ACME_ROOT}/new-order", acme_req, 201)
-        authz = response_data["authorizations"][0]
+        _ = response_data["authorizations"][0]
 
         time.sleep(2)
 
@@ -780,3 +782,8 @@ class TestAcme(unittest.TestCase):
         acme_req = get_authz_jws(kid, priv_key, authz)
         response_data, _ = send_request(f"{authz}", acme_req, 200)
         self.assertTrue(response_data["status"] in ["processing", "invalid"])  # NOT VALID
+
+        # Get order after challenge
+        acme_req = get_authz_jws(kid, priv_key, order)
+        response_data, _ = send_request(f"{order}", acme_req, 200)
+        self.assertTrue(response_data["status"] == "pending")
