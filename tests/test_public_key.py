@@ -152,7 +152,10 @@ class TestPublicKey(unittest.TestCase):
         }
 
         req = requests.get(
-            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT,
+            headers=request_headers,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -288,7 +291,10 @@ class TestPublicKey(unittest.TestCase):
             )
         }
         req = requests.get(
-            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT,
+            headers=request_headers,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 401)
 
@@ -306,6 +312,9 @@ class TestPublicKey(unittest.TestCase):
             )
         }
         req = requests.get(
-            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT, headers=request_headers, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + SEARCH_PUBLIC_KEY_ENDPOINT,
+            headers=request_headers,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
