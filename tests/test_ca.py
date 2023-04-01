@@ -239,7 +239,7 @@ class TestCa(unittest.TestCase):
 
             request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/ca")}
 
-            data = {
+            json_data = {
                 "key_label": hex(int.from_bytes(os.urandom(20), "big") >> 1),
                 "name_dict": name_dict,
                 "issuer_pem": create_i_ca(self.ca_url, pub_key, priv_key, issuer_name_dict),
@@ -247,7 +247,11 @@ class TestCa(unittest.TestCase):
             }
 
             req = requests.post(
-                self.ca_url + "/ca", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+                self.ca_url + "/ca",
+                headers=request_headers,
+                json=json_data,
+                timeout=10,
+                verify=verify_pkcs11_ca_tls_cert(),
             )
             self.assertTrue(req.status_code == 200)
             new_ca: str = json.loads(req.text)["certificate"]

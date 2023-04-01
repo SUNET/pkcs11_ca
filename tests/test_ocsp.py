@@ -18,6 +18,11 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import create_i_ca, verify_pkcs11_ca_tls_cert
 
+OCSP_ENDPOINT = "/ocsp"
+REVOKE_ENDPOINT = "/revoke"
+
+OCSP_DUMMY_DATA = b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b"
+
 with open("data/trusted_keys/privkey1.key", "rb") as file_data:
     priv_key = file_data.read()
 with open("data/trusted_keys/pubkey1.pem", "rb") as file_data:
@@ -137,12 +142,16 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/revoke")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + REVOKE_ENDPOINT)}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
         data["reason"] = 5
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + REVOKE_ENDPOINT,
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
@@ -178,32 +187,30 @@ class TestOCSP(unittest.TestCase):
         request_certs_data = [
             (
                 b"R\x94\xca?\xac`\xf7i\x819\x14\x94\xa7\x085H\x84\xb4&\xcc",
-                b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b",
+                OCSP_DUMMY_DATA,
                 440320505043419981128735462508870123525487964711,
             )
         ]
         ocsp_request_bytes = asyncio.run(request(request_certs_data))
 
         # GET
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # POST
-        data = self._submit_req("POST", self.ca_url + "/ocsp/", ocsp_request_bytes)
+        data = self._submit_req("POST", self.ca_url + OCSP_ENDPOINT, ocsp_request_bytes)
         ocsp_response = asn1_ocsp.OCSPResponse().load(data)
         self.assertTrue(isinstance(ocsp_response, asn1_ocsp.OCSPResponse))
         self.assertTrue(data == b"0\x03\n\x01\x06")
 
         # GET
-        data = self._submit_req("GET", self.ca_url + "/ocsp/" + "sldfsf!!#¤&%¤%YARSFdfvdfv")
+        data = self._submit_req("GET", self.ca_url + OCSP_ENDPOINT + "/sldfsf!!#¤&%¤%YARSFdfvdfv")
         self.assertTrue(data == b"0")
-        data = self._submit_req("GET", self.ca_url + "/ocsp/" + "sdfsfas/sdfsdf/d")
+        data = self._submit_req("GET", self.ca_url + OCSP_ENDPOINT + "/sdfsfas/sdfsdf/d")
         self.assertTrue(data == b"0")
 
         # POST
-        data = self._submit_req(
-            "POST", self.ca_url + "/ocsp/", b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b"
-        )
+        data = self._submit_req("POST", self.ca_url + OCSP_ENDPOINT, OCSP_DUMMY_DATA)
         self.assertTrue(data == b"0")
 
     def test_ocsp_mixed(self) -> None:
@@ -217,7 +224,7 @@ class TestOCSP(unittest.TestCase):
         request_certs_data = [
             (
                 b"R\x94\xca?\xac`\xf7i\x819\x14\x94\xa7\x085H\x84\xb4&\xcc",
-                b"\xad\xd0\x88DW\x96'\xce\xf4\"\xc6\xc77W\xc9\xefi\xa4[\x8b",
+                OCSP_DUMMY_DATA,
                 440320505043419981128735462508870123525487964711,
             ),
             (i_n_h, i_n_k, serial),
@@ -231,17 +238,21 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # Revoke cert
-        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + "/revoke")}
+        request_headers = {"Authorization": create_jwt_header_str(pub_key, priv_key, self.ca_url + REVOKE_ENDPOINT)}
 
         data = json.loads('{"pem": "' + new_ca.replace("\n", "\\n") + '"' + "}")
         data["reason"] = 5
         req = requests.post(
-            self.ca_url + "/revoke", headers=request_headers, json=data, timeout=10, verify=verify_pkcs11_ca_tls_cert()
+            self.ca_url + REVOKE_ENDPOINT,
+            headers=request_headers,
+            json=data,
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
 
         # GET
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -260,7 +271,7 @@ class TestOCSP(unittest.TestCase):
         )
 
         # POST
-        data, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/", ocsp_request_bytes)
+        data, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}", ocsp_request_bytes)
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["responses"][0]["cert_status"]
@@ -299,7 +310,7 @@ class TestOCSP(unittest.TestCase):
         self.assertTrue(isinstance(ocsp_request, asn1_ocsp.OCSPRequest))
 
         # GET
-        _, ocsp_response = self._ocsp_request(f"{self.ca_url}/ocsp/{ocsp_encode(ocsp_request_bytes)}")
+        _, ocsp_response = self._ocsp_request(f"{self.ca_url}{OCSP_ENDPOINT}/{ocsp_encode(ocsp_request_bytes)}")
         self._check_certs_in_req_and_resp(ocsp_request, ocsp_response)
         self.assertTrue(
             ocsp_response["response_bytes"]["response"].native["tbs_response_data"]["response_extensions"][0][

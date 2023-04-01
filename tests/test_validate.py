@@ -1,7 +1,6 @@
 """
 Test our input data validation
 """
-import json
 import os
 import unittest
 
