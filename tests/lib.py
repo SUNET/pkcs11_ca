@@ -75,14 +75,19 @@ def create_i_ca(root_url: str, pub_key: bytes, priv_key: bytes, name_dict: Dict[
 
 
 def cdp_url_point(point: OrderedDict[str, Any]) -> Union[str, None]:
+    """Get CDP URL from CDP"""
+
     for _, name in enumerate(point["distribution_point"]):
         if "/crl/" in name:
             ret: str = name
             return ret
 
+    return None
+
 
 def cdp_url(pem: str) -> str:
     """GET CDP URL"""
+
     data = pem.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)
@@ -111,7 +116,7 @@ def ca_url_from_cert(cert: asn1_x509.Certificate) -> Union[str, None]:
                     url_ca: str = descr["access_location"]
                     return url_ca
 
-    return
+    return None
 
 
 def write_ca_to_chain(der: bytes, path: str, leaf: bool = False) -> None:
