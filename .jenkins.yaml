@@ -1,5 +1,8 @@
-
 clean_workspace: true
+git:
+  branch: main
+builders:
+  - docker
 triggers:
   github_push: true
   cron: "@weekly"
@@ -8,24 +11,18 @@ triggers:
 
 extra_jobs:
   - name: pkcs11_ca-ca
-    builders:
-      - docker
     docker_name: pkcs11_ca/ca
     docker_context_dir: .
     build_in_docker:
       dockerfile: containers/ca/Dockerfile
 
   # - name: pkcs11_ca-postgres
-    # builders:
-    #   - docker
     # docker_name: pkcs11_ca/postgres
     # docker_context_dir: .
     # build_in_docker:
     #   dockerfile: containers/postgres/Dockerfile
 
   - name: pkcs11_ca-test
-    builders:
-      - docker
     docker_name: pkcs11_ca/test
     docker_context_dir: .
     build_in_docker:
