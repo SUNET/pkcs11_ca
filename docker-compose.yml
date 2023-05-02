@@ -5,7 +5,7 @@ services:
   ca:
     build:
       context: .
-      dockerfile: containers/Dockerfile_ca
+      dockerfile: containers/ca/Dockerfile
     ports:
       - "8005:8005"
     depends_on:
@@ -39,7 +39,7 @@ services:
   postgres:
     # build:
     # context: .
-    # dockerfile: data/postgres_container/Dockerfile
+    # dockerfile: containers/postgres/Dockerfile
     image: postgres:15.2-bullseye@sha256:f1f635486b8673d041e2b180a029b712a37ac42ca5479ea13029b53988ed164c
     restart: always
     # read_only: true
@@ -61,7 +61,7 @@ services:
   test1:
     build:
       context: .
-      dockerfile: containers/Dockerfile_test
+      dockerfile: containers/test/Dockerfile
     depends_on:
       - "ca"
     restart: "no"
