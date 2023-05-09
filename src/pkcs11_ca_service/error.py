@@ -12,7 +12,7 @@ class DBInitFail(Exception):
 
 
 class NoSuchDBObject(Exception):
-    """Class to handle objects not existsing in DB"""
+    """Class to handle objects not existing in DB"""
 
     def __init__(self, message: str = "No such object in DB") -> None:
         self.message = message
