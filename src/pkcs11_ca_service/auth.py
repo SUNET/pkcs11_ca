@@ -102,7 +102,7 @@ async def _authorized_by(request: Request) -> int:
 async def authorized_by(request: Request) -> int:
     """Authorize a request to our http server.
 
-    Returns the ID of the public key in DB whoch was used to authorize the request.
+    Returns the ID of the public key in DB which was used to authorize the request.
 
     Parameters:
     request (fastapi.Request): The entire HTTP request which we can extract the JWT and nonce from.
