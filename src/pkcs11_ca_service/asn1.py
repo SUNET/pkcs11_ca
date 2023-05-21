@@ -648,7 +648,7 @@ def cert_revoked(serial_number: int, crl_pem: str) -> bool:
     return False
 
 
-def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
+def aia_and_cdp_exts(issuer_path: str, timestamping_usage: bool = False) -> asn1_x509.Extensions:
     """Create AIA and CDP extensions.
 
     Parameters:
@@ -694,6 +694,15 @@ def aia_and_cdp_exts(issuer_path: str) -> asn1_x509.Extensions:
     exts = asn1_x509.Extensions()
     exts.append(aia_ext)
     exts.append(cdp_ext)
+
+    if timestamping_usage:
+        ekus = asn1_x509.ExtKeyUsageSyntax([asn1_x509.KeyPurposeId("1.3.6.1.5.5.7.3.8")])
+        ekus_ext = asn1_x509.Extension()
+        ekus_ext["extn_id"] = asn1_x509.ExtensionId("2.5.29.37")
+        ekus_ext["critical"] = True
+        ekus_ext["extn_value"] = ekus
+        exts.append(ekus_ext)
+
     return exts
 
 

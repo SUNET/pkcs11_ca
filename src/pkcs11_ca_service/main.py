@@ -51,6 +51,7 @@ from .route_functions import (
     sign_csr,
 )
 from .startup import startup
+from .timestamp import timestamp_handle_request
 
 if "_" in os.environ and "sphinx-build" in os.environ["_"]:
     print("Running sphinx build")
@@ -709,7 +710,7 @@ async def post_pkcs11_sign(request: Request) -> JSONResponse:
 
 @app.post("/cmc01")
 async def post_cmc(request: Request) -> Response:
-    """fixme"""
+    """CMC fixme"""
 
     content_type = request.headers.get("Content-type")
     if content_type is None or content_type != "application/pkcs7-mime":
@@ -723,6 +724,25 @@ async def post_cmc(request: Request) -> Response:
         return Response(status_code=200, content=data_content, media_type="application/pkcs7-mime")
     except (ValueError, TypeError):
         return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+
+
+@app.post("/timestamp")
+async def post_timestamp(request: Request) -> Response:
+    """Timestamp fixme"""
+
+    content_type = request.headers.get("Content-type")
+    if content_type is None or content_type != "application/timestamp-query":
+        return Response(status_code=400, content=b"0", media_type="application/timestamp-reply")
+
+    data = await request.body()
+    print("timestamp req for debugging")
+    print(data.hex())
+    try:
+        data_content = await timestamp_handle_request(data)
+        return Response(status_code=200, content=data_content, media_type="application/timestamp-reply")
+    except (ValueError, TypeError) as e:
+        raise e
+        return Response(status_code=400, content=b"0", media_type="application/timestamp-reply")
 
 
 acme_endpoints = [

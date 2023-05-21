@@ -26,6 +26,7 @@ DB_TABLE_MODULES = [
     "acme_account",
     "acme_order",
     "acme_authorization",
+    "timestamp",
 ]
 
 # Allowed JWT signing algos
@@ -49,6 +50,39 @@ ROOT_CA_NAME_DICT = {
     "organizational_unit_name": "SUNET Infrastructure",
     "common_name": "ca-test.sunet.se",
 }
+
+# Fixme comment
+TIMESTAMP_KEYS_TYPE = "secp256r1"  # Must be in KEY_TYPES above
+TIMESTAMP_EXPIRE = 365 * 15
+TIMESTAMP_ROOT_KEY_LABEL = "timestamp_root_test3"
+TIMESTAMP_ROOT_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-timestamp3-root.sunet.se",
+}
+TIMESTAMP_SIGNING_KEY_LABEL = "timestamp_signer_test3"
+TIMESTAMP_SIGNING_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-timestamp3-signer.sunet.se",
+}
+
+TIMESTAMP_CERT_KEY_LABEL = "timestamp_cert_test3"
+TIMESTAMP_CERT_NAME_DICT = {
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "ca-test-timestamp3-cert.sunet.se",
+}
+
 
 # The CMC ROOT cert is the root of all CMC certs
 # The CMC SIGNING cert is the CA which signs the CMC responses

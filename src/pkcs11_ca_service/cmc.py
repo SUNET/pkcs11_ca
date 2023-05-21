@@ -1,7 +1,7 @@
 """CMC functions"""
 import datetime
 import hashlib
-from random import randint
+import secrets
 from typing import Dict, List, Union
 
 from asn1crypto import algos as asn1_algos
@@ -145,7 +145,7 @@ def _create_cmc_response_status_packet(
     status_v2_attr_values = asn1_cmc.SetOfCMCStatusInfoV2()
     status_v2_attr_values.append(status_v2)
     status_v2_attr = asn1_cmc.TaggedAttribute()
-    status_v2_attr["bodyPartID"] = randint(10000000, 4294967294)
+    status_v2_attr["bodyPartID"] = secrets.randbelow(4294967293)
     status_v2_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.25")
     status_v2_attr["attrValues"] = status_v2_attr_values
     return status_v2_attr
@@ -181,14 +181,14 @@ async def create_cmc_response_packet(
 
     if nonce is not None:
         nonce_attr = asn1_cmc.TaggedAttribute()
-        nonce_attr["bodyPartID"] = randint(10000000, 4294967294)
+        nonce_attr["bodyPartID"] = secrets.randbelow(4294967293)
         nonce_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.7")
         nonce_attr["attrValues"] = asn1_cms.SetOfOctetString.load(nonce)
         response_controls.append(nonce_attr)
 
     if reg_info is not None:
         reg_info_attr = asn1_cmc.TaggedAttribute()
-        reg_info_attr["bodyPartID"] = randint(10000000, 4294967294)
+        reg_info_attr["bodyPartID"] = secrets.randbelow(4294967293)
         reg_info_attr["attrType"] = asn1_cmc.TaggedAttributeType("1.3.6.1.5.5.7.7.19")
         reg_info_attr["attrValues"] = asn1_cms.SetOfOctetString.load(reg_info)
         response_controls.append(reg_info_attr)
@@ -296,7 +296,7 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     )
     signer_info["signature_algorithm"] = signed_digest_algo(CMC_KEYS_TYPE)
     signer_info["signature"] = await PKCS11Session().sign(
-        "cmc_signer_test3", signer_info["signed_attrs"].retag(17).dump(), key_type=CMC_KEYS_TYPE
+        CMC_SIGNING_KEY_LABEL, signer_info["signed_attrs"].retag(17).dump(), key_type=CMC_KEYS_TYPE
     )
 
     signed_data["signer_infos"] = asn1_cms.SignerInfos({signer_info})

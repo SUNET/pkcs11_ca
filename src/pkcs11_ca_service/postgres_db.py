@@ -46,8 +46,17 @@ from .config import (
     ROOT_CA_KEY_LABEL,
     ROOT_CA_KEY_TYPE,
     ROOT_CA_NAME_DICT,
+    TIMESTAMP_CERT_KEY_LABEL,
+    TIMESTAMP_CERT_NAME_DICT,
+    TIMESTAMP_EXPIRE,
+    TIMESTAMP_KEYS_TYPE,
+    TIMESTAMP_ROOT_KEY_LABEL,
+    TIMESTAMP_ROOT_NAME_DICT,
+    TIMESTAMP_SIGNING_KEY_LABEL,
+    TIMESTAMP_SIGNING_NAME_DICT,
 )
 from .error import WrongDataType
+from .timestamp import create_timestamp_certificate
 
 # asyncpg is safe from sql injections when using parameterized queries
 # https://github.com/MagicStack/asyncpg/issues/822
@@ -439,6 +448,53 @@ class PostgresDB(DataBaseObject):
                 hashlib.sha256(token_bytes(256)).hexdigest(),
             )
 
+            timestamp_root_path = hashlib.sha256(token_bytes(256)).hexdigest()
+
+            await cls._insert_init_ca(
+                classes_info,
+                TIMESTAMP_ROOT_KEY_LABEL,
+                TIMESTAMP_ROOT_NAME_DICT,
+                "TIMESTAMP_root_ca",
+                TIMESTAMP_KEYS_TYPE,
+                TIMESTAMP_EXPIRE,
+                6,
+                6,
+                None,
+                None,
+                None,
+                None,
+                timestamp_root_path,
+            )
+
+            timestamp_ca_path = hashlib.sha256(token_bytes(256)).hexdigest()
+
+            await cls._insert_init_ca(
+                classes_info,
+                TIMESTAMP_SIGNING_KEY_LABEL,
+                TIMESTAMP_SIGNING_NAME_DICT,
+                "TIMESTAMP_signing_ca",
+                TIMESTAMP_KEYS_TYPE,
+                TIMESTAMP_EXPIRE,
+                6,
+                7,
+                TIMESTAMP_ROOT_KEY_LABEL,
+                TIMESTAMP_ROOT_NAME_DICT,
+                TIMESTAMP_KEYS_TYPE,
+                timestamp_root_path,
+                timestamp_ca_path,
+            )
+
+            timestamp_cert = await create_timestamp_certificate(
+                timestamp_ca_path,
+                TIMESTAMP_CERT_KEY_LABEL,
+                TIMESTAMP_CERT_NAME_DICT,
+                TIMESTAMP_KEYS_TYPE,
+                TIMESTAMP_SIGNING_KEY_LABEL,
+                TIMESTAMP_SIGNING_NAME_DICT,
+                TIMESTAMP_KEYS_TYPE,
+            )
+            await PKCS11Session.import_certificate(timestamp_cert, TIMESTAMP_CERT_KEY_LABEL)
+
             await cls._insert_healthcheck_key(classes_info)
 
         # Load trusted keys
@@ -501,10 +557,10 @@ class PostgresDB(DataBaseObject):
                 query = cls._insert_root_item_query(classes_info["pkcs11_key"], "pkcs11_key")
                 await conn.execute(
                     query,
-                    6,
+                    8,
                     HEALTHCHECK_KEY_LABEL,
                     HEALTHCHECK_KEY_TYPE,
-                    6,
+                    8,
                     str(datetime.datetime.utcnow()),
                 )
                 print("Created healthcheck PKCS11 key", flush=True)

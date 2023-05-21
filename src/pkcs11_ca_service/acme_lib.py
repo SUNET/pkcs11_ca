@@ -163,7 +163,7 @@ async def account_exists(acme_account_input: AcmeAccountInput) -> Union[AcmeAcco
 
 def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
     """Execute the http-01 ACME challenge, return true if successful, false if failed
-    Retry 5 times each after 5 seconds if the challenge fails.
+    Retry 3 times each after 3 seconds if the challenge fails.
 
     Parameters:
     url (str): The challenge's URL
@@ -175,7 +175,7 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
 
     """
 
-    for _ in range(3):
+    for x in range(3):
         try:
             req = requests.get(f"http://{url}/.well-known/acme-challenge/{token}", timeout=3)
             if req.status_code != 200:
@@ -187,7 +187,7 @@ def http_01_challenge(url: str, token: str, key_authorization: str) -> bool:
             return False
 
         except requestsConnectionError:
-            print(f"(1) Failed to connect to ACME challenge at http://{url}/.well-known/acme-challenge/{token}")
+            print(f"({x+1}) Failed to connect to ACME challenge at http://{url}/.well-known/acme-challenge/{token}")
 
         time.sleep(3)
 
