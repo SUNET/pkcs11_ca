@@ -1,4 +1,4 @@
-"""CMC functions"""
+"""Timestamp functions"""
 import datetime
 import hashlib
 import secrets
@@ -15,15 +15,13 @@ from python_x509_pkcs11.csr import sign_csr
 from python_x509_pkcs11.lib import signed_digest_algo
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .asn1 import aia_and_cdp_exts, cert_pem_serial_number, pem_cert_to_key_hash
+from .asn1 import aia_and_cdp_exts, cert_pem_serial_number
 from .base import DataBaseObject, DataClassObject, InputObject
-from .ca import Ca, CaInput
+from .ca import CaInput
 from .config import (
     TIMESTAMP_CERT_KEY_LABEL,
-    TIMESTAMP_CERT_NAME_DICT,
     TIMESTAMP_KEYS_TYPE,
     TIMESTAMP_ROOT_KEY_LABEL,
-    TIMESTAMP_ROOT_NAME_DICT,
     TIMESTAMP_SIGNING_KEY_LABEL,
     TIMESTAMP_SIGNING_NAME_DICT,
 )
@@ -169,7 +167,21 @@ async def create_timestamp_certificate(
     signer_subject_name: Dict[str, str],
     signer_key_type: str,
 ) -> str:
-    """Create a timestamp certificate signed by a PKCS11 key"""
+    """Create a timestamp certificate signed by a PKCS11 key.
+    Returns the PEM encoded certificate
+
+    Parameters:
+    issuer_path (str): The path for CRL and AIA extension to write into the cert
+    key_label (str): The pkcs11 key label to create the certificate's key.
+    subject_name (Dict[str, str]): The certificate's subject name dict.
+    key_type (str): The certificate's key type.
+    signer_key_label (str): The pkcs11 key label to sign the certificate.
+    signer_subject_name (Dict[str, str]): The certificate's issuers subject name dict.
+    signer_key_type (str): The certificate's signers key type.
+
+    Returns:
+    str
+    """
 
     pk_info, _ = await PKCS11Session().create_keypair(key_label, key_type=key_type)
     data = pk_info.encode("utf-8")
@@ -194,9 +206,19 @@ async def create_timestamp_certificate(
 
 
 async def create_timestamp_response_packet(hashed_message: bytes, nonce: Union[int, None]) -> asn1_tsp.TSTInfo:
+    """Create a timestamp response asn1 package
+
+    Parameters:
+    hashed_message (bytes): The timestamp request.
+    nonce (Union[int, None]): The nonce
+
+    Returns:
+    asn1crypto.tsp.TSTInfo
+    """
+
     tst_info = asn1_tsp.TSTInfo()
     tst_info["version"] = 1
-    # FIXME remove policy?
+    # FIXME Apple has 1.2.3 as policy so I guess we also have it?
     tst_info["policy"] = "1.2.3"
     tst_info["message_imprint"] = asn1_tsp.MessageImprint(
         {
@@ -224,9 +246,17 @@ async def create_timestamp_response_packet(hashed_message: bytes, nonce: Union[i
     return tst_info
 
 
-async def create_timestamp_signed_data(
-    hashed_message: bytes, nonce: Union[int, None], cert_req: bool
-) -> asn1_cms.ContentInfo:
+async def create_timestamp_signed_data(hashed_message: bytes, nonce: Union[int, None]) -> asn1_cms.ContentInfo:
+    """Create a timestamp signed data asn1 structure
+
+    Parameters:
+    hashed_message (bytes): The timestamp request.
+    nonce (Union[int, None]): The nonce
+
+    Returns:
+    asn1crypto.cms.ContentInfo
+    """
+
     signer_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=TIMESTAMP_SIGNING_KEY_LABEL))
     signer = await ca_request(CaInput(pkcs11_key=signer_pkcs11_key.serial))
 
@@ -235,8 +265,6 @@ async def create_timestamp_signed_data(
 
     timestamp_cert = await PKCS11Session.export_certificate(TIMESTAMP_CERT_KEY_LABEL)
 
-    # FIXME make this into a recursive chain instead of assuming next is root and
-    # Dont issue all certs are issued by the same issuer
     chain: List[asn1_x509.Certificate] = [
         asn1_x509.Certificate.load(asn1_pem.unarmor(root_signer.pem.encode("utf-8"))[2]),
         asn1_x509.Certificate.load(asn1_pem.unarmor(signer.pem.encode("utf-8"))[2]),
@@ -260,7 +288,6 @@ async def create_timestamp_signed_data(
 
     signer_info = asn1_cms.SignerInfo()
     signer_info["version"] = 1
-    # signer_info["sid"] = asn1_cms.SignerIdentifier({"subject_key_identifier": pem_cert_to_key_hash(signer.pem)})
     signer_info["sid"] = asn1_cms.SignerIdentifier(
         {
             "issuer_and_serial_number": asn1_cms.IssuerAndSerialNumber(
@@ -340,20 +367,37 @@ async def create_timestamp_signed_data(
     return cmc_resp
 
 
-async def create_timestamp_response(hashed_message: bytes, nonce: Union[int, None], cert_req: bool) -> bytes:
+async def create_timestamp_response(hashed_message: bytes, nonce: Union[int, None] = None) -> bytes:
+    """Create a timestamp certificate.
+
+    Parameters:
+    hashed_message (bytes): The hashed message.
+    nonce (Union[int, None]): The request nonce.
+
+    Returns:
+    bytes
+    """
+
     # FIXME handle errors
     pki_status_info = asn1_tsp.PKIStatusInfo()
     pki_status_info["status"] = 0
 
     timestamp_resp = asn1_tsp.TimeStampResp()
     timestamp_resp["status"] = pki_status_info
-    timestamp_resp["time_stamp_token"] = await create_timestamp_signed_data(hashed_message, nonce, cert_req)
+    timestamp_resp["time_stamp_token"] = await create_timestamp_signed_data(hashed_message, nonce)
     ret: bytes = timestamp_resp.dump()
     return ret
 
 
 async def timestamp_handle_request(data: bytes) -> bytes:
-    """Handle and extract CMS CMC request"""
+    """Handle and respond to a timestamp request.
+
+    Parameters:
+    data (bytes): The timestamp request.
+
+    Returns:
+    bytes
+    """
 
     ts_req = asn1_tsp.TimeStampReq.load(data)
     _ = ts_req.native  # Ensure valid data
@@ -361,7 +405,8 @@ async def timestamp_handle_request(data: bytes) -> bytes:
     # Dont assume hash is sha256
     hashed_message = ts_req["message_imprint"]["hashed_message"].native
     nonce: Union[int, None] = ts_req["nonce"].native
-    cert_req: bool = ts_req["cert_req"].native
+
+    # FIXME - Fetch policy in request if exists and enure the response have the same policy
 
     if not isinstance(hashed_message, bytes) or len(hashed_message) < 3:
         raise ValueError("Problem with hashed message in timestamp request")
@@ -369,7 +414,4 @@ async def timestamp_handle_request(data: bytes) -> bytes:
     if nonce is None or not isinstance(nonce, int):
         raise ValueError("Problem with nonce in timestamp request")
 
-    if not isinstance(cert_req, bool):
-        raise ValueError("Problem with cert required in timestamp request")
-
-    return await create_timestamp_response(hashed_message, nonce, cert_req)
+    return await create_timestamp_response(hashed_message, nonce)

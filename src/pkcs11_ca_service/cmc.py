@@ -44,6 +44,7 @@ from .route_functions import ca_request, pkcs11_key_request
 
 async def cmc_revoke(revoke_data: bytes) -> None:
     """Revoke a certificate based on the CMC RevokeRequest"""
+
     set_of_revoke_request = asn1_cmc.SetOfRevokeRequest.load(revoke_data)
     revoked_certs = 0
 
