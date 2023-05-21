@@ -11,7 +11,7 @@ from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import verify_pkcs11_ca_tls_cert
 
-TIMESTAMP_ENDPOINT = "/timestamp"
+TIMESTAMP_ENDPOINT = "/timestamp01"
 TIMESTAMP_CONTENT_TYPE = "application/timestamp-query"
 
 
@@ -40,7 +40,6 @@ class TestTimestamp(unittest.TestCase):
             verify=verify_pkcs11_ca_tls_cert(),
         )
         self.assertTrue(req.status_code == 200)
-        print(req.content.hex())
 
     def test_timestamp_verify(self) -> None:
         """
@@ -53,7 +52,10 @@ class TestTimestamp(unittest.TestCase):
             [
                 "bash",
                 "-c",
-                """echo "testmessage" > timestamp_state.txt; openssl ts -query -digest 34070729087df0bb18ae8e7e4659a4f58e4fe57e626a8e345c6ec85aae265cf0 -sha256 -cert -out ts_req.tsq 2> /dev/null; curl -k https://ca:8005/timestamp -H 'Content-Type: application/timestamp-query' -s -S --data-binary "@ts_req.tsq" -o "ts_req.tsr" ; openssl ts -reply -in ts_req.tsr -token_out 2> /dev/null | openssl pkcs7 -inform der -print_certs 2> /dev/null | sed -n '/-----BEGIN/,/-----END/p' > timestamp_chain.pem ; openssl ts -verify -digest 34070729087df0bb18ae8e7e4659a4f58e4fe57e626a8e345c6ec85aae265cf0 -in ts_req.tsr -CAfile timestamp_chain.pem > /dev/null 2> /dev/null""",  # pylint: disable=line-too-long
+                """echo "testmessage" > timestamp_state.txt; openssl ts -query -digest 34070729087df0bb18ae8e7e4659a4f58e4fe57e626a8e345c6ec85aae265cf0 -sha256 -cert -out ts_req.tsq 2> /dev/null; curl -k '"""
+                + self.ca_url
+                + TIMESTAMP_ENDPOINT
+                + """' -H 'Content-Type: application/timestamp-query' -s -S --data-binary "@ts_req.tsq" -o "ts_req.tsr" ; openssl ts -reply -in ts_req.tsr -token_out 2> /dev/null | openssl pkcs7 -inform der -print_certs 2> /dev/null | sed -n '/-----BEGIN/,/-----END/p' > timestamp_chain.pem ; openssl ts -verify -digest 34070729087df0bb18ae8e7e4659a4f58e4fe57e626a8e345c6ec85aae265cf0 -in ts_req.tsr -CAfile timestamp_chain.pem > /dev/null 2> /dev/null""",  # pylint: disable=line-too-long
             ]
         )
         # Dummy code for unittest to run?

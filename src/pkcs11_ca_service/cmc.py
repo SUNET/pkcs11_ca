@@ -308,8 +308,10 @@ async def create_cmc_response(  # pylint: disable-msg=too-many-locals
     cmc_resp["content"] = signed_data
 
     ret: bytes = cmc_resp.dump()
-    print("cmc response for debugging")
-    print(ret.hex())
+
+    # print("cmc response for debugging")
+    # print(ret.hex())
+
     return ret
 
 

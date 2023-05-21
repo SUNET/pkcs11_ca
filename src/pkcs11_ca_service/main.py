@@ -712,37 +712,43 @@ async def post_pkcs11_sign(request: Request) -> JSONResponse:
 async def post_cmc(request: Request) -> Response:
     """CMC fixme"""
 
+    reply_media_type = "application/pkcs7-mime"
+
     content_type = request.headers.get("Content-type")
-    if content_type is None or content_type != "application/pkcs7-mime":
-        return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+    if content_type is None or content_type != reply_media_type:
+        return Response(status_code=400, content=b"0", media_type=reply_media_type)
 
     data = await request.body()
-    print("cmc req for debugging")
-    print(data.hex())
+
+    # print("cmc req for debugging")
+    # print(data.hex())
     try:
         data_content = await cmc_handle_request(data)
-        return Response(status_code=200, content=data_content, media_type="application/pkcs7-mime")
+        return Response(status_code=200, content=data_content, media_type=reply_media_type)
     except (ValueError, TypeError):
-        return Response(status_code=400, content=b"0", media_type="application/pkcs7-mime")
+        return Response(status_code=400, content=b"0", media_type=reply_media_type)
 
 
-@app.post("/timestamp")
+@app.post("/timestamp01")
 async def post_timestamp(request: Request) -> Response:
     """Timestamp fixme"""
 
+    reply_media_type = "application/timestamp-reply"
+
     content_type = request.headers.get("Content-type")
     if content_type is None or content_type != "application/timestamp-query":
-        return Response(status_code=400, content=b"0", media_type="application/timestamp-reply")
+        return Response(status_code=400, content=b"0", media_type=reply_media_type)
 
     data = await request.body()
-    print("timestamp req for debugging")
-    print(data.hex())
+
+    # print("timestamp req for debugging")
+    # print(data.hex())
+
     try:
         data_content = await timestamp_handle_request(data)
-        return Response(status_code=200, content=data_content, media_type="application/timestamp-reply")
+        return Response(status_code=200, content=data_content, media_type=reply_media_type)
     except (ValueError, TypeError) as e:
-        raise e
-        return Response(status_code=400, content=b"0", media_type="application/timestamp-reply")
+        return Response(status_code=400, content=b"0", media_type=reply_media_type)
 
 
 acme_endpoints = [

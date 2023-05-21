@@ -386,6 +386,10 @@ async def create_timestamp_response(hashed_message: bytes, nonce: Union[int, Non
     timestamp_resp["status"] = pki_status_info
     timestamp_resp["time_stamp_token"] = await create_timestamp_signed_data(hashed_message, nonce)
     ret: bytes = timestamp_resp.dump()
+
+    # print("timestamp response for debugging")
+    # print(ret.hex())
+
     return ret
 
 
