@@ -92,7 +92,7 @@ def _set_tbs_key_usage(
 ) -> asn1_csr.CertificationRequestInfo:
     # https://github.com/wbond/asn1crypto/blob/master/asn1crypto/x509.py#L438
     # Bit 0, 5 ,6, from left to right
-    k_u = asn1_x509.KeyUsage(("100000000",))
+    k_u = asn1_x509.KeyUsage(("110000000",))
     ext = asn1_x509.Extension()
     ext["extn_id"] = asn1_x509.ExtensionId("2.5.29.15")
     ext["critical"] = True
@@ -183,7 +183,14 @@ async def create_timestamp_certificate(
     str
     """
 
-    pk_info, _ = await PKCS11Session().create_keypair(key_label, key_type=key_type)
+    # pk_info, _ = await PKCS11Session().create_keypair(key_label, key_type=key_type)
+
+    # TS test block uncomment above line
+    priv = b"0w\x02\x01\x01\x04 \xc1\x96a \xd3M\xe2\x04\xaaY\xe8{%F\x0eTt?\xa7\x0c\x85\xf3Hh\xbd,&\xe5\x8c\xb5\xa3[\xa0\n\x06\x08*\x86H\xce=\x03\x01\x07\xa1D\x03B\x00\x04\xae-\x90\t\xee-\x8d\xe4\x1b\xcfC\xb4TJ\x89[\x89\x82\x85+9\xb7\x96\xef\x12\xae\xfeG\x1f\xf7aX\x88\xca\xcf\xab9\x0b\xcd>\xb8\xfc\x95g\xa4\xca \r\x9d_\xa2\x1b1*\x17\x11\xc2\x8b\xd0\x98\x94Za\x82"  # pylint: disable=C0301
+    pub = b"0Y0\x13\x06\x07*\x86H\xce=\x02\x01\x06\x08*\x86H\xce=\x03\x01\x07\x03B\x00\x04\xae-\x90\t\xee-\x8d\xe4\x1b\xcfC\xb4TJ\x89[\x89\x82\x85+9\xb7\x96\xef\x12\xae\xfeG\x1f\xf7aX\x88\xca\xcf\xab9\x0b\xcd>\xb8\xfc\x95g\xa4\xca \r\x9d_\xa2\x1b1*\x17\x11\xc2\x8b\xd0\x98\x94Za\x82"  # pylint: disable=C0301
+    await PKCS11Session.import_keypair(pub, priv, key_label, key_type="secp256r1")
+    pk_info, _ = await PKCS11Session.public_key_data(key_label, key_type="secp256r1")
+
     data = pk_info.encode("utf-8")
     if asn1_pem.detect(data):
         _, _, data = asn1_pem.unarmor(data)

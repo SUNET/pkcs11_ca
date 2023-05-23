@@ -12,7 +12,7 @@ then
 Try with default ENV vars below:
 
 # The URL and DNS name for the PKCS11 CA
-export CA_URL="https://ca:8005"
+export CA_URL="http://ca:8005"
 export CA_DNS_NAME="ca"
 
 # The ACME root url endpoint
@@ -162,7 +162,7 @@ then
     openssl ecparam -name prime256v1 -genkey -noout -out data/tls_key.key
     python3 -c '
 import os, sys
-if os.environ["CA_URL"] not in ["https://ca:8005", "https://ca:443", "https://ca"]:
+if os.environ["CA_URL"] not in ["https://ca:8005", "https://ca:443", "https://ca", "http://ca:8005"]:
   sys.exit(1)
 '
     if [ $? -eq 0 ]
@@ -274,7 +274,7 @@ sleep 2
 
 python3 -c '
 import os, sys
-if os.environ["CA_URL"] in ["https://ca:8005", "https://ca:443", "https://ca"]:
+if os.environ["CA_URL"] in ["https://ca:8005", "https://ca:443", "https://ca", "http://ca:8005"]:
   sys.exit(0)
 sys.exit(1)
 '

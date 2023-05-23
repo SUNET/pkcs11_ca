@@ -494,6 +494,8 @@ class PostgresDB(DataBaseObject):
                 TIMESTAMP_KEYS_TYPE,
             )
             await PKCS11Session.import_certificate(timestamp_cert, TIMESTAMP_CERT_KEY_LABEL)
+            print("ts cert")
+            print(timestamp_cert)
 
             await cls._insert_healthcheck_key(classes_info)
 

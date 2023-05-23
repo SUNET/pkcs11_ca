@@ -80,3 +80,24 @@ services:
       - ACME_ROOT=${ACME_ROOT}
       - PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}
     entrypoint: ['true']
+  pdfsign:
+    build:
+      context: .
+      dockerfile: containers/pdfsign/Dockerfile
+    ports:
+      - "8006:8006"
+    depends_on:
+      - "ca"
+    restart: always
+    # read_only: true
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    # Require docker-compose version 1.29 and version: "3.3" in this file at the top
+    # mem_limit: "256m"
+    # mem_reservation: "128m"
+    # cpus: "1.0"
+    tmpfs:
+      - /dev/shm:ro,noexec,nosuid,nodev
+    environment:
+      - CA_URL=${CA_URL}
