@@ -92,7 +92,7 @@ def _set_tbs_key_usage(
 ) -> asn1_csr.CertificationRequestInfo:
     # https://github.com/wbond/asn1crypto/blob/master/asn1crypto/x509.py#L438
     # Bit 0, 5 ,6, from left to right
-    k_u = asn1_x509.KeyUsage(("100000000",))
+    k_u = asn1_x509.KeyUsage(("110000000",))
     ext = asn1_x509.Extension()
     ext["extn_id"] = asn1_x509.ExtensionId("2.5.29.15")
     ext["critical"] = True
