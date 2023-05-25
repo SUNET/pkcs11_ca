@@ -1,7 +1,5 @@
 FROM debian:bullseye-20230502-slim@sha256:249d9dc1b57918b203e45f647ea675cd940de5942863f35c979e5d926f024a7e
 
-MAINTAINER victor@sunet.se
-
 EXPOSE 8006/tcp
 
 # Metadata
@@ -30,7 +28,7 @@ RUN apt-get update \
     curl \
     && pip3 install --require-hashes -r /app/requirements.txt \
     && apt-get autoremove -y
-    
+
 
 # Remove setuid and setgid
 RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
