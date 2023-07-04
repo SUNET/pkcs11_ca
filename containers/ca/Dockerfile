@@ -33,6 +33,7 @@ RUN apt-get update \
     gcc \
     python3-pip \
     python3-dev \
+    iputils-ping \
     && apt-get autoremove -y
 
 # Remove setuid and setgid
@@ -45,12 +46,12 @@ RUN usermod -a -G softhsm pkcs11_ca
 # Copy files
 COPY ./src /app/src
 COPY ./tests /app/tests
-COPY ./data/trusted_keys /app/trusted_keys
+#COPY ./data/trusted_keys /app/trusted_keys
 COPY ./containers/healthcheck.sh /app/healthcheck.sh
 COPY ./containers/healthcheck.py /app/healthcheck.py
 COPY ./containers/logging.json /app/logging.json
-COPY ./data/tls_certificate.pem /app/tls_certificate.pem
-COPY ./data/tls_key.key /app/tls_key.key
+#COPY ./data/tls_certificate.pem /app/tls_certificate.pem
+#COPY ./data/tls_key.key /app/tls_key.key
 
 # HSM stuff
 # WORKDIR /usr/src/luna-client
@@ -66,7 +67,7 @@ COPY ./data/tls_key.key /app/tls_key.key
 # WORKDIR /app
 
 # Run as user
-USER pkcs11_ca
+#USER pkcs11_ca
 
 # Set env variables now during build
 # ENV PKCS11_TOKEN="my_test_token_1"
