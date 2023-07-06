@@ -12,3 +12,4 @@ importlib-resources
 sphinx
 zipp
 importlib-metadata
+exceptiongroup
