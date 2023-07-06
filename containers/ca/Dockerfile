@@ -1,4 +1,4 @@
-FROM debian:bullseye-20230502-slim@sha256:249d9dc1b57918b203e45f647ea675cd940de5942863f35c979e5d926f024a7e
+FROM debian:bookworm-20230703-slim@sha256:01bd742e2c269abf94e2fefb47b08b5b61c9a880b993417d23a1d0bd9fa60dc4
 
 MAINTAINER victor@sunet.se
 
@@ -28,6 +28,8 @@ RUN apt-get update \
     libz-dev \
     dnsutils \
     mercurial \
+    python3-venv \
+    && python3 -m venv .venv && . .venv/bin/activate \
     && pip3 install --require-hashes -r requirements.txt \
     && apt-get remove -y \
     wget \
@@ -79,9 +81,11 @@ USER pkcs11_ca
 
 # Add healthcheck
 HEALTHCHECK --interval=120s --timeout=15s --retries=1 --start-period=30s \
-    CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
+    CMD sh -c '. .venv/bin/activate && healthcheck.sh' || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
 # ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--ssl-keyfile", "tls_key.key", "--ssl-certfile", "tls_certificate.pem", "--ssl-version", "2", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
-ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
+# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
 
 # ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
+
+CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.main:app --log-config ./logging.json --host 0.0.0.0 --port 8005 --workers 1 --header server:pkcs11_ca'

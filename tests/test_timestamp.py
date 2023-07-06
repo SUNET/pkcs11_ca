@@ -60,3 +60,6 @@ class TestTimestamp(unittest.TestCase):
         )
         # Dummy code for unittest to run?
         self.assertTrue(1 == 2 - 1)
+
+        """17442  2023-05-22 14:21:31 pyhanko sign addsig --no-strict-syntax --trust ts_chain.pem --timestamp-url http://timestamp.digicert.com --field Sig1 --with-validation-info --use-pades pemder --key ts_privkey.pem --cert ts_cert.pem --no-pass rabb.pdf rabb_signed_10.pdf
+17443  2023-05-22 14:21:48 pyhanko sign validate --trust ts_chain.pem --other-certs ts_chain.pem --no-strict-syntax --pretty-print rabb_signed_10.pdf """

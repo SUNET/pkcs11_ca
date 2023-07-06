@@ -1,4 +1,4 @@
-FROM debian:bullseye-20230502-slim@sha256:249d9dc1b57918b203e45f647ea675cd940de5942863f35c979e5d926f024a7e
+FROM debian:bookworm-20230703-slim@sha256:01bd742e2c269abf94e2fefb47b08b5b61c9a880b993417d23a1d0bd9fa60dc4
 
 MAINTAINER victor@sunet.se
 
@@ -19,7 +19,7 @@ COPY ./requirements.txt /app/requirements.txt
 RUN apt-get update \
     && apt-get install -y \
     python3-pip \
-    netcat \
+    netcat-traditional \
     dnsutils \
     git \
     openssl \
@@ -28,7 +28,9 @@ RUN apt-get update \
     emacs-nox \
     bsdmainutils \
     curl \
-    && pip3 install --require-hashes -r /app/requirements.txt \
+    python3-venv \
+    && python3 -m venv .venv && . .venv/bin/activate \
+    && pip3 install --require-hashes -r requirements.txt \
     && apt-get autoremove -y
     
 
@@ -64,4 +66,6 @@ USER pkcs11_ca_pdfsign
 
 # ENTRYPOINT ["sleep", "300"]
 # ENTRYPOINT ["python3", "-m", "unittest"]
-ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.pdfsign:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8006", "--workers", "1", "--header", "server:pkcs11_ca_pdfsign"]
+# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.pdfsign:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8006", "--workers", "1", "--header", "server:pkcs11_ca_pdfsign"]
+
+CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.pdfsign:app --log-config ./logging.json --host 0.0.0.0 --port 8006 --workers 1 --header server:pkcs11_ca_pdfsign'
