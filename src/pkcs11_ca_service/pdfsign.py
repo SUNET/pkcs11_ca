@@ -6,7 +6,7 @@ import time
 from typing import Any
 
 from fastapi import FastAPI, Response, status
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, validator
 
 # Create fastapi app
 # Disable swagger and docs endpoints for now
@@ -28,7 +28,7 @@ class PDFSignReply(BaseModel):
     error: str
     create_ts: int
 
-    @field_validator("data")
+    @validator("data")
     def data_len(cls, v: str) -> str:
         """validate data field by length"""
         if len(v) < 3:

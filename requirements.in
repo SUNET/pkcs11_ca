@@ -13,4 +13,5 @@ sphinx
 zipp
 importlib-metadata
 pyhanko
+pydantic
 exceptiongroup
