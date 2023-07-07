@@ -6,6 +6,8 @@ fastapi
 asyncpg
 cryptography
 requests
+types-requests
+types-jsonschema
 openapi_schema_validator
 pkgutil-resolve-name
 importlib-resources
@@ -13,3 +15,4 @@ sphinx
 zipp
 importlib-metadata
 pyhanko
+mypy
