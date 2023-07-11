@@ -68,4 +68,4 @@ USER pkcs11_ca_pdfsign
 # ENTRYPOINT ["python3", "-m", "unittest"]
 # ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.pdfsign:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8006", "--workers", "1", "--header", "server:pkcs11_ca_pdfsign"]
 
-CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.pdfsign:app --log-config ./logging.json --host 0.0.0.0 --port 8006 --workers 1 --header server:pkcs11_ca_pdfsign'
+CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.pdf.run:api --log-config ./logging.json --host 0.0.0.0 --port 8006 --workers 1 --header server:pkcs11_ca_pdfsign'

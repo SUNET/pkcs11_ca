@@ -26,14 +26,18 @@
 	},
 	"loggers": {
 		"uvicorn": {
-			"handlers": ["default"],
+			"handlers": [
+				"default"
+			],
 			"level": "INFO"
 		},
 		"uvicorn.error": {
 			"level": "INFO"
 		},
 		"uvicorn.access": {
-			"handlers": ["access"],
+			"handlers": [
+				"access"
+			],
 			"level": "INFO",
 			"propagate": false
 		}
