@@ -2,7 +2,7 @@ import logging
 # from logging import Logger, getLogger
 from fastapi import FastAPI
 from typing import Optional
-from pyhanko.sign import signers, SimpleSigner
+from pyhanko.sign import signers, SimpleSigner, timestamps
 from pyhanko.keys import load_cert_from_pemder
 from pyhanko_certvalidator import ValidationContext
 from .context import ContextRequestRoute
@@ -45,7 +45,9 @@ class PDFAPI(FastAPI):
         self.chain_path = "/app/ts_chain.pem"
         self.key_path = "/app/ts_priv"
         self.cert_path = "/app/ts_cert.pem"
-        self.timestamp_url = timestamp_url
+        self.tst_client = timestamps.HTTPTimeStamper(
+            url=timestamp_url,
+        )
 
         self.logger.info(msg=f"chain_path: {self.chain_path}")
         self.logger.info(msg=f"cert_path: {self.cert_path}")
@@ -57,9 +59,11 @@ class PDFAPI(FastAPI):
             # ca_chain_files=(self.chain_path),
             signature_mechanism=None)
 
+        self.cert_pemder = load_cert_from_pemder(self.cert_path)
+
         self.validator_context = ValidationContext(
             trust_roots=[
-                load_cert_from_pemder(self.cert_path)
+                self.cert_pemder,
             ],
         )
 

@@ -29,8 +29,12 @@ def sign_pdf(req: ContextRequest, in_data: PDFSignRequest) -> Any:
     req.app.logger.info(
         f"Received a base64 PDF, transaction_id: {in_data.transaction_id}")
 
-    reply = sign(req=req, transaction_id=in_data.transaction_id,
-                 base64_pdf=in_data.data)
+    reply = sign(req=req,
+                 transaction_id=in_data.transaction_id,
+                 base64_pdf=in_data.data,
+                 reason=in_data.reason,
+                 location=in_data.location,
+                 )
 
     return reply
 

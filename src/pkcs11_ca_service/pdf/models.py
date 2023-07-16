@@ -6,6 +6,9 @@ class PDFSignRequest(BaseModel):
     """Class to represent request"""
 
     transaction_id: str
+    field_name: str = "Signature1"
+    location: str
+    reason: str
     data: str
 
     @validator("data")
