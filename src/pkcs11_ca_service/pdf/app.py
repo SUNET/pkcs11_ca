@@ -3,6 +3,8 @@ import os
 from fastapi import FastAPI
 from typing import Optional
 from pyhanko.sign import signers, SimpleSigner
+from pyhanko.keys import load_cert_from_pemder
+from pyhanko_certvalidator import ValidationContext
 from .context import ContextRequestRoute
 from .router import pdf_router
 from .exceptions import (
@@ -21,10 +23,10 @@ class PDFAPI(FastAPI):
                  service_name: str = "pdf_api",
                  timestamp_url: str = "http://ca_ca:8005/timestamp01"
                  ):
-        super().__init__()
-
         self.service_name = service_name
         self.logger: Logger = getLogger(self.service_name)
+        super().__init__()
+
         # self.logger_config: str = "{asctime} | {levelname:7} | {hostname} | {name:35} | {module:10} | {message}"
 
         self.chain_path = "/app/ts_chain.pem"
@@ -41,6 +43,12 @@ class PDFAPI(FastAPI):
             cert_file=self.cert_path,
             # ca_chain_files=(self.chain_path),
             signature_mechanism=None)
+
+        self.validator_context = ValidationContext(
+            trust_roots=[
+                load_cert_from_pemder(self.cert_path)
+            ],
+        )
 
 
 def init_api(service_name: str = "pdf_api") -> PDFAPI:

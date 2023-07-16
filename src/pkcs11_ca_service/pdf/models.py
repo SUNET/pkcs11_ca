@@ -30,7 +30,12 @@ class PDFValidateRequest(BaseModel):
     data: str
 
 
+class PDFValidateData(BaseModel):
+    """Class to represent validation data"""
+    valid: bool
+
+
 class PDFValidateReply(BaseModel):
     """Class to represent reply"""
+    data: PDFValidateData
     error: str
-    message: str

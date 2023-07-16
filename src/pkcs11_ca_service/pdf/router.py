@@ -6,7 +6,7 @@ from typing import Any
 import uuid
 from fastapi import APIRouter
 from .context import ContextRequest, ContextRequestRoute
-from .utils import base64_to_byte, sign
+from .utils import sign, validate
 from .models import PDFSignRequest, PDFSignReply, PDFValidateRequest, PDFValidateReply
 from .exceptions import ErrorDetail
 
@@ -43,25 +43,6 @@ def validate_pdf(req: ContextRequest, in_data: PDFValidateRequest) -> Any:
 
     req.app.logger.info("Validate a signed base64 PDF")
 
-    filename = f"validate_candidate_{str(uuid.uuid4())}.pdf"
+    reply = validate(req=req, base64_pdf=in_data.data)
 
-    base64_to_byte(base64_str=in_data.data, filename=filename)
-
-    output = subprocess.run([
-        "bash",
-        "-c",
-        """pyhanko sign validate - -pretty-print""",
-        + f"{filename}",
-    ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-
-    os.remove(filename)
-
-    print(f"output from validate: {output.stdout}")
-    return PDFValidateReply(
-        error="",
-        message=output,
-    )
+    return reply
