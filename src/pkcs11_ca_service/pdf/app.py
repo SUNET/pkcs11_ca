@@ -1,5 +1,5 @@
-from logging import Logger, getLogger
-import os
+import logging
+# from logging import Logger, getLogger
 from fastapi import FastAPI
 from typing import Optional
 from pyhanko.sign import signers, SimpleSigner
@@ -24,8 +24,21 @@ class PDFAPI(FastAPI):
                  timestamp_url: str = "http://ca_ca:8005/timestamp01"
                  ):
         self.service_name = service_name
-        self.logger: Logger = getLogger(self.service_name)
+        self.logger = logging.getLogger(self.service_name)
+        self.logger.setLevel(logging.DEBUG)
+
         super().__init__()
+
+        ch = logging.StreamHandler()
+        ch.setLevel(logging.DEBUG)
+
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+
+        ch.setFormatter(formatter)
+
+        self.logger.addHandler(ch)
 
         # self.logger_config: str = "{asctime} | {levelname:7} | {hostname} | {name:35} | {module:10} | {message}"
 

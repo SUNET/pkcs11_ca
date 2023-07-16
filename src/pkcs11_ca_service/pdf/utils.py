@@ -1,16 +1,12 @@
 """ PDF utils for signing and validating PDFs """
 import base64
-import binascii
-import os
 import sys
 from io import BytesIO
 
 from pyhanko.sign import signers
-from pyhanko_certvalidator import ValidationContext
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
 from pyhanko.sign.validation import validate_pdf_signature
 from pyhanko.pdf_utils.reader import PdfFileReader
-from pyhanko.keys import load_cert_from_pemder
 from .models import PDFSignReply, PDFValidateReply, PDFValidateData
 from .context import ContextRequest
 
@@ -32,12 +28,10 @@ def sign(req: ContextRequest, transaction_id: str, base64_pdf: str) -> PDFSignRe
             reason='Testing',
             use_pades_lta=True,
             embed_validation_info=False,
-            # validation_context=ValidationContext(),
+            validation_context=req.app.validator_context,
         ),
         signer=req.app.cms_signer,
     )
-    print("out: ", out, file=sys.stdout)
-    req.app.logger.debug(msg=f"out: {out}")
 
     req.app.logger.info(
         msg=f"Successfully signed the PDF, transaction_id: {transaction_id}"
