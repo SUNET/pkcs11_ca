@@ -608,7 +608,7 @@ class RevokeInput(InputObject):
     """Class to represent revoke specification matching from HTTP post data"""
 
     pem: str
-    reason: Union[int, None]
+    reason: Union[int, None] = None
 
 
 @app.post("/is_revoked")
