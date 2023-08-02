@@ -232,7 +232,7 @@ click==8.1.6 \
     --hash=sha256:48ee849951919527a045bfe3bf7baa8a959c423134e1a5b98c05c20ba75a1cbd \
     --hash=sha256:fa244bb30b3b5ee2cae3da8f55c9e5e0c0e86093306301fb418eb9dc40fbded5
     # via uvicorn
-cryptography==41.0.2 \
+cryptography==41.0.3 \
     --hash=sha256:01f1d9e537f9a15b037d5d9ee442b8c22e3ae11ce65ea1f3316a41c78756b711 \
     --hash=sha256:079347de771f9282fbfe0e0236c716686950c19dee1b76240ab09ce1624d76d7 \
     --hash=sha256:182be4171f9332b6741ee818ec27daff9fb00349f706629f5cbf417bd50e66fd \
