@@ -102,3 +102,6 @@ services:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
       - CA_URL=${CA_URL}
+      - ACME_ROOT=${ACME_ROOT}
+      - PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}
+    entrypoint: ['true']

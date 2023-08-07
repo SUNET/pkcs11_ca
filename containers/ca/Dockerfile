@@ -53,8 +53,8 @@ COPY ./data/trusted_keys /app/trusted_keys
 COPY ./containers/healthcheck.sh /app/healthcheck.sh
 COPY ./containers/healthcheck.py /app/healthcheck.py
 COPY ./containers/logging.json /app/logging.json
-#COPY ./data/tls_certificate.pem /app/tls_certificate.pem
-#COPY ./data/tls_key.key /app/tls_key.key
+COPY ./data/tls_certificate.pem /app/tls_certificate.pem
+COPY ./data/tls_key.key /app/tls_key.key
 
 # HSM stuff
 # WORKDIR /usr/src/luna-client
