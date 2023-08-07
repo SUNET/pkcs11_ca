@@ -18,32 +18,40 @@ def sign(req: ContextRequest, transaction_id: str, base64_pdf: str, reason: str,
         msg=f"Trying to sign the PDF, transaction_id: {transaction_id}"
     )
     pdf_writer = IncrementalPdfFileWriter(
-        BytesIO(base64.b64decode(base64_pdf.encode("utf-8"), validate=True))
+        input_stream=BytesIO(base64.b64decode(base64_pdf))
     )
 
-    out = signers.sign_pdf(
-        pdf_writer, signers.PdfSignatureMetadata(
-            field_name='Signature1',
-            location=location,
-            reason=reason,
-            subfilter=SigSeedSubFilter.PADES,
-            use_pades_lta=True,
-            embed_validation_info=True,
-            validation_context=req.app.validator_context,
-        ),
-        signer=req.app.cms_signer,
-        timestamper=req.app.tst_client,
+    f = BytesIO()
+
+    signature_meta = signers.PdfSignatureMetadata(
+        field_name='Signature1',
+        location=location,
+        reason=reason,
+        subfilter=SigSeedSubFilter.PADES,
+        use_pades_lta=True,
+        embed_validation_info=True,
+        validation_context=req.app.validator_context,
     )
+
+    signers.sign_pdf(
+        pdf_writer,
+        signature_meta=signature_meta,
+        signer=req.app.cms_signer,
+        output=f,
+        # timestamper=req.app.tst_client,
+    )
+
+    base64_encoded = base64.b64encode(f.getvalue()).decode("utf-8")
 
     req.app.logger.info(
         msg=f"Successfully signed the PDF, transaction_id: {transaction_id}"
     )
 
-    signed_pdf_b64 = base64.b64encode(out.read()).decode("utf-8")
+    f.close()
 
     return PDFSignReply(
         transaction_id=transaction_id,
-        data=signed_pdf_b64,
+        data=base64_encoded,
         error="",
     )
 
@@ -59,17 +67,17 @@ def validate(req: ContextRequest, base64_pdf: str) -> PDFValidateReply:
 
     sig = pdf.embedded_signatures[0]
     status = validate_pdf_signature(
-        sig,
-        req.app.validator_context,
+        embedded_sig=sig,
+        signer_validation_context=req.app.validator_context,
     )
 
-    status_ltv = validate_pdf_ltv_signature(
-        sig,
-        RevocationInfoValidationType.PADES_LTA,
-        validation_context_kwargs={'trust_roots': [req.app.cert_pemder]},
-    )
+    # status_ltv = validate_pdf_ltv_signature(
+    #    sig,
+    #    RevocationInfoValidationType.PADES_LTA,
+    #    validation_context_kwargs={'trust_roots': [req.app.cert_pemder]},
+    # )
 
-    req.app.logger.info(msg=status_ltv.pretty_print_details())
+    # req.app.logger.info(msg=status_ltv.pretty_print_details())
 
     return PDFValidateReply(
         data=PDFValidateData(

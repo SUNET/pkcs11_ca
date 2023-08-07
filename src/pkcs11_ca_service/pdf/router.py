@@ -1,9 +1,6 @@
 """Router for PDF signing and validation"""
 
-import os
-import subprocess
 from typing import Any
-import uuid
 from fastapi import APIRouter
 from .context import ContextRequest, ContextRequestRoute
 from .utils import sign, validate

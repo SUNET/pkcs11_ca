@@ -21,7 +21,7 @@ class PDFAPI(FastAPI):
 
     def __init__(self,
                  service_name: str = "pdf_api",
-                 timestamp_url: str = "http://ca_ca:8005/timestamp01"
+                 timestamp_url: str = "http://ca:8005/timestamp01"
                  ):
         self.service_name = service_name
         self.logger = logging.getLogger(self.service_name)
@@ -39,8 +39,6 @@ class PDFAPI(FastAPI):
         ch.setFormatter(formatter)
 
         self.logger.addHandler(ch)
-
-        # self.logger_config: str = "{asctime} | {levelname:7} | {hostname} | {name:35} | {module:10} | {message}"
 
         self.chain_path = "/app/ts_chain.pem"
         self.key_path = "/app/ts_priv"

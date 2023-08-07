@@ -15,6 +15,7 @@
         "pyhanko",
         "redoc",
         "secp",
+        "subfilter",
         "timestamper"
     ]
 }
