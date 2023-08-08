@@ -1,0 +1,21 @@
+{
+    "cSpell.words": [
+        "addsig",
+        "asyncpg",
+        "fastapi",
+        "HEALTHCHECK",
+        "jsonschema",
+        "masv",
+        "pades",
+        "PDFAPI",
+        "pdfsign",
+        "pemder",
+        "pems",
+        "pydantic",
+        "pyhanko",
+        "redoc",
+        "secp",
+        "subfilter",
+        "timestamper"
+    ]
+}
