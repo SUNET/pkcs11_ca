@@ -5,8 +5,9 @@ from typing import Optional
 from pyhanko.sign import signers, SimpleSigner, timestamps
 from pyhanko.keys import load_cert_from_pemder
 from pyhanko_certvalidator import ValidationContext
-from .context import ContextRequestRoute
-from .router import pdf_router, status_router
+from pkcs11_ca_service.pdf.context import ContextRequestRoute
+from pkcs11_ca_service.pdf.routers.pdf import pdf_router
+from pkcs11_ca_service.pdf.routers.status import status_router
 from .exceptions import (
     RequestValidationError,
     validation_exception_handler,

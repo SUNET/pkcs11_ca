@@ -1,4 +1,3 @@
-""" PDF utils for signing and validating PDFs """
 import base64
 from io import BytesIO
 from pkcs11_ca_service.common.helpers import unix_ts
