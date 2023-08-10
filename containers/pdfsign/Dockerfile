@@ -1,71 +1,54 @@
-FROM debian:bookworm-20230703-slim@sha256:01bd742e2c269abf94e2fefb47b08b5b61c9a880b993417d23a1d0bd9fa60dc4
+FROM debian:stable
 
-MAINTAINER victor@sunet.se
-
-EXPOSE 8006/tcp
-
-# Metadata
-LABEL version="1.03"
-LABEL description="pkcs11_ca pdfsign"
-
-# Set work dir
-WORKDIR /app
-
-# Copy the requirement.txt file needed to install deps
-COPY ./requirements.txt /app/requirements.txt
+RUN mkdir -p /opt/sunet/pkcs11
 
 
-# Install deps
-RUN apt-get update \
-    && apt-get install -y \
+RUN addgroup --system sunet && adduser --system --shell /bin/false --ingroup sunet sunet
+
+env DEBIAN_FRONTEND noninteractive
+
+RUN apt-get update && \
+    apt-get -y dist-upgrade && \
+    apt-get install -y \
     python3-pip \
     netcat-traditional \
     dnsutils \
     git \
     openssl \
     vim-tiny \
-    nano \
     emacs-nox \
     bsdmainutils \
     curl \
     python3-venv \
-    && python3 -m venv .venv && . .venv/bin/activate \
-    && pip3 install --require-hashes -r requirements.txt \
-    && apt-get autoremove -y
-    
+    iputils-ping \
+    procps \
+    net-tools \
+    bind9-host \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Remove setuid and setgid
-RUN find / -xdev -perm /6000 -type f -exec chmod a-s {} \; || true
+RUN mkdir -p /var/log/sunet && chown sunet: /var/log/sunet && chmod 770 /var/log/sunet
 
-# Add user and add to softhsm group
-RUN useradd pkcs11_ca_pdfsign -u 1502 -s /usr/sbin/nologin
+WORKDIR /opt/sunet/pkcs11
+
+COPY src .
+COPY containers/logging.json .
+COPY data/pdfsign/ts_chain.pem .
+COPY data/pdfsign/ts_cert.pem .
+COPY data/pdfsign/ts_priv .
+COPY containers/pdfsign/start.sh /
+COPY requirements.txt .
 
 
-COPY ./src /app/src
-# COPY ./tests /app/tests
-# COPY ./data/trusted_keys /app/data/trusted_keys
-# COPY ./containers/healthcheck.sh /app/healthcheck.sh
-# COPY ./containers/healthcheck.py /app/healthcheck.py
-# COPY ./data/tls_certificate.pem /app/tls_certificate.pem
-
-COPY ./containers/logging.json /app/logging.json
-COPY ./data/pdfsign/ts_chain.pem /app/ts_chain.pem
-COPY ./data/pdfsign/ts_cert.pem /app/ts_cert.pem
-# COPY ./data/pdfsign/ts_priv /app/ts_priv
-
-RUN bash -c 'echo -e "LS0tLS1CRUdJTiBFQyBQUklWQVRFIEtFWS0tLS0tCk1IY0NBUUVFSU1HV1lTRFRUZUlFcWxub2V5\nVkdEbFIwUDZjTWhmTklhTDBzSnVXTXRhTmJvQW9HQ0NxR1NNNDkKQXdFSG9VUURRZ0FFcmkyUUNl\nNHRqZVFiejBPMFZFcUpXNG1DaFNzNXQ1YnZFcTcrUngvM1lWaUl5cytyT1F2TgpQcmo4bFdla3lp\nQU5uVitpR3pFcUZ4SENpOUNZbEZwaGdnPT0KLS0tLS1FTkQgRUMgUFJJVkFURSBLRVktLS0tLQo=" | base64 -d > /app/ts_priv'
-
-RUN chown -R pkcs11_ca_pdfsign /app
+#RUN chown -R sunet /
 
 # Run as user
-USER pkcs11_ca_pdfsign
+#USER pkcs11_ca_pdfsign
 
-# Add healthcheck
-# HEALTHCHECK --interval=30s --timeout=15s --retries=1 --start-period=30s \
-#     CMD sh healthcheck.sh || bash -c 'kill -s 15 1 && (sleep 7; kill -s 9 1)'
 
-# ENTRYPOINT ["sleep", "300"]
-# ENTRYPOINT ["python3", "-m", "unittest"]
-# ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.pdfsign:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8006", "--workers", "1", "--header", "server:pkcs11_ca_pdfsign"]
+EXPOSE 8080
 
-CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.pdf.run:api --log-config ./logging.json --host 0.0.0.0 --port 8006 --workers 1 --header server:pkcs11_ca_pdfsign'
+HEALTHCHECK --interval=27s CMD curl --max-time 20 http://localhost:8080/status/healthy | grep -q STATUS_OK
+
+ENTRYPOINT [ "/bin/bash"]
+
+CMD [ "/start.sh" ]
