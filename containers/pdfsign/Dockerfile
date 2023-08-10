@@ -38,13 +38,6 @@ COPY data/pdfsign/ts_priv .
 COPY containers/pdfsign/start.sh /
 COPY requirements.txt ./
 
-
-#RUN chown -R sunet /
-
-# Run as user
-#USER pkcs11_ca_pdfsign
-
-
 EXPOSE 8080
 
 HEALTHCHECK --interval=27s CMD curl --max-time 20 http://localhost:8080/status/healthy | grep -q STATUS_OK
