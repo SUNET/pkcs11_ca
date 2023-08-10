@@ -1,14 +1,15 @@
 """ PDF utils for signing and validating PDFs """
 import base64
 from io import BytesIO
+from pkcs11_ca_service.common.helpers import unix_ts
 
 from pyhanko.sign import signers
 from pyhanko.sign.fields import SigSeedSubFilter
 from pyhanko.pdf_utils.incremental_writer import IncrementalPdfFileWriter
-from pyhanko.sign.validation import validate_pdf_signature,  validate_pdf_ltv_signature, RevocationInfoValidationType
+from pyhanko.sign.validation import validate_pdf_signature
 from pyhanko.pdf_utils.reader import PdfFileReader
-from .models import PDFSignReply, PDFValidateReply, PDFValidateData
-from .context import ContextRequest
+from pkcs11_ca_service.pdf.models import PDFSignReply, PDFValidateReply, PDFValidateData
+from pkcs11_ca_service.pdf.context import ContextRequest
 
 
 def sign(req: ContextRequest, transaction_id: str, base64_pdf: str, reason: str, location: str) -> PDFSignReply:
@@ -52,6 +53,7 @@ def sign(req: ContextRequest, transaction_id: str, base64_pdf: str, reason: str,
     return PDFSignReply(
         transaction_id=transaction_id,
         data=base64_encoded,
+        create_ts=unix_ts(),
         error="",
     )
 

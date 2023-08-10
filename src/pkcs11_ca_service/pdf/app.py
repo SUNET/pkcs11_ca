@@ -6,7 +6,7 @@ from pyhanko.sign import signers, SimpleSigner, timestamps
 from pyhanko.keys import load_cert_from_pemder
 from pyhanko_certvalidator import ValidationContext
 from .context import ContextRequestRoute
-from .router import pdf_router
+from .router import pdf_router, status_router
 from .exceptions import (
     RequestValidationError,
     validation_exception_handler,
@@ -40,9 +40,9 @@ class PDFAPI(FastAPI):
 
         self.logger.addHandler(ch)
 
-        self.chain_path = "/app/ts_chain.pem"
-        self.key_path = "/app/ts_priv"
-        self.cert_path = "/app/ts_cert.pem"
+        self.chain_path = "/opt/sunet/ts_chain.pem"
+        self.key_path = "/opt/sunet/ts_priv"
+        self.cert_path = "/opt/sunet/ts_cert.pem"
         self.tst_client = timestamps.HTTPTimeStamper(
             url=timestamp_url,
         )
@@ -73,6 +73,7 @@ def init_api(service_name: str = "pdf_api") -> PDFAPI:
 
     # Routers
     app.include_router(pdf_router)
+    app.include_router(status_router)
 
     # Exception handling
     app.add_exception_handler(RequestValidationError,
