@@ -19,10 +19,6 @@ app_entrypoint="pkcs11_ca_service.pdf.run:api"
 app_name="pdfsign"
 base_dir="/opt/sunet"
 project_dir="${base_dir}/src"
-#app_dir="${project_dir}/${app_name}"
-#cfg_dir="${base_dir}/etc"
-#extra_sources_dir=${extra_sources_dir-"${base_dir}/sources"}
-# These *can* be set from Puppet, but are less expected to...
 log_dir="/var/log/sunet"
 state_dir="${base_dir}/run"
 workers="4"
