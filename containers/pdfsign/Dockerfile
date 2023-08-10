@@ -28,15 +28,15 @@ RUN apt-get update && \
 
 RUN mkdir -p /var/log/sunet && chown sunet: /var/log/sunet && chmod 770 /var/log/sunet
 
-WORKDIR /opt/sunet/pkcs11
+WORKDIR /opt/sunet
 
-COPY src .
+COPY src ./src
 COPY containers/logging.json .
 COPY data/pdfsign/ts_chain.pem .
 COPY data/pdfsign/ts_cert.pem .
 COPY data/pdfsign/ts_priv .
 COPY containers/pdfsign/start.sh /
-COPY requirements.txt .
+COPY requirements.txt ./
 
 
 #RUN chown -R sunet /

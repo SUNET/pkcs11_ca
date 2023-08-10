@@ -3,22 +3,22 @@
 set -e
 set -x
 
-python3 -mvenv /opt/sunet/pkcs11
-/opt/sunet/pkcs11/bin/pip install --upgrade pip wheel
-/opt/sunet/pkcs11/bin/pip install --index-url https://pypi.sunet.se/simple -r /opt/sunet/pkcs11/requirements.txt
+python3 -mvenv /opt/sunet/venv
+/opt/sunet/venv/bin/pip install --upgrade pip wheel
+/opt/sunet/venv/bin/pip install --index-url https://pypi.sunet.se/simple -r /opt/sunet/requirements.txt
 
-ls -l /opt/sunet/pkcs11/bin/
+ls -hal /opt/sunet/venv/
+ls -hal /opt/sunet/src
+ls -hal /opt/sunet
 
-. /opt/sunet/pkcs11/bin/activate
 
-ls -hal /var/log/sunet
-ls -hal /opt/sunet/pkcs11
+. /opt/sunet/venv/bin/activate
 
 
 app_entrypoint="pkcs11_ca_service.pdf.run:api"
 app_name="pdfsign"
-base_dir="/opt/sunet/pkcs11"
-project_dir="${base_dir}/pdfsign/src"
+base_dir="/opt/sunet"
+project_dir="${base_dir}/src"
 #app_dir="${project_dir}/${app_name}"
 #cfg_dir="${base_dir}/etc"
 #extra_sources_dir=${extra_sources_dir-"${base_dir}/sources"}
@@ -37,8 +37,13 @@ test -d "${state_dir}" && chown -R sunet: "${state_dir}"
 export PYTHONPATH=${PYTHONPATH-${project_dir}}
 echo "PYTHONPATH=${PYTHONPATH}"
 
+export PYTHONPATH="${PYTHONPATH:+${PYTHONPATH}:}/opt/sunet/venv"
+
+echo ""
+echo "$0: Starting ${app_name}"
+
 exec start-stop-daemon --start -c sunet:sunet --exec \
-     /opt/sunet/pkcs11/bin/gunicorn \
+     /opt/sunet/venv/bin/gunicorn \
      --pidfile "${state_dir}/${app_name}.pid" \
      --user=sunet --group=sunet -- \
      --bind 0.0.0.0:8080 \
