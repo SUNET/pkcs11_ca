@@ -1,4 +1,5 @@
 uvicorn[standard]
+gunicorn
 python-x509-pkcs11
 python_cmc
 pyjwt

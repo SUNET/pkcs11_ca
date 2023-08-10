@@ -4,8 +4,23 @@ from typing import Any
 from fastapi import APIRouter
 from .context import ContextRequest, ContextRequestRoute
 from .utils import sign, validate
-from .models import PDFSignRequest, PDFSignReply, PDFValidateRequest, PDFValidateReply
+from .models import PDFSignRequest, PDFSignReply, PDFValidateRequest, PDFValidateReply, StatusReply
 from .exceptions import ErrorDetail
+
+status_router = APIRouter(route_class=ContextRequestRoute, prefix="/status")
+
+
+@status_router.get("/healthy", response_model=StatusReply)
+async def healthy(req: ContextRequest) -> Any:
+    """Endpoint for status/healthy"""
+
+    req.app.logger.info(msg="Check for healthy")
+
+    reply = StatusReply(
+        status="STATUS_OK",
+    )
+
+    return reply
 
 
 pdf_router = APIRouter(

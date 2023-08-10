@@ -42,3 +42,7 @@ class PDFValidateReply(BaseModel):
     """Class to represent reply"""
     data: PDFValidateData
     error: str
+
+
+class StatusReply(BaseModel):
+    status: str

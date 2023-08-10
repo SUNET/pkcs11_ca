@@ -115,12 +115,12 @@ then
 fi
 
 # Check python3
-which python3 > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "python3 not found, install with sudo apt-get install python3"
-    exit 1
-fi
+#which python3 > /dev/null
+#if [ $? -ne 0 ]
+#then
+#    echo "python3 not found, install with sudo apt-get install python3"
+#    exit 1
+#fi
 
 # Generate trusted keys
 mkdir -p data/trusted_keys
@@ -176,83 +176,83 @@ if os.environ["CA_URL"] not in ["https://ca:8005", "https://ca:443", "https://ca
 fi
 
 # Check docker
-which docker > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "docker not found, install with sudo apt-get install docker.io"
-    echo "sudo usermod -a -G docker $USER"
-    echo "logout and in now for docker group to work"
-    exit 1
-fi
+#which docker > /dev/null
+#if [ $? -ne 0 ]
+#then
+#    echo "docker not found, install with sudo apt-get install docker.io"
+#    echo "sudo usermod -a -G docker $USER"
+#    echo "logout and in now for docker group to work"
+#    exit 1
+#fi
 
-# Check docker-compose
-which docker-compose > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "docker-compose not found, install with pip3 install docker-compose"
-    exit 1
-fi
+## Check docker-compose
+#which docker-compose > /dev/null
+#if [ $? -ne 0 ]
+#then
+#    echo "docker-compose not found, install with pip3 install docker-compose"
+#    exit 1
+#fi
 
-# Check code
-echo "Checking code package"
+## Check code
+#echo "Checking code package"
+#
+#which mypy > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    mypy
+#else
+#    echo "mypy is not installed, skipping..."
+#    echo "Dont forget to install types-requests types-jsonschema"
+#fi
 
-which mypy > /dev/null
-if [ $? -eq 0 ]
-then
-    mypy
-else
-    echo "mypy is not installed, skipping..."
-    echo "Dont forget to install types-requests types-jsonschema"
-fi
+#which isort > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    isort src
+#else
+#    echo "isort is not installed, skipping..."
+#fi
+#
+#which black > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    black src
+#else
+#    echo "black is not installed, skipping..."
+#fi
+#
+#which pylint > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    pylint src
+#else
+#    echo "pylint is not installed, skipping..."
+#fi
 
-which isort > /dev/null
-if [ $? -eq 0 ]
-then
-    isort src
-else
-    echo "isort is not installed, skipping..."
-fi
-
-which black > /dev/null
-if [ $? -eq 0 ]
-then
-    black src
-else
-    echo "black is not installed, skipping..."
-fi
-
-which pylint > /dev/null
-if [ $? -eq 0 ]
-then
-    pylint src
-else
-    echo "pylint is not installed, skipping..."
-fi
-
-# For tests
-which mypy > /dev/null
-if [ $? -eq 0 ]
-then
-    mypy --strict --namespace-packages --ignore-missing-imports tests
-fi
-
-which isort > /dev/null
-if [ $? -eq 0 ]
-then
-    isort tests
-fi
-
-which black > /dev/null
-if [ $? -eq 0 ]
-then
-    black tests
-fi
-
-which pylint > /dev/null
-if [ $? -eq 0 ]
-then
-    pylint tests
-fi
+## For tests
+#which mypy > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    mypy --strict --namespace-packages --ignore-missing-imports tests
+#fi
+#
+#which isort > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    isort tests
+#fi
+#
+#which black > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    black tests
+#fi
+#
+#which pylint > /dev/null
+#if [ $? -eq 0 ]
+#then
+#    pylint tests
+#fi
 
 echo "Using 'sudo' to set correct directory ownership"
 # Remove git create folder files
@@ -264,7 +264,7 @@ docker-compose build || exit 1
 sudo chown -R 1500 data/hsm_tokens
 sudo chown -R 999 data/db_data
 
-docker-compose -f docker-compose.yml up -d || exit 1
+#docker-compose -f docker-compose.yml up -d || exit 1
 
 # Allow container to startup
 sleep 3

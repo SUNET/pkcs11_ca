@@ -7,6 +7,9 @@ PIPSYNC=pip-sync --index-url https://pypi.sunet.se/simple --python-executable $(
 sync_deps:
 	$(PIPSYNC) requirements.txt
 
+update_deps:
+	$(PIPCOMPILE) requirements.in
+
 ifndef VERSION
 VERSION := latest                                                                                                                                                                                                                              
 endif

@@ -1,6 +1,5 @@
 version: "3.3"
-# Require docker-compose version 1.29
-# version: "3.9"
+
 services:
   ca:
     build:
@@ -11,14 +10,10 @@ services:
     depends_on:
       - "postgres"
     restart: always
-    read_only: true
-    cap_drop: [ALL]
+    #read_only: true
+    #cap_drop: [ALL]
     security_opt:
       - no-new-privileges:true
-    # Require docker-compose version 1.29 and version: "3.3" in this file at the top
-    # mem_limit: "512m"
-    # mem_reservation: "128m"
-    # cpus: "1.75"
     volumes:
       - ./data/hsm_tokens:/var/lib/softhsm/tokens
     tmpfs:
@@ -36,20 +31,10 @@ services:
       - POSTGRES_PORT=${POSTGRES_PORT}
       - POSTGRES_DATABASE=${POSTGRES_DATABASE}
       - POSTGRES_TIMEOUT=${POSTGRES_TIMEOUT}
+
   postgres:
-    # build:
-    # context: .
-    # dockerfile: containers/postgres/Dockerfile
     image: postgres:15.3-bookworm@sha256:ad126c2b7482bf0ea4f90c2cbb9ab1dfec41ab58d8bef773273a3a1733ad6af0
     restart: always
-    # read_only: true
-    # cap_drop: [ALL]
-    # security_opt:
-    #   - no-new-privileges:true
-    # Require docker-compose version 1.299 and version: "3.3" in this file at the top
-    # mem_limit: "1g"
-    # mem_reservation: "128m"
-    # cpus: "1.75"
     volumes:
       - ./data/db_data:/var/lib/postgresql/data
     tmpfs:
@@ -58,46 +43,17 @@ services:
       - POSTGRES_DB=${POSTGRES_DATABASE}
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-  #test1:
-  #  build:
-  #    context: .
-  #    dockerfile: containers/test/Dockerfile
-  #  depends_on:
-  #    - "ca"
-  #  restart: "no"
-  #  # read_only: true
-  #  cap_drop: [ALL]
-  #  security_opt:
-  #    - no-new-privileges:true
-  #  # Require docker-compose version 1.29 and version: "3.3" in this file at the top
-  #  # mem_limit: "256m"
-  #  # mem_reservation: "128m"
-  #  # cpus: "1.0"
-  #  tmpfs:
-  #    - /dev/shm:ro,noexec,nosuid,nodev
-  #  environment:
-  #    - CA_URL=${CA_URL}
-  #    - ACME_ROOT=${ACME_ROOT}
-  #    - PKCS11_SIGN_API_TOKEN=${PKCS11_SIGN_API_TOKEN}
-  #  entrypoint: ['true']
+
   pdfsign:
     image: docker.sunet.se/dc4eu/pkcs11_pdfsign:latest
-    #build:
-    #  context: .
-    #  dockerfile: containers/pdfsign/Dockerfile
     ports:
-      - "8006:8006"
+      - "8080:8080"
     depends_on:
       - "ca"
     restart: always
-    # read_only: true
-    cap_drop: [ALL]
-    security_opt:
-      - no-new-privileges:true
-    # Require docker-compose version 1.29 and version: "3.3" in this file at the top
-    # mem_limit: "256m"
-    # mem_reservation: "128m"
-    # cpus: "1.0"
+    #cap_drop: [ALL]
+    #security_opt:
+    #  - no-new-privileges:true
     tmpfs:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
