@@ -1,5 +1,5 @@
 from pydantic import BaseModel, validator
-from typing import Optional
+from typing import Any, Optional
 from datetime import datetime
 
 
@@ -31,22 +31,20 @@ class PDFSignReply(BaseModel):
 
 class PDFValidateRequest(BaseModel):
     """Class to represent request"""
+
     data: str
-
-
-class PDFValidateData(BaseModel):
-    """Class to represent validation data"""
-    valid: bool
 
 
 class PDFValidateReply(BaseModel):
     """Class to represent reply"""
-    data: PDFValidateData
-    error: str
+
+    valid: Optional[bool] = False
+    error: Optional[str] = None
 
 
 class StatusReply(BaseModel):
     """Class to represent status reply"""
+
     status: str
     message: Optional[str] = None
     last_check: int

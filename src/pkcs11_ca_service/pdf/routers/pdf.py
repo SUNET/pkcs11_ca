@@ -19,24 +19,24 @@ pdf_router = APIRouter(
 
 @pdf_router.post("/sign", response_model=PDFSignReply)
 def endpoint_sign_pdf(req: ContextRequest, in_data: PDFSignRequest) -> Any:
-    """ endpoint for signing a base64 encoded PDF """
+    """endpoint for signing a base64 encoded PDF"""
 
-    req.app.logger.info(
-        f"Received a base64 PDF, transaction_id: {in_data.transaction_id}")
+    req.app.logger.info(f"Received a base64 PDF, transaction_id: {in_data.transaction_id}")
 
-    reply = sign(req=req,
-                 transaction_id=in_data.transaction_id,
-                 base64_pdf=in_data.data,
-                 reason=in_data.reason,
-                 location=in_data.location,
-                 )
+    reply = sign(
+        req=req,
+        transaction_id=in_data.transaction_id,
+        base64_pdf=in_data.data,
+        reason=in_data.reason,
+        location=in_data.location,
+    )
 
     return reply
 
 
 @pdf_router.post("/validate", response_model=PDFValidateReply)
 def endpoint_validate_pdf(req: ContextRequest, in_data: PDFValidateRequest) -> Any:
-    """ endpoint for validation of a base64 encoded PDF """
+    """endpoint for validation of a base64 encoded PDF"""
 
     req.app.logger.info("Validate a signed base64 PDF")
 
