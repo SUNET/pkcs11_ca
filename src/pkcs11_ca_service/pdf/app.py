@@ -5,6 +5,7 @@ from typing import Optional
 from pyhanko.sign import signers, SimpleSigner, timestamps
 from pyhanko.keys import load_cert_from_pemder
 from pyhanko_certvalidator import ValidationContext
+from pkcs11_ca_service.common.helpers import unix_ts
 from pkcs11_ca_service.pdf.context import ContextRequestRoute
 from pkcs11_ca_service.pdf.routers.pdf import pdf_router
 from pkcs11_ca_service.pdf.routers.status import status_router
@@ -15,6 +16,7 @@ from .exceptions import (
     http_error_detail_handler,
     unexpected_error_handler,
 )
+from pkcs11_ca_service.pdf.models import StatusReply
 
 
 class PDFAPI(FastAPI):
@@ -46,6 +48,12 @@ class PDFAPI(FastAPI):
         self.cert_path = "/opt/sunet/ts_cert.pem"
         self.tst_client = timestamps.HTTPTimeStamper(
             url=timestamp_url,
+        )
+
+        self.status_storage = StatusReply(
+            status="STATUS_OK",
+            last_check=unix_ts(),
+            next_check=unix_ts(),
         )
 
         self.logger.info(msg=f"chain_path: {self.chain_path}")

@@ -8,6 +8,6 @@ status_router = APIRouter(route_class=ContextRequestRoute, prefix="/status")
 
 
 @status_router.get("/healthy", response_model=StatusReply)
-async def endpoint_healthy(req: ContextRequest) -> Any:
+def endpoint_healthy(req: ContextRequest) -> Any:
     """Endpoint for status/healthy"""
     return healthy(req=req)
