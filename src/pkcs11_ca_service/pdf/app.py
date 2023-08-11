@@ -52,8 +52,8 @@ class PDFAPI(FastAPI):
 
         self.status_storage = StatusReply(
             status="STATUS_OK",
-            last_check=unix_ts(),
-            next_check=unix_ts(),
+            last_check=0,
+            next_check=0,
         )
 
         self.logger.info(msg=f"chain_path: {self.chain_path}")

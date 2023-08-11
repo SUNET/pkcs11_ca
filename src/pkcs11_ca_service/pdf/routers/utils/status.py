@@ -18,7 +18,7 @@ def healthy(req: ContextRequest) -> StatusReply:
 
         validate_pdf = validate(req=req, base64_pdf=signed_pdf.data)
 
-        req.app.status_storage.next_check = now+60
+        req.app.status_storage.next_check = now+5
 
         req.app.status_storage = StatusReply(
             status="STATUS_FAIL",
