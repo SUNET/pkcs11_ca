@@ -1,5 +1,6 @@
 from pydantic import BaseModel, validator
 from typing import Optional
+from datetime import datetime
 
 
 class PDFSignRequest(BaseModel):
@@ -45,4 +46,8 @@ class PDFValidateReply(BaseModel):
 
 
 class StatusReply(BaseModel):
+    """Class to represent status reply"""
     status: str
+    message: Optional[str] = None
+    last_check: int
+    next_check: int

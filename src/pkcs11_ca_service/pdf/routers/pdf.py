@@ -1,26 +1,9 @@
-"""Router for PDF signing and validation"""
-
 from typing import Any
 from fastapi import APIRouter
-from .context import ContextRequest, ContextRequestRoute
-from .utils import sign, validate
-from .models import PDFSignRequest, PDFSignReply, PDFValidateRequest, PDFValidateReply, StatusReply
-from .exceptions import ErrorDetail
-
-status_router = APIRouter(route_class=ContextRequestRoute, prefix="/status")
-
-
-@status_router.get("/healthy", response_model=StatusReply)
-async def healthy(req: ContextRequest) -> Any:
-    """Endpoint for status/healthy"""
-
-    req.app.logger.info(msg="Check for healthy")
-
-    reply = StatusReply(
-        status="STATUS_OK",
-    )
-
-    return reply
+from pkcs11_ca_service.pdf.routers.utils.pdf import sign, validate
+from pkcs11_ca_service.pdf.models import PDFSignRequest, PDFSignReply, PDFValidateRequest, PDFValidateReply
+from pkcs11_ca_service.pdf.exceptions import ErrorDetail
+from pkcs11_ca_service.pdf.context import ContextRequest, ContextRequestRoute
 
 
 pdf_router = APIRouter(
@@ -35,7 +18,7 @@ pdf_router = APIRouter(
 
 
 @pdf_router.post("/sign", response_model=PDFSignReply)
-def sign_pdf(req: ContextRequest, in_data: PDFSignRequest) -> Any:
+def endpoint_sign_pdf(req: ContextRequest, in_data: PDFSignRequest) -> Any:
     """ endpoint for signing a base64 encoded PDF """
 
     req.app.logger.info(
@@ -52,7 +35,7 @@ def sign_pdf(req: ContextRequest, in_data: PDFSignRequest) -> Any:
 
 
 @pdf_router.post("/validate", response_model=PDFValidateReply)
-def validate_pdf(req: ContextRequest, in_data: PDFValidateRequest) -> Any:
+def endpoint_validate_pdf(req: ContextRequest, in_data: PDFValidateRequest) -> Any:
     """ endpoint for validation of a base64 encoded PDF """
 
     req.app.logger.info("Validate a signed base64 PDF")
