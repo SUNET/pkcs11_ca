@@ -772,7 +772,7 @@ typing-extensions==4.7.1 \
     #   fastapi
     #   pydantic
     #   pydantic-core
-urllib3==2.0.4 \
+urllib3==2.0.6 \
     --hash=sha256:8d22f86aae8ef5e410d4f539fde9ce6b2113a001bb4d189e0aed70642d602b11 \
     --hash=sha256:de7df1803967d2c2a98e4b11bb7d6bd9210474c46e8a0401514e3a42a75ebde4
     # via requests
