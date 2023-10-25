@@ -1,4 +1,4 @@
-from datetime import timedelta
+"""status utils"""
 from pkcs11_ca_service.common.helpers import unix_ts
 from pkcs11_ca_service.pdf.models import StatusReply
 from pkcs11_ca_service.pdf.context import ContextRequest
@@ -27,7 +27,7 @@ def healthy(req: ContextRequest) -> StatusReply:
             next_check=req.app.status_storage.next_check,
         )
 
-        if validate_pdf.valid:
+        if validate_pdf.valid_signature:
             req.app.status_storage.status = "STATUS_OK"
 
     return req.app.status_storage

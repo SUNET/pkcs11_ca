@@ -36,12 +36,14 @@ ci: docker-build docker-push
 
 vscode_venv:
 	$(info Creating virtualenv in devcontainer)
+	python3 -m venv .venv
 
 vscode_pip: vscode_venv
 	$(info Installing pip packages in devcontainer)
 	pip3 install --upgrade pip
 	pip3 install pip-tools
-	pip3 install -r requirements.txt
+	.venv/bin/pip install -r requirements.txt
+# .venv/bin/mypy --install-types
 
 vscode_packages:
 	$(info Installing apt packages in devcontainer)

@@ -1,4 +1,8 @@
+"""config"""
+
+from typing import Any, Mapping, Optional
 from pydantic import BaseModel
+import yaml
 
 
 class CA(BaseModel):
@@ -35,3 +39,10 @@ class PDFSign(BaseModel):
 class Config(CA, Pkcs11, Postgres, PDFSign):
     """Config class"""
     acme_root: str = "/acme"
+
+
+def load_config(test_config: Optional[Mapping[str, Any]] = None,):
+    if test_config:
+        return
+    with open(file="config.yaml",encoding="UTF-8", mode="r") as f:
+        cfg = yaml.load(f, Loader=yaml.FullLoader)

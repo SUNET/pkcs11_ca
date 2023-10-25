@@ -1,0 +1,24 @@
+---
+
+config:
+    acme_root: "/acme"
+  pdf:
+    ca:
+      url: "http://ca:8005"
+      dns_name: ca
+    pkcs11:
+      sign_api_token: "xyz"
+      token: "my_test_token_1"
+      pin: "1234"
+      module: "/usr/lib/softhsm/libsofthsm2.so"
+    postgres:
+      host: "postgres"
+      user: "pkcs11_testuser1"
+      password: "DBUserPassword"
+      port: "5432"
+      database: "pkcs11_testdb1"
+      timeout: "5"
+    pdfsign:
+      chain_path: "/app/ts_chain.pem"
+      key_path: "/app/ts_priv"
+      cert_path: "/app/ts_cert.pem"

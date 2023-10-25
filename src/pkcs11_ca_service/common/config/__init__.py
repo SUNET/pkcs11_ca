@@ -1,2 +1,3 @@
-"""common"""
+"""config"""
+
 __author__ = "masv"
