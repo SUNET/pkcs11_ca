@@ -1,3 +1,5 @@
+"""status router"""
+
 from typing import Any
 from fastapi import APIRouter
 from pkcs11_ca_service.pdf.routers.utils.status import healthy
