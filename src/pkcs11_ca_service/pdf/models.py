@@ -1,6 +1,7 @@
-from pydantic import BaseModel, validator
+"""pdf model"""
+
 from typing import Optional
-from datetime import datetime
+from pydantic import BaseModel, validator
 
 
 class PDFSignRequest(BaseModel):
@@ -24,29 +25,29 @@ class PDFSignReply(BaseModel):
     """Class to represent reply"""
 
     transaction_id: str
-    data: str
-    error: str
+    data: Optional[str] = None
+    error: Optional[str] = None
     create_ts: Optional[int]
 
 
 class PDFValidateRequest(BaseModel):
     """Class to represent request"""
+
     data: str
-
-
-class PDFValidateData(BaseModel):
-    """Class to represent validation data"""
-    valid: bool
 
 
 class PDFValidateReply(BaseModel):
     """Class to represent reply"""
-    data: PDFValidateData
-    error: str
+
+    valid_signature: bool = False
+    transaction_id: Optional[str] = None
+    is_revoked: bool = False
+    error: Optional[str] = None
 
 
 class StatusReply(BaseModel):
     """Class to represent status reply"""
+
     status: str
     message: Optional[str] = None
     last_check: int

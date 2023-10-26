@@ -2,6 +2,7 @@
     "cSpell.words": [
         "addsig",
         "asyncpg",
+        "certvalidator",
         "fastapi",
         "HEALTHCHECK",
         "jsonschema",
@@ -17,5 +18,9 @@
         "secp",
         "subfilter",
         "timestamper"
-    ]
+    ],
+    "[python]": {
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "python.formatting.provider": "none"
 }
