@@ -6,11 +6,20 @@ jobs:
   VM-test-job:
 
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python: ["3.9", "3.10", "3.11", "3.12"]
+
     steps:
-      - name: Install dependencies
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install and run
         run: |
           sudo apt-get update
-          sudo apt-get install git python3-dev python3-pip docker-compose flit curl -y
+          sudo apt-get install docker-compose curl -y
           bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
           export CA_URL=https://ca && \
           export CA_DNS_NAME=ca && \
@@ -27,8 +36,6 @@ jobs:
           export POSTGRES_TIMEOUT=5 && \
           id && \
           cd && \
-          git clone https://github.com/SUNET/pkcs11_ca.git && \
-          cd pkcs11_ca && \
           python3 -m pip install -r requirements.txt && \
           python3 -m pip install types-requests mypy black pylint && \
           bash deploy.sh'
