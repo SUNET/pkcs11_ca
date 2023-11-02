@@ -36,7 +36,7 @@ jobs:
           export POSTGRES_TIMEOUT=5 && \
           id && \
           cd && \
-	  ls -altr && \
+          ls -altr && \
           python3 -m pip install -r requirements.txt && \
           python3 -m pip install types-requests mypy black pylint && \
           bash deploy.sh'
