@@ -60,8 +60,7 @@ else:
     startup_task = loop.create_task(startup())
 
 # Create fastapi app
-# Disable swagger and docs endpoints for now
-app = FastAPI(docs_url=None, redoc_url=None)
+app = FastAPI()
 
 
 @app.get("/new-nonce")
