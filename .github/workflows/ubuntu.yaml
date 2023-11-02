@@ -20,9 +20,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install docker-compose curl -y
-          bash -c 'cd work/pkcs11_ca/pkcs11_ca && \
-          export PATH="$PATH:$HOME/.local/bin" && \
-          export CA_URL=https://ca && \
+	  pip3 install types-requests mypy black pylint
+	  pip3 install -r requirements.txt
+          bash -c 'export CA_URL=https://ca && \
           export CA_DNS_NAME=ca && \
           export ACME_ROOT=/acme && \
           export PKCS11_SIGN_API_TOKEN=xyz && \
@@ -34,10 +34,7 @@ jobs:
           export POSTGRES_PASSWORD=DBUserPassword && \
           export POSTGRES_PORT=5432 && \
           export POSTGRES_DATABASE=pkcs11_testdb1 && \
-          export POSTGRES_TIMEOUT=5 && \
-          id && \
-          cd && \
-          ls -altr && \
-          python3 -m pip install -r requirements.txt && \
-          python3 -m pip install types-requests mypy black pylint && \
-          bash deploy.sh'
+          export POSTGRES_TIMEOUT=5'
+          id
+          ls -altr
+          bash deploy.sh
