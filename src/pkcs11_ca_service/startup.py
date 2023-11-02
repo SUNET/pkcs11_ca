@@ -9,13 +9,23 @@ from pkcs11.exceptions import NoSuchKey
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
 from .base import DataBaseObject, DataClassObject
+from .ca import CaInput
 from .config import (
+    ACME_SIGNER_KEY_LABEL,
+    CMC_CERT_ISSUING_KEY_LABEL,
+    CMC_ROOT_KEY_LABEL,
+    CMC_SIGNING_KEY_LABEL,
     DB_MODULE,
     DB_TABLE_MODULES,
     PKCS11_BACKEND,
     ROOT_CA_KEY_LABEL,
     ROOT_CA_KEY_TYPE,
+    TIMESTAMP_CERT_KEY_LABEL,
+    TIMESTAMP_ROOT_KEY_LABEL,
+    TIMESTAMP_SIGNING_KEY_LABEL,
 )
+from .pkcs11_key import Pkcs11KeyInput
+from .route_functions import ca_request, pkcs11_key_request
 
 
 def _load_db_data_classes() -> List[DataClassObject]:
@@ -112,6 +122,34 @@ async def _pkcs11_startup(db_obj: DataBaseObject) -> bool:
     return True
 
 
+async def write_root_certs_to_disk() -> None:
+    """Write global root cers to file for easy access"""
+
+    for cert in [
+        ACME_SIGNER_KEY_LABEL,
+        CMC_ROOT_KEY_LABEL,
+        CMC_SIGNING_KEY_LABEL,
+        CMC_CERT_ISSUING_KEY_LABEL,
+        TIMESTAMP_ROOT_KEY_LABEL,
+        TIMESTAMP_SIGNING_KEY_LABEL,
+        TIMESTAMP_CERT_KEY_LABEL,
+    ]:
+        cert_pkcs11_key = await pkcs11_key_request(Pkcs11KeyInput(key_label=cert))
+        cert_obj = await ca_request(CaInput(pkcs11_key=cert_pkcs11_key.serial))
+
+        if os.path.isfile(f"/etc/pkcs11_ca/ca_root_certs/{cert}.crt"):
+            with open(f"/etc/pkcs11_ca/ca_root_certs/{cert}.crt", encoding="utf-8") as cert_file:
+                cert_data = cert_file.read()
+            if cert_data.strip() != cert_obj.pem.strip():
+                print(f"ERROR: Cert for pkcs11 key {cert} is not the same as /etc/pkcs11_ca/ca_root_certs/{cert}.crt")
+                sys.exit(1)
+
+            continue
+
+        with open(f"/etc/pkcs11_ca/ca_root_certs/{cert}.crt", "w", encoding="utf-8") as cert_file:
+            cert_file.write(cert_obj.pem + "\n")
+
+
 async def startup() -> None:
     """Startup main function
 
@@ -133,3 +171,5 @@ async def startup() -> None:
     # Check pkcs11 with database
     if not await _pkcs11_startup(db_obj):
         sys.exit(1)
+
+    await write_root_certs_to_disk()

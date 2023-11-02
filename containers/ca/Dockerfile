@@ -2,7 +2,7 @@ FROM debian:bookworm-20231009-slim@sha256:ceffa8e71bafc0190f915774b9696a0b6cb626
 
 MAINTAINER victor@sunet.se
 
-EXPOSE 8005/tcp
+EXPOSE 443/tcp
 
 # Metadata
 LABEL version="1.03"
@@ -86,4 +86,4 @@ HEALTHCHECK --interval=120s --timeout=15s --retries=1 --start-period=30s \
 # ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--ssl-keyfile", "tls_key.key", "--ssl-certfile", "tls_certificate.pem", "--ssl-version", "2", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
 # ENTRYPOINT ["uvicorn", "src.pkcs11_ca_service.main:app", "--log-config", "./logging.json", "--host", "0.0.0.0", "--port", "8005", "--workers", "1", "--header", "server:pkcs11_ca"]
 
-CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.main:app --ssl-keyfile tls_key.key --ssl-certfile tls_certificate.pem --ssl-version 2 --log-config ./logging.json --host 0.0.0.0 --port 8005 --workers 1 --header server:pkcs11_ca'
+CMD sh -c '. .venv/bin/activate && uvicorn src.pkcs11_ca_service.main:app --ssl-keyfile tls_key.key --ssl-certfile tls_certificate.pem --ssl-version 2 --log-config ./logging.json --host 0.0.0.0 --port 443 --workers 1 --header server:pkcs11_ca'

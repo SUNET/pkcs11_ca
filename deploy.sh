@@ -12,7 +12,7 @@ then
 Try with default ENV vars below:
 
 # The URL and DNS name for the PKCS11 CA
-export CA_URL="https://ca:8005"
+export CA_URL="https://ca"
 export CA_DNS_NAME="ca"
 
 # The ACME root url endpoint
@@ -105,7 +105,6 @@ then
     exit 1
 fi
 
-
 # Check openssl
 which openssl > /dev/null
 if [ $? -ne 0 ]
@@ -119,6 +118,32 @@ which python3 > /dev/null
 if [ $? -ne 0 ]
 then
     echo "python3 not found, install with sudo apt-get install python3"
+    exit 1
+fi
+
+# Check docker
+which docker > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "docker not found, for example, install with sudo apt-get install docker.io"
+    echo "sudo usermod -a -G docker $USER"
+    echo "logout and in now for docker group to work"
+    exit 1
+fi
+
+# Check docker-compose
+which docker-compose > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "docker-compose not found, install with pip3 install docker-compose"
+    exit 1
+fi
+
+# Check sudo
+which sudo > /dev/null
+if [ $? -ne 0 ]
+then
+    echo "sudo not found, install with sudo apt-get install sudo"
     exit 1
 fi
 
@@ -173,24 +198,6 @@ if os.environ["CA_URL"] not in ["https://ca:8005", "https://ca:443", "https://ca
     fi
 
     chmod 644 data/tls_key*.key
-fi
-
-# Check docker
-which docker > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "docker not found, install with sudo apt-get install docker.io"
-    echo "sudo usermod -a -G docker $USER"
-    echo "logout and in now for docker group to work"
-    exit 1
-fi
-
-# Check docker-compose
-which docker-compose > /dev/null
-if [ $? -ne 0 ]
-then
-    echo "docker-compose not found, install with pip3 install docker-compose"
-    exit 1
 fi
 
 # Check code
@@ -256,12 +263,15 @@ fi
 
 echo "Using 'sudo' to set correct directory ownership"
 # Remove git create folder files
+docker-compose -f docker-compose.yml down || exit 1 # Stop service if running
 sudo rm -f data/hsm_tokens/.empty || exit 1 # if sudo is not installed ot failed
 sudo rm -f data/db_data/.empty
-sudo mkdir -p data/hsm_tokens data/db_data
-sudo chown -R $USER data/hsm_tokens data/db_data/
+sudo rm -f data/ca_root_certs/.empty
+sudo mkdir -p data/hsm_tokens data/db_data data/ca_root_certs
+sudo chown -R $USER data/hsm_tokens data/db_data data/ca_root_certs
 docker-compose build || exit 1
 sudo chown -R 1500 data/hsm_tokens
+sudo chown -R 1500 data/ca_root_certs
 sudo chown -R 999 data/db_data
 
 docker-compose -f docker-compose.yml up -d || exit 1

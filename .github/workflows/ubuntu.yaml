@@ -12,7 +12,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install git python3-dev python3-pip docker-compose flit curl -y
           bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
-          export CA_URL=https://ca:8005 && \
+          export CA_URL=https://ca && \
           export CA_DNS_NAME=ca && \
           export ACME_ROOT=/acme && \
           export PKCS11_SIGN_API_TOKEN=xyz && \

@@ -7,7 +7,7 @@ services:
       context: .
       dockerfile: containers/ca/Dockerfile
     ports:
-      - "8005:8005"
+      - "443:443"
     depends_on:
       - "postgres"
     restart: always
@@ -21,6 +21,7 @@ services:
     # cpus: "1.75"
     volumes:
       - ./data/hsm_tokens:/var/lib/softhsm/tokens
+      - ./data/ca_root_certs:/etc/pkcs11_ca/ca_root_certs/
     tmpfs:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
@@ -40,7 +41,7 @@ services:
     # build:
     # context: .
     # dockerfile: containers/postgres/Dockerfile
-    image: postgres:15.4-bookworm@sha256:2e89ed90224245851ea2b01e0b20c4b893e69141eb36e7a1cece7fb9e19f21f0
+    image: postgres:16.0-bookworm@sha256:3648b6c2ac30de803a598afbaaef47851a6ee1795d74b4a5dcc09a22513b15c9
     restart: always
     # read_only: true
     # cap_drop: [ALL]
