@@ -20,7 +20,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install docker-compose curl -y
-          bash -c 'export PATH="$PATH:$HOME/.local/bin" && \
+          bash -c 'cd work/pkcs11_ca/pkcs11_ca && \
+	  export PATH="$PATH:$HOME/.local/bin" && \
           export CA_URL=https://ca && \
           export CA_DNS_NAME=ca && \
           export ACME_ROOT=/acme && \
