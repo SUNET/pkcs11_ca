@@ -20,8 +20,8 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install docker-compose curl -y
-	  pip3 install types-requests mypy black pylint
-	  pip3 install -r requirements.txt
+          pip3 install types-requests mypy black pylint
+          pip3 install -r requirements.txt
           bash -c 'export CA_URL=https://ca && \
           export CA_DNS_NAME=ca && \
           export ACME_ROOT=/acme && \
