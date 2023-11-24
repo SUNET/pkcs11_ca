@@ -42,7 +42,7 @@ def sign(req: ContextRequest, transaction_id: str, base64_pdf: str, reason: str,
             signature_meta=signature_meta,
             signer=req.app.simple_signer,
             output=signed_pdf,
-            # timestamper=req.app.tst_client,
+           # timestamper=req.app.tst_client,
         )
     except PdfKeyNotAvailableError as _e:
         err_msg = f"ca_pdfsign: input pdf is encrypted, err: {_e}"
@@ -84,7 +84,7 @@ def validate(req: ContextRequest, base64_pdf: str) -> PDFValidateReply:
 
     req.app.logger.info(msg="Trying to validate the PDF")
 
-    pdf = PdfFileReader(BytesIO(base64.b64decode(base64_pdf.encode("utf-8"), validate=True)))
+    pdf = PdfFileReader(BytesIO(base64.b64decode(base64_pdf.encode("utf-8"), validate=True)), strict=False)
 
     if len(pdf.embedded_signatures) == 0:
         return PDFValidateReply(error="No signature found")
@@ -99,17 +99,17 @@ def validate(req: ContextRequest, base64_pdf: str) -> PDFValidateReply:
 
     req.app.logger.info(msg=f"status: {status}")
 
-    # status_ltv = validate_pdf_ltv_signature(
+    #status_ltv = validate_pdf_ltv_signature(
     #    sig,
-    #    RevocationInfoValidationType.PADES_LTA,
+    #    ltv.RevocationInfoValidationType.PADES_LTA,
     #    validation_context_kwargs={'trust_roots': [req.app.cert_pemder]},
     # )
 
-    # req.app.logger.info(msg=status_ltv.pretty_print_details())
+    #req.app.logger.info(msg=status_ltv.pretty_print_details())
 
     req.app.logger.info(msg="Successfully validate PDF")
 
     return PDFValidateReply(
-        valid_signature=status.valid,
+        valid_signature=status.bottom_line,
         transaction_id= transaction_id,
     )
