@@ -1,4 +1,4 @@
-FROM debian:bookworm-20231009-slim@sha256:ceffa8e71bafc0190f915774b9696a0b6cb6262d1df5f64028b570ca4055ba83
+FROM debian:bookworm-20231120-slim@sha256:93ff361288a7c365614a5791efa3633ce4224542afb6b53a1790330a8e52fc7d
 
 MAINTAINER victor@sunet.se
 
