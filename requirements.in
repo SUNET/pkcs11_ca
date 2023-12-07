@@ -4,6 +4,7 @@ python_cmc
 pyjwt
 fastapi
 asyncpg
+async-timeout
 cryptography
 requests
 openapi_schema_validator
