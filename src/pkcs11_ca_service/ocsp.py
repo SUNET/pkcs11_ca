@@ -9,22 +9,11 @@ from fastapi import HTTPException
 from python_x509_pkcs11.ocsp import request_nonce, response
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .asn1 import (
-    cert_is_self_signed,
-    cert_revoked,
-    cert_revoked_time,
-    ocsp_decode,
-    pem_cert_to_key_hash,
-)
+from .asn1 import cert_is_self_signed, cert_revoked, cert_revoked_time, ocsp_decode, pem_cert_to_key_hash
 from .ca import CaInput
 from .pkcs11_key import Pkcs11KeyInput
 from .public_key import PublicKeyInput
-from .route_functions import (
-    ca_request,
-    crl_request,
-    pkcs11_key_request,
-    public_key_request,
-)
+from .route_functions import ca_request, crl_request, pkcs11_key_request, public_key_request
 
 # Sign the request with the key for the first single request
 # single requests for certificates by another CA will get unknown status

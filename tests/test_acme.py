@@ -18,12 +18,7 @@ from asn1crypto import csr as asn1_csr
 from asn1crypto import pem as asn1_pem
 from asn1crypto import x509 as asn1_x509
 from cryptography import x509
-from cryptography.hazmat.primitives.asymmetric.ec import (
-    ECDSA,
-    SECP256R1,
-    EllipticCurvePrivateKey,
-    generate_private_key,
-)
+from cryptography.hazmat.primitives.asymmetric.ec import ECDSA, SECP256R1, EllipticCurvePrivateKey, generate_private_key
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.serialization import (
     Encoding,

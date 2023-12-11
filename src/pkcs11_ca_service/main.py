@@ -43,13 +43,7 @@ from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
 from .pkcs11_sign import pkcs11_sign
 from .public_key import PublicKey, PublicKeyInput
 from .public_key import search as public_key_search
-from .route_functions import (
-    ca_request,
-    crl_request,
-    healthcheck,
-    pkcs11_key_request,
-    sign_csr,
-)
+from .route_functions import ca_request, crl_request, healthcheck, pkcs11_key_request, sign_csr
 from .startup import startup
 from .timestamp import timestamp_handle_request
 

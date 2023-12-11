@@ -9,12 +9,7 @@ import requests
 from asn1crypto import crl as asn1_crl
 from asn1crypto import pem as asn1_pem
 
-from src.pkcs11_ca_service.asn1 import (
-    cert_pem_serial_number,
-    cert_revoked,
-    create_jwt_header_str,
-    crl_expired,
-)
+from src.pkcs11_ca_service.asn1 import cert_pem_serial_number, cert_revoked, create_jwt_header_str, crl_expired
 from src.pkcs11_ca_service.config import ROOT_URL
 
 from .lib import cdp_url, create_i_ca, verify_pkcs11_ca_tls_cert

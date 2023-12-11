@@ -50,6 +50,7 @@ ignore_missing_imports = true
 
 [tool.isort]
 profile = "black"
+line_length = 120
 src_paths = ["src", "tests"]
 
 [tool.black]

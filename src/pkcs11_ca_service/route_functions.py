@@ -6,13 +6,7 @@ from python_x509_pkcs11.crl import create as create_crl
 from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
 from python_x509_pkcs11.pkcs11_handle import PKCS11Session
 
-from .asn1 import (
-    aia_and_cdp_exts,
-    cert_is_ca,
-    cert_pem_serial_number,
-    crl_expired,
-    pem_cert_to_name_dict,
-)
+from .asn1 import aia_and_cdp_exts, cert_is_ca, cert_pem_serial_number, crl_expired, pem_cert_to_name_dict
 from .base import db_load_data_class
 from .ca import Ca, CaInput
 from .certificate import Certificate

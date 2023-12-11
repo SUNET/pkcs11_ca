@@ -787,9 +787,9 @@ python-dotenv==1.0.0 \
 python-pkcs11==0.7.0 \
     --hash=sha256:9737e0c24cabb8bc9d48bf8c57c3df2a70f8cdd96b70c50290803286f9e46bf7
     # via python-x509-pkcs11
-python-x509-pkcs11==0.8.0 \
-    --hash=sha256:1af692f00473d991e567f7e65fe277312bad9f9b630d7e1c42d7c2023e120755 \
-    --hash=sha256:c95b28f343df70ef666ac61c65b79a4f2d8c1aac11720b3462e1ceeda89197b7
+python-x509-pkcs11==0.8.3 \
+    --hash=sha256:0ff24280d7f6d07f9e7a5cfc2fa14b2360686132f85f196752389c42fbd0b819 \
+    --hash=sha256:68cc4d0bfb1f4f9d82661b82f0ebc4517f0bbe48863b1dbe47beb8826caf3638
     # via -r requirements.in
 pyyaml==6.0.1 \
     --hash=sha256:04ac92ad1925b2cff1db0cfebffb6ffc43457495c9b3c39d3fcae417d7125dc5 \
