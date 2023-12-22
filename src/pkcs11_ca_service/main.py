@@ -37,6 +37,7 @@ from .crl import Crl, CrlInput
 from .crl import search as crl_search
 from .csr import Csr, CsrInput
 from .csr import search as csr_search
+from .edusign import create_edusign_longterm_crl
 from .nonce import nonce_response
 from .ocsp import ocsp_response
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
@@ -828,3 +829,23 @@ async def head_acme_new_nonce() -> Response:
     """
 
     return nonce_response(200)
+
+
+@app.get("/edusign/longterm-crl")
+async def edusign_longterm_crl() -> Response:
+    """/edusign/longterm-crl", GET method.
+
+    Get an edusign one year empty CRL.
+
+    Returns:
+    fastapi.Response
+    """
+
+    try:
+        longterm_crl = await create_edusign_longterm_crl()
+        return Response(status_code=200, content=crl_as_der(longterm_crl), media_type="application/pkix-crl")
+    except (HTTPException, ValueError, TypeError) as e:
+        print(f"Error: Problem with edusign longterm CRL creation: {e}")
+        return Response(
+            status_code=500, content='{"detail":"Problem with edusign longterm CRL"}', media_type="application/json"
+        )

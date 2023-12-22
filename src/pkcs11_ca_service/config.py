@@ -178,3 +178,14 @@ AYYwCgYIKoZIzj0EAwIDSAAwRQIhAKKdU1WvRVApCYXR7jDwt0A+FDIUkF8i5Jkx
 JOvOkFmuAiAAi7tZG8mz4lh5+Z/BihVKZ308MQAlZJE+hQ7BvA4IwQ==
 -----END CERTIFICATE-----""",
 ]
+
+EDUSIGN_LONGTERM_CRL_KEY_LABEL = "EDUSIGN_KEY_LABEL_HERE"  # FIXME HERE!
+EDUSIGN_LONGTERM_CRL_KEY_TYPE = "rsa_4096"  # FIXME HERE!
+EDUSIGN_LONGTERM_CRL_CA_NAME_DICT = {  # FIXME HERE!
+    "country_name": "SE",
+    "state_or_province_name": "Stockholm",
+    "locality_name": "Stockholm",
+    "organization_name": "SUNET",
+    "organizational_unit_name": "SUNET Infrastructure",
+    "common_name": "edusign_crl_FIXME",
+}
