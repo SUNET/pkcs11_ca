@@ -37,7 +37,7 @@ from .crl import Crl, CrlInput
 from .crl import search as crl_search
 from .csr import Csr, CsrInput
 from .csr import search as csr_search
-from .edusign import create_edusign_longterm_crl
+from .edusign import create_edusign_longterm_crl, edusign_simple_healthecheck
 from .nonce import nonce_response
 from .ocsp import ocsp_response
 from .pkcs11_key import Pkcs11Key, Pkcs11KeyInput
@@ -844,8 +844,22 @@ async def edusign_longterm_crl() -> Response:
     try:
         longterm_crl = await create_edusign_longterm_crl()
         return Response(status_code=200, content=crl_as_der(longterm_crl), media_type="application/pkix-crl")
-    except (HTTPException, ValueError, TypeError) as e:
-        print(f"Error: Problem with edusign longterm CRL creation: {e}")
+    except (ValueError, TypeError) as exception:
+        print(f"Error: Problem with edusign longterm CRL creation: {exception}")
         return Response(
             status_code=500, content='{"detail":"Problem with edusign longterm CRL"}', media_type="application/json"
         )
+
+
+@app.get("/edusign/simple_healthcheck")
+async def edusign_longterm_crl() -> JSONResponse:
+    """/edusign/simple_healthcheck", GET method.
+
+    Simple healthcheck
+
+    Returns:
+    fastapi.Response
+    """
+
+    await edusign_simple_healthecheck()
+    return JSONResponse(status_code=200, content={"status": "OK"})

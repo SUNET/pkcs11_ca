@@ -57,3 +57,17 @@ class TestEDUSIGN(unittest.TestCase):
             crl_dict["tbs_cert_list"]["next_update"]
             > (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=359)).replace(microsecond=0)
         )
+
+    def test_edusign_simple_healthcheck(self) -> None:
+        """
+        Test our simple healthcheck
+        """
+
+        req = requests.get(
+            self.ca_url + "/edusign/simple_healthcheck",
+            timeout=10,
+            verify=verify_pkcs11_ca_tls_cert(),
+        )
+
+        # Ensure status 200 OK
+        self.assertTrue(req.status_code == 200)
