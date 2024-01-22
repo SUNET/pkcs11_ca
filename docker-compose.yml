@@ -6,8 +6,6 @@ services:
     build:
       context: .
       dockerfile: containers/remote_ca/Dockerfile
-    ports:
-      - "8080:8080"
     # depends_on:
     #   - "postgres"
     restart: always
@@ -25,6 +23,7 @@ services:
     tmpfs:
       - /dev/shm:ro,noexec,nosuid,nodev
     environment:
+      - PKCS11_TOKEN_SUPPORT_RECREATE_SESSION=TRUE
       - PKCS11_TOKEN=${PKCS11_TOKEN}
       - PKCS11_PIN=${PKCS11_PIN}
       - PKCS11_MODULE=${PKCS11_MODULE}

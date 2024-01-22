@@ -62,6 +62,17 @@ startup_task = loop.create_task(pkcs11_startup())
 app = FastAPI()
 
 
+@app.get("/pkcs11/simple_healthcheck")
+async def get_pkcs11_simple_healthcheck() -> JSONResponse:
+    _ = await PKCS11Session().sign(
+        key_label="test_pkcs11_device_do_not_use",
+        data=b"test_data",
+        verify_signature=True,
+        key_type="rsa_2048",
+    )
+    return JSONResponse({"status": "ok"})
+
+
 @app.post("/pkcs11/import_certificate")
 async def post_pkcs11_import_certificate(request: Request, pkcs11_request: PKCS11Request) -> JSONResponse:
     if not isinstance(pkcs11_request.cert_label, str) or not isinstance(pkcs11_request.cert_pem, str):

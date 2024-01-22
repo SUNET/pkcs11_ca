@@ -7,7 +7,7 @@ if [ -z "$CA_URL" ]
 then
     echo "Set ENV CA_URL"
     echo '''
-# Documentation here: https://pkcs11-ca.readthedocs.io/en/latest/configuration.htm
+# Documentation here: https://pkcs11-ca.readthedocs.io/en/latest/configuration.html
 
 Try with default ENV vars below:
 
