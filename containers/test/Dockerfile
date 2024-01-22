@@ -61,4 +61,5 @@ USER pkcs11_ca_test1
 # ENTRYPOINT ["sleep", "300"]
 # ENTRYPOINT ["python3", "-m", "unittest"]
 
+# CMD sh -c '. .venv/bin/activate && sleep 600'
 CMD sh -c '. .venv/bin/activate && python3 -m unittest'

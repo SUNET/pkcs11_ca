@@ -7,7 +7,7 @@ if [ -z "$CA_URL" ]
 then
     echo "Set ENV CA_URL"
     echo '''
-# Documentation here: https://pkcs11-ca.readthedocs.io/en/latest/configuration.htm
+# Documentation here: https://pkcs11-ca.readthedocs.io/en/latest/configuration.html
 
 Try with default ENV vars below:
 
@@ -267,10 +267,14 @@ docker-compose -f docker-compose.yml down || exit 1 # Stop service if running
 sudo rm -f data/hsm_tokens/.empty || exit 1 # if sudo is not installed ot failed
 sudo rm -f data/db_data/.empty
 sudo rm -f data/ca_root_certs/.empty
-sudo mkdir -p data/hsm_tokens data/db_data data/ca_root_certs
-sudo chown -R $USER data/hsm_tokens data/db_data data/ca_root_certs
+sudo rm -f data/remote_ca_root_certs/.empty
+
+sudo mkdir -p data/hsm_tokens data/remote_hsm_tokens data/db_data data/ca_root_certs data/remote_ca_root_certs
+sudo chown -R $USER data/hsm_tokens data/remote_hsm_tokens data/db_data data/ca_root_certs data/remote_ca_root_certs
 docker-compose build || exit 1
 sudo chown -R 1500 data/hsm_tokens
+sudo chown -R 1500 data/remote_hsm_tokens
+sudo chown -R 1500 data/remote_ca_root_certs
 sudo chown -R 1500 data/ca_root_certs
 sudo chown -R 999 data/db_data
 

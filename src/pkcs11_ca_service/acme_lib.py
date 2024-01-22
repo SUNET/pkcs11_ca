@@ -23,17 +23,8 @@ from python_x509_pkcs11.csr import sign_csr as pkcs11_sign_csr
 from requests.exceptions import ConnectionError as requestsConnectionError
 
 from .acme_account import AcmeAccount, AcmeAccountInput, contact_from_payload
-from .acme_authorization import (
-    AcmeAuthorization,
-    AcmeAuthorizationInput,
-    challenges_from_list,
-)
-from .acme_order import (
-    AcmeOrder,
-    AcmeOrderInput,
-    authorizations_from_list,
-    identifiers_from_payload,
-)
+from .acme_authorization import AcmeAuthorization, AcmeAuthorizationInput, challenges_from_list
+from .acme_order import AcmeOrder, AcmeOrderInput, authorizations_from_list, identifiers_from_payload
 from .asn1 import (
     aia_and_cdp_exts,
     cert_from_der,
