@@ -157,12 +157,12 @@ async def startup() -> None:
     None
     """
 
-    db_obj = _load_db_module()
-    db_data_classes = _load_db_data_classes()
-
     # Check pkcs11
     if not await _pkcs11_check():
         sys.exit(1)
+
+    db_obj = _load_db_module()
+    db_data_classes = _load_db_data_classes()
 
     # Check DB
     if not await _db_startup(db_obj, db_data_classes):
