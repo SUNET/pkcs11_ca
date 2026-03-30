@@ -783,7 +783,7 @@ pydantic-core==2.14.6 \
     --hash=sha256:fd9e98b408384989ea4ab60206b8e100d8687da18b5c813c11e92fd8212a98e0 \
     --hash=sha256:ffff855100bc066ff2cd3aa4a60bc9534661816b110f0243e59503ec2df38421
     # via pydantic
-pygments==2.17.2 \
+pygments==2.20.0 \
     --hash=sha256:b27c2826c47d0f3219f29554824c30c5e8945175d888647acd804ddd04af846c \
     --hash=sha256:da46cec9fd2de5be3a8a784f434e4c4ab670b4ff54d605c4c2717e9d49c4c367
     # via sphinx
