@@ -257,7 +257,7 @@ class PostgresDB(DataBaseObject):
                     key_pem = key_pem.strip() + "\n"  # Fix whitespaces for pem key
 
                     # If exist the skip
-                    query = "SELECT pem FROM public_key WHERE pem = $1"
+                    query = "SELECT pem FROM public_key WHERE md5(pem) = md5($1) AND pem = $1"
                     rows = await conn.fetch(query, key_pem)
                     if rows:
                         print(f"Key {ROOT_ADMIN_KEYS_FOLDER}/{key_file} already exist in DB, skipping")
