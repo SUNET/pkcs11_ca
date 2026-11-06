@@ -62,6 +62,17 @@ from .timestamp import create_timestamp_certificate
 # https://github.com/MagicStack/asyncpg/issues/822
 
 
+def _where_equal(field: str, arg_num: int) -> str:
+    """Return the SQL condition 'field = $arg_num'.
+
+    For the 'pem' field the unique index is on md5(pem), see _init_table.
+    So also compare md5(pem) = md5($arg_num) to make the query use that index.
+    """
+    if field == "pem":
+        return "md5(" + field + ") = md5($" + str(arg_num) + ") AND " + field + " = $" + str(arg_num)
+    return field + " = $" + str(arg_num)
+
+
 class PostgresDB(DataBaseObject):
     """Class to use with Postgres DB"""
 
@@ -71,7 +82,7 @@ class PostgresDB(DataBaseObject):
     async def delete(cls, table_name: str, unique_field: str, data: Union[str, int]) -> None:
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-                query = "DELETE FROM " + table_name + " WHERE " + unique_field + " = $1"
+                query = "DELETE FROM " + table_name + " WHERE " + _where_equal(unique_field, 1)
                 await conn.execute(query, data)
 
     @classmethod
@@ -91,7 +102,7 @@ class PostgresDB(DataBaseObject):
                 for index, key in enumerate(fields):
                     query += key + " = $" + str(index + 1) + ","
                     args = args + (fields[key],)  # type: ignore
-                query = query[:-1] + " WHERE " + unique_fields[0] + " = $" + str(len(fields) + 1)
+                query = query[:-1] + " WHERE " + _where_equal(unique_fields[0], len(fields) + 1)
                 args = args + (fields[unique_fields[0]],)  # type: ignore
                 await conn.fetch(query, *args)
 
@@ -105,7 +116,7 @@ class PostgresDB(DataBaseObject):
         serial: int
         async with cls.pool.acquire() as conn:
             async with conn.transaction():
-                query = "SELECT serial from " + table_name + " WHERE " + unique_fields[0] + " = $1"
+                query = "SELECT serial from " + table_name + " WHERE " + _where_equal(unique_fields[0], 1)
                 rows = await conn.fetch(query, fields[unique_fields[0]])
                 if rows:
                     serial = rows[0][0]
@@ -164,7 +175,7 @@ class PostgresDB(DataBaseObject):
                         query = "SELECT "
                         for field in fields:
                             query += field + ","
-                        query = query[:-1] + " FROM " + table_name + " WHERE " + key + " = $1"
+                        query = query[:-1] + " FROM " + table_name + " WHERE " + _where_equal(key, 1)
                         rows = await conn.fetch(query, search[key])
                         fields_list += cls._rows_to_class_objects(rows, fields)
 
